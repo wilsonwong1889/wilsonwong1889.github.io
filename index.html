@@ -73,6 +73,38 @@
       font-weight: 600;
       margin: 18px 0 6px 0;
     }
+    /* Pizza Table Styles */
+    .pizza-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+    .pizza-table th, .pizza-table td {
+      border-bottom: 1px dotted #bbb;
+      padding: 8px 4px;
+      text-align: left;
+    }
+    .pizza-table th {
+      background: #e8e1dc;
+      color: #c0392b;
+      font-size: 1.08em;
+    }
+    .size-col {
+      text-align: center;
+      min-width: 70px;
+    }
+    .desc {
+      color: #555;
+      font-size: 0.98em;
+    }
+    .note {
+      font-size: 0.95em;
+      color: #666;
+      margin-bottom: 18px;
+    }
+    .extra-table {
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -130,71 +162,162 @@
       </ul>
     </section>
 
+    <!-- New Pizza Section Starts Here -->
     <section>
       <h2>Pizzas</h2>
-      <div class="category-group">
-        <div>
-          <div class="subheading">Coyote's House Pizza (All pizzas made fresh daily)</div>
-          <ul>
-            <li><span class="dish-name">House Special (Sm)</span><span class="price">$21.50</span></li>
-            <li><span class="dish-name">House Special (Med)</span><span class="price">$26.75</span></li>
-            <li><span class="dish-name">House Special (Lrg)</span><span class="price">$34.20</span></li>
-            <li><span class="dish-name">The Hawaiian (Sm)</span><span class="price">$17.95</span></li>
-            <li><span class="dish-name">The Hawaiian (Med)</span><span class="price">$23.50</span></li>
-            <li><span class="dish-name">The Hawaiian (Lrg)</span><span class="price">$25.60</span></li>
-            <li><span class="dish-name">The Vegetarian (Sm)</span><span class="price">$21.25</span></li>
-            <li><span class="dish-name">The Vegetarian (Med)</span><span class="price">$25.50</span></li>
-            <li><span class="dish-name">The Vegetarian (Lrg)</span><span class="price">$31.95</span></li>
-            <li><span class="dish-name">The Mexican (Sm)</span><span class="price">$23.25</span></li>
-            <li><span class="dish-name">The Mexican (Med)</span><span class="price">$26.75</span></li>
-            <li><span class="dish-name">The Mexican (Lrg)</span><span class="price">$31.95</span></li>
-          </ul>
-        </div>
-
-        <div>
-          <div class="subheading">Specialty Pizzas</div>
-          <ul>
-            <li><span class="dish-name">Meat Lovers (Sm)</span><span class="price">$23.50</span></li>
-            <li><span class="dish-name">Meat Lovers (Med)</span><span class="price">$27.75</span></li>
-            <li><span class="dish-name">Meat Lovers (Lrg)</span><span class="price">$34.25</span></li>
-            <li><span class="dish-name">Teriyaki Chicken (Sm)</span><span class="price">$23.50</span></li>
-            <li><span class="dish-name">Teriyaki Chicken (Med)</span><span class="price">$27.95</span></li>
-            <li><span class="dish-name">Teriyaki Chicken (Lrg)</span><span class="price">$34.50</span></li>
-            <li><span class="dish-name">Ginger Beef (Sm)</span><span class="price">$24.95</span></li>
-            <li><span class="dish-name">Ginger Beef (Med)</span><span class="price">$29.95</span></li>
-            <li><span class="dish-name">Ginger Beef (Lrg)</span><span class="price">$38.95</span></li>
-          </ul>
-        </div>
-
-        <div>
-          <div class="subheading">Create Your Own Pizza</div>
-          <ul>
-            <li><span class="dish-name">Cheese (Sm)</span><span class="price">$14.95</span></li>
-            <li><span class="dish-name">Cheese (Med)</span><span class="price">$17.85</span></li>
-            <li><span class="dish-name">Cheese (Lrg)</span><span class="price">$20.95</span></li>
-            <li><span class="dish-name">1 Topping (Sm)</span><span class="price">$15.95</span></li>
-            <li><span class="dish-name">1 Topping (Med)</span><span class="price">$19.95</span></li>
-            <li><span class="dish-name">1 Topping (Lrg)</span><span class="price">$23.50</span></li>
-            <li><span class="dish-name">2 Topping (Sm)</span><span class="price">$16.95</span></li>
-            <li><span class="dish-name">2 Topping (Med)</span><span class="price">$22.50</span></li>
-            <li><span class="dish-name">2 Topping (Lrg)</span><span class="price">$26.25</span></li>
-            <li><span class="dish-name">3 Topping (Sm)</span><span class="price">$18.50</span></li>
-            <li><span class="dish-name">3 Topping (Med)</span><span class="price">$23.25</span></li>
-            <li><span class="dish-name">3 Topping (Lrg)</span><span class="price">$27.65</span></li>
-            <li><span class="dish-name">4 Topping (Sm)</span><span class="price">$19.95</span></li>
-            <li><span class="dish-name">4 Topping (Med)</span><span class="price">$25.50</span></li>
-            <li><span class="dish-name">4 Topping (Lrg)</span><span class="price">$29.95</span></li>
-            <li><span class="dish-name">5 Topping (Sm)</span><span class="price">$21.50</span></li>
-            <li><span class="dish-name">5 Topping (Med)</span><span class="price">$26.75</span></li>
-            <li><span class="dish-name">5 Topping (Lrg)</span><span class="price">$31.95</span></li>
-            <li><span class="dish-name">6 Topping (Sm)</span><span class="price">$22.95</span></li>
-            <li><span class="dish-name">6 Topping (Med)</span><span class="price">$28.75</span></li>
-            <li><span class="dish-name">6 Topping (Lrg)</span><span class="price">$34.95</span></li>
-            <li><span class="dish-name">Additional Wings or Deep Fried Wontons</span><span class="price">$8.50</span></li>
-          </ul>
-        </div>
+      <div class="subheading">All our pizza is made fresh daily</div>
+      <!-- House Specialties -->
+      <h3>House Specialties</h3>
+      <table class="pizza-table">
+        <thead>
+          <tr>
+            <th>Pizza</th>
+            <th class="size-col">Small</th>
+            <th class="size-col">Medium</th>
+            <th class="size-col">Large</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>House Special</strong><br>
+              <span class="desc">Pepperoni, Ham, Shrimp, Mushrooms, Olives, Green Peppers</span></td>
+            <td>$21.50</td>
+            <td>$26.75</td>
+            <td>$34.20</td>
+          </tr>
+          <tr>
+            <td><strong>The Hawaiian</strong><br>
+              <span class="desc">Ham & Pineapple</span></td>
+            <td>$17.95</td>
+            <td>$23.50</td>
+            <td>$25.60</td>
+          </tr>
+          <tr>
+            <td><strong>The Vegetarian</strong><br>
+              <span class="desc">Mushrooms, Pineapple, Green Peppers, Olives, Onions, Tomatoes</span></td>
+            <td>$21.25</td>
+            <td>$25.50</td>
+            <td>$31.95</td>
+          </tr>
+          <tr>
+            <td><strong>The Mexican</strong><br>
+              <span class="desc">Taco Meat, Tomatoes, Green Peppers, Onions, Olives, Sour Cream</span></td>
+            <td>$23.25</td>
+            <td>$26.75</td>
+            <td>$31.95</td>
+          </tr>
+        </tbody>
+      </table>
+      <!-- Specialty Pizzas -->
+      <h3>Specialty Pizzas</h3>
+      <table class="pizza-table">
+        <thead>
+          <tr>
+            <th>Pizza</th>
+            <th class="size-col">Small</th>
+            <th class="size-col">Medium</th>
+            <th class="size-col">Large</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Meat Lovers</strong><br>
+              <span class="desc">Pepperoni, Ham, Salami, Ground Beef, Bacon</span></td>
+            <td>$23.50</td>
+            <td>$27.75</td>
+            <td>$34.25</td>
+          </tr>
+          <tr>
+            <td><strong>Teriyaki Chicken</strong><br>
+              <span class="desc">Chicken, Onions, Mushrooms, Green Peppers</span></td>
+            <td>$23.50</td>
+            <td>$27.95</td>
+            <td>$34.50</td>
+          </tr>
+          <tr>
+            <td><strong>Ginger Beef</strong><br>
+              <span class="desc">Crispy Ginger Beef, Onions, Carrots, Green Peppers</span></td>
+            <td>$24.95</td>
+            <td>$29.95</td>
+            <td>$38.95</td>
+          </tr>
+        </tbody>
+      </table>
+      <!-- Create Your Own Pizza -->
+      <h3>Create Your Own Pizza</h3>
+      <div class="note">
+        Choose from: Ham, Salami, Pepperoni, Beef, Bacon, Shrimp, Mushrooms, Green Pepper, Onion, Jalapeno, Pepper, Tomato, Pineapple, Olives, Cheddar Cheese
       </div>
+      <table class="pizza-table">
+        <thead>
+          <tr>
+            <th>Cheese & Toppings</th>
+            <th class="size-col">Small</th>
+            <th class="size-col">Medium</th>
+            <th class="size-col">Large</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cheese</td>
+            <td>$14.95</td>
+            <td>$17.85</td>
+            <td>$20.95</td>
+          </tr>
+          <tr>
+            <td>1 Topping</td>
+            <td>$15.95</td>
+            <td>$19.95</td>
+            <td>$23.50</td>
+          </tr>
+          <tr>
+            <td>2 Toppings</td>
+            <td>$16.95</td>
+            <td>$22.50</td>
+            <td>$26.25</td>
+          </tr>
+          <tr>
+            <td>3 Toppings</td>
+            <td>$18.50</td>
+            <td>$23.25</td>
+            <td>$27.65</td>
+          </tr>
+          <tr>
+            <td>4 Toppings</td>
+            <td>$19.95</td>
+            <td>$25.50</td>
+            <td>$29.95</td>
+          </tr>
+          <tr>
+            <td>5 Toppings</td>
+            <td>$21.50</td>
+            <td>$26.75</td>
+            <td>$31.95</td>
+          </tr>
+          <tr>
+            <td>6 Toppings</td>
+            <td>$22.95</td>
+            <td>$28.75</td>
+            <td>$34.95</td>
+          </tr>
+        </tbody>
+      </table>
+      <table class="pizza-table extra-table">
+        <thead>
+          <tr>
+            <th>Extras</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Additional Wings or Deep Fried Wontons</td>
+            <td>$8.50</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
+    <!-- End Pizza Section -->
 
     <section>
       <h2>Beverages</h2>
