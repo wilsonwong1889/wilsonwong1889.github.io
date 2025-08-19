@@ -2,536 +2,119 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Coyote Grill & Wok Menu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Portfolio</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
       margin: 0;
-      background: #faf8f5;
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      background: #f9f9f9;
       color: #333;
     }
     header {
-      background: #c0392b;
+      background: #333;
       color: #fff;
-      padding: 30px 0 10px 0;
+      padding: 1rem 2rem;
       text-align: center;
     }
-    main {
-      max-width: 900px;
-      margin: 40px auto;
-      padding: 0 16px;
+    nav {
+      margin-top: 10px;
+    }
+    nav a {
+      color: #fff;
+      text-decoration: none;
+      margin: 0 15px;
+    }
+    nav a:hover {
+      text-decoration: underline;
     }
     section {
-      margin-bottom: 32px;
+      padding: 2rem;
+      max-width: 900px;
+      margin: auto;
     }
     h2 {
-      border-bottom: 2px solid #c0392b;
-      margin-bottom: 10px;
-      padding-bottom: 5px;
+      margin-top: 0;
+      color: #444;
     }
-    ul {
-      list-style: none;
-      padding: 0;
+    .projects {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
     }
-    li {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px dotted #bbb;
-    }
-    .dish-name {
-      font-weight: bold;
-    }
-    .price {
-      color: #c0392b;
-      min-width: 90px;
-      text-align: right;
-    }
-    .category-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 40px;
-    }
-    @media (max-width: 1000px) {
-      .category-group {
-        flex-direction: column;
-        gap: 0;
-      }
-      main {
-        max-width: 99vw;
-      }
+    .card {
+      background: #fff;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     footer {
       text-align: center;
-      padding: 16px;
-      background: #eee;
-      margin-top: 40px;
-      font-size: 0.9em;
-    }
-    .subheading {
-      font-size: 1.05em;
-      font-weight: 600;
-      margin: 18px 0 6px 0;
-    }
-    /* Pizza Table Styles */
-    .pizza-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 16px;
-    }
-    .pizza-table th, .pizza-table td {
-      border-bottom: 1px dotted #bbb;
-      padding: 8px 4px;
-      text-align: left;
-    }
-    .pizza-table th {
-      background: #e8e1dc;
-      color: #c0392b;
-      font-size: 1.08em;
-    }
-    .size-col {
-      text-align: center;
-      min-width: 70px;
-    }
-    .desc {
-      color: #555;
-      font-size: 0.98em;
-    }
-    .note {
-      font-size: 0.95em;
-      color: #666;
-      margin-bottom: 18px;
-    }
-    .extra-table {
-      margin-top: 10px;
+      padding: 1rem;
+      background: #333;
+      color: #fff;
+      margin-top: 2rem;
     }
   </style>
 </head>
 <body>
+
   <header>
-    <h1>Coyote Grill & Wok Menu</h1>
-    <p>201 51 Avenue Coalhurst, AB &bull; 403-328-6010</p>
-    <p>Owned by Kevin Wong</p>
-    <p>Follow us: <strong>@CoyotesGrillandWok</strong> (Facebook &amp; Instagram)</p>
-    <p>Tue-Fri: 11am-9pm &bull; Sat-Sun: 4pm-9pm &bull; Closed Mondays & Holidays</p>
+    <h1>My Portfolio</h1>
+    <p>Computer Science Student | Aspiring Developer</p>
+    <nav>
+      <a href="#about">About</a>
+      <a href="#projects">Projects</a>
+      <a href="#skills">Skills</a>
+      <a href="#contact">Contact</a>
+    </nav>
   </header>
-  <main>
 
-<section>
-  <h2>Appetizers</h2>
-  <ul>
-    <li><span class="dish-name">Spring Roll (2)</span><span class="price">$5.85</span></li>
-    <li><span class="dish-name">Onion Rings</span><span class="price">$9.95</span></li>
-    <li><span class="dish-name">BBQ Pork</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Deep Fried Ribs</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Deep Fried Chicken Wings</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Deep Fried Wontons</span><span class="price">$13.85</span></li>
-    <li><span class="dish-name">Pork Dumplings</span><span class="price">$14.95</span></li>
-  </ul>
-</section>
-    
-    <section>
-      <h2>Soup &amp; Salads</h2>
-      <ul>
-<li>
-  <span class="dish-name">Tossed Salad</span>
-  <span class="price">Small $8.50 &nbsp;|&nbsp; Large $10.95</span>
-</li>
-<li>
-  <span class="dish-name">Caesar Salad</span>
-  <span class="price">Small $10.55 &nbsp;|&nbsp; Large $12.95</span>
-</li>
-        <li><span class="dish-name">Grilled Chicken Caesar Salad</span><span class="price">$14.55</span></li>
-        <li><span class="dish-name">Shrimp Tossed Salad</span><span class="price">$15.95</span></li>
-      </ul>
+  <section id="about">
+    <h2>About Me</h2>
+    <p>Hello! I’m [Your Name], a passionate developer who enjoys building simple and creative web applications. I love learning new technologies and turning ideas into reality.</p>
+  </section>
 
-    <li>
-      <span class="dish-name">Wonton Soup</span>
-      <span class="price">Small $6.95 &nbsp;|&nbsp; Large $12.75</span>
-    </li>
-    <li>
-      <span class="dish-name">Wonton Noodle Soup</span>
-      <span class="price">Large $13.25</span>
-    </li>
-    <li>
-      <span class="dish-name">BBQ Pork Noodle Soup</span>
-      <span class="price">Large $11.25</span>
-    </li>
-    <li>
-      <span class="dish-name">Wor Wonton Soup (min. for one per)</span>
-      <span class="price">$18.25</span>
-    </li>
-    <li>
-      <span class="dish-name">Wonton Wor Maim</span>
-      <span class="price">Large $18.25</span>
-    </li>
-  </ul>
-</section>
-
-    
-
-    <section>
-      <h2>Entrées</h2>
-      <ul>
-        <li><span class="dish-name">Chicken Fingers & Fries</span><span class="price">$15.99</span></li>
-        <li><span class="dish-name">Fish & Chips</span><span class="price">$16.95</span></li>
-        <li><span class="dish-name">Veal Cutlet</span><span class="price">$16.95</span></li>
-        <li><span class="dish-name">8 oz. New York Steak</span><span class="price">$27.95</span></li>
-        <li><span class="dish-name">10 oz. New York Steak</span><span class="price">$30.95</span></li>
-      </ul>
-    </section>
-
-
-
-    <section>
-      <h2>Burgers &amp; Sandwiches</h2>
-      <div class="subheading">Served with Fries, Salad or Soup</div>
-      <ul>
-        <li><span class="dish-name">Hamburger</span><span class="price">$13.95</span></li>
-        <li><span class="dish-name">Cheese Burger</span><span class="price">$14.55</span></li>
-        <li><span class="dish-name">Great Canadian Burger</span><span class="price">$15.95</span></li>
-        <li><span class="dish-name">Double Burger</span><span class="price">$16.95</span></li>
-        <li><span class="dish-name">Chicken Burger</span><span class="price">$15.95</span></li>
-        <li><span class="dish-name">Chicken Club Sandwich</span><span class="price">$16.95</span></li>
-        <li><span class="dish-name">Cold Turkey or Ham</span><span class="price">$11.95</span></li>
-        <li><span class="dish-name">Grilled Cheese</span><span class="price">$11.50</span></li>
-        <li><span class="dish-name">Grilled Ham & Cheese</span><span class="price">$11.75</span></li>
-        <li><span class="dish-name">Denver Sandwich</span><span class="price">$11.75</span></li>
-        <li><span class="dish-name">Club House</span><span class="price">$13.90</span></li>
-        <li><span class="dish-name">Bacon, Lettuce, Tomato</span><span class="price">$12.50</span></li>
-        <li><span class="dish-name">Poutine</span><span class="price">$9.55</span></li>
-        <li><span class="dish-name">French Fries</span><span class="price">$7.45</span></li>
-        <li><span class="dish-name">Side of Gravy</span><span class="price">$2.05</span></li>
-      </ul>
-    </section>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-    <!-- New Pizza Section Starts Here -->
-    <section>
-      <h2>Pizzas</h2>
-      <div class="subheading">All our pizza is made fresh daily</div>
-      <!-- House Specialties -->
-      <h3>House Specialties</h3>
-      <table class="pizza-table">
-        <thead>
-          <tr>
-            <th>Pizza</th>
-            <th class="size-col">Small</th>
-            <th class="size-col">Medium</th>
-            <th class="size-col">Large</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>House Special</strong><br>
-              <span class="desc">Pepperoni, Ham, Shrimp, Mushrooms, Olives, Green Peppers</span></td>
-            <td>$21.50</td>
-            <td>$26.75</td>
-            <td>$34.20</td>
-          </tr>
-          <tr>
-            <td><strong>The Hawaiian</strong><br>
-              <span class="desc">Ham & Pineapple</span></td>
-            <td>$17.95</td>
-            <td>$23.50</td>
-            <td>$25.60</td>
-          </tr>
-          <tr>
-            <td><strong>The Vegetarian</strong><br>
-              <span class="desc">Mushrooms, Pineapple, Green Peppers, Olives, Onions, Tomatoes</span></td>
-            <td>$21.25</td>
-            <td>$25.50</td>
-            <td>$31.95</td>
-          </tr>
-          <tr>
-            <td><strong>The Mexican</strong><br>
-              <span class="desc">Taco Meat, Tomatoes, Green Peppers, Onions, Olives, Sour Cream</span></td>
-            <td>$23.25</td>
-            <td>$26.75</td>
-            <td>$31.95</td>
-          </tr>
-        </tbody>
-      </table>
-      <!-- Specialty Pizzas -->
-      <h3>Specialty Pizzas</h3>
-      <table class="pizza-table">
-        <thead>
-          <tr>
-            <th>Pizza</th>
-            <th class="size-col">Small</th>
-            <th class="size-col">Medium</th>
-            <th class="size-col">Large</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>Meat Lovers</strong><br>
-              <span class="desc">Pepperoni, Ham, Salami, Ground Beef, Bacon</span></td>
-            <td>$23.50</td>
-            <td>$27.75</td>
-            <td>$34.25</td>
-          </tr>
-          <tr>
-            <td><strong>Teriyaki Chicken</strong><br>
-              <span class="desc">Chicken, Onions, Mushrooms, Green Peppers</span></td>
-            <td>$23.50</td>
-            <td>$27.95</td>
-            <td>$34.50</td>
-          </tr>
-          <tr>
-            <td><strong>Ginger Beef</strong><br>
-              <span class="desc">Crispy Ginger Beef, Onions, Carrots, Green Peppers</span></td>
-            <td>$24.95</td>
-            <td>$29.95</td>
-            <td>$38.95</td>
-          </tr>
-        </tbody>
-      </table>
-      <!-- Create Your Own Pizza -->
-      <h3>Create Your Own Pizza</h3>
-      <div class="note">
-        Choose from: Ham, Salami, Pepperoni, Beef, Bacon, Shrimp, Mushrooms, Green Pepper, Onion, Jalapeno, Pepper, Tomato, Pineapple, Olives, Cheddar Cheese
+  <section id="projects">
+    <h2>Projects</h2>
+    <div class="projects">
+      <div class="card">
+        <h3>Project One</h3>
+        <p>A short description of your project. <a href="#">View Project</a></p>
       </div>
-      <table class="pizza-table">
-        <thead>
-          <tr>
-            <th>Cheese & Toppings</th>
-            <th class="size-col">Small</th>
-            <th class="size-col">Medium</th>
-            <th class="size-col">Large</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Cheese</td>
-            <td>$14.95</td>
-            <td>$17.85</td>
-            <td>$20.95</td>
-          </tr>
-          <tr>
-            <td>1 Topping</td>
-            <td>$15.95</td>
-            <td>$19.95</td>
-            <td>$23.50</td>
-          </tr>
-          <tr>
-            <td>2 Toppings</td>
-            <td>$16.95</td>
-            <td>$22.50</td>
-            <td>$26.25</td>
-          </tr>
-          <tr>
-            <td>3 Toppings</td>
-            <td>$18.50</td>
-            <td>$23.25</td>
-            <td>$27.65</td>
-          </tr>
-          <tr>
-            <td>4 Toppings</td>
-            <td>$19.95</td>
-            <td>$25.50</td>
-            <td>$29.95</td>
-          </tr>
-          <tr>
-            <td>5 Toppings</td>
-            <td>$21.50</td>
-            <td>$26.75</td>
-            <td>$31.95</td>
-          </tr>
-          <tr>
-            <td>6 Toppings</td>
-            <td>$22.95</td>
-            <td>$28.75</td>
-            <td>$34.95</td>
-          </tr>
-        </tbody>
-      </table>
-      <table class="pizza-table extra-table">
-        <thead>
-          <tr>
-            <th>Extras</th>
-            <th>Price</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Additional Wings or Deep Fried Wontons</td>
-            <td>$8.50</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-    <!-- End Pizza Section -->
+      <div class="card">
+        <h3>Project Two</h3>
+        <p>A short description of your project. <a href="#">View Project</a></p>
+      </div>
+      <div class="card">
+        <h3>Project Three</h3>
+        <p>A short description of your project. <a href="#">View Project</a></p>
+      </div>
+    </div>
+  </section>
 
+  <section id="skills">
+    <h2>Skills</h2>
+    <ul>
+      <li>HTML, CSS, JavaScript</li>
+      <li>Python & C++</li>
+      <li>SQL & Databases</li>
+      <li>Problem-Solving & Debugging</li>
+    </ul>
+  </section>
 
-<section>
-  <h2>Rice</h2>
-  <ul>
-    <li><span class="dish-name">Chicken Fried Rice</span><span class="price">$14.95</span></li>
-    <li><span class="dish-name">BBQ Pork Fried Rice</span><span class="price">$14.95</span></li>
-    <li><span class="dish-name">Special Fried Rice</span><span class="price">$15.95</span></li>
-    <li><span class="dish-name">Vegetable Fried Rice</span><span class="price">$13.95</span></li>
-    <li><span class="dish-name">Shrimp Fried Rice</span><span class="price">$15.95</span></li>
-    <li><span class="dish-name">Onion Fried Rice</span><span class="price">$13.95</span></li>
-    <li><span class="dish-name">Bacon Fried Rice</span><span class="price">$14.95</span></li>
-    <li><span class="dish-name">Plain Fried Rice</span><span class="price">$12.95</span></li>
-    <li><span class="dish-name">Steamed Rice</span><span class="price">$4.25</span></li>
-  </ul>
-</section>
+  <section id="contact">
+    <h2>Contact</h2>
+    <p>If you’d like to work together or have any questions, feel free to reach out!</p>
+    <p>Email: <a href="mailto:your.email@example.com">your.email@example.com</a></p>
+    <p>LinkedIn: <a href="#">linkedin.com/in/yourprofile</a></p>
+    <p>GitHub: <a href="#">github.com/yourusername</a></p>
+  </section>
 
-<section>
-  <h2>Chow Mein</h2>
-  <ul>
-    <li><span class="dish-name">Regular Chow Mein</span><span class="price">$13.85</span></li>
-    <li><span class="dish-name">Mixed Vegetable Chow Mein</span><span class="price">$16.95</span></li>
-    <li><span class="dish-name">Chow Mein</span><span class="price">$19.25</span></li>
-    <li><span class="dish-name">Chef Chow Mein</span><span class="price">$18.75</span></li>
-    <li><span class="dish-name">Special Shrimp Chow Mein</span><span class="price">$19.95</span></li>
-    <li><span class="dish-name">Special Beef Chow Mein</span><span class="price">$18.75</span></li>
-    <li><span class="dish-name">Special Chicken Chow Mein</span><span class="price">$18.75</span></li>
-    <li><span class="dish-name">Special Shrimp Squid & Chicken Chow Mein</span><span class="price">$21.35</span></li>
-    <li><span class="dish-name">Special Chicken or Beef Green Pepper & Black Bean Chow Mein</span><span class="price">$18.75</span></li>
-    <li><span class="dish-name">Shanghai Chow Mein</span><span class="price">$17.55</span></li>
-  </ul>
-</section>
-
-<section>
-  <h2>Chow Funn / Rice Sticks</h2>
-  <ul>
-    <li><span class="dish-name">Beef Dry Chow Funn</span><span class="price">$18.95</span></li>
-    <li><span class="dish-name">Beef & Green Pepper</span><span class="price">$18.95</span></li>
-    <li><span class="dish-name">Black Bean Chow Funn</span><span class="price">$18.95</span></li>
-    <li><span class="dish-name">Satay Beef Chow Funn</span><span class="price">$18.95</span></li>
-    <li><span class="dish-name">Singapore Fried Rice Stick (with a touch of curry)</span><span class="price">$18.95</span></li>
-  </ul>
-</section>
-
-<section>
-  <h2>Chop Suey & Beef</h2>
-  <ul>
-    <li><span class="dish-name">Vegetable Chop Suey</span><span class="price">$15.25</span></li>
-    <li><span class="dish-name">Special Chop Suey</span><span class="price">$18.15</span></li>
-    <li><span class="dish-name">Beef Chop Suey</span><span class="price">$17.95</span></li>
-    <li><span class="dish-name">Beef with Broccoli</span><span class="price">$17.50</span></li>
-    <li><span class="dish-name">Beef Mushroom Broccoli</span><span class="price">$17.95</span></li>
-    <li><span class="dish-name">Beef with Black Pepper Sauce</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Beef with Black Bean Sauce</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Ginger Beef</span><span class="price">$19.25</span></li>
-    <li><span class="dish-name">Beef with Mushrooms</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Szechuan Beef</span><span class="price">$18.75</span></li>
-    <li><span class="dish-name">Beef with Curry</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Beef Tomato</span><span class="price">$18.25</span></li>
-  </ul>
-</section>
-
-<section>
-  <h2>Chicken & Pork</h2>
-  <ul>
-    <li><span class="dish-name">Chicken Balls w/ Pineapple Sauce</span><span class="price">$17.60</span></li>
-    <li><span class="dish-name">Chicken Balls w/ Sweet & Sour Sauce</span><span class="price">$17.60</span></li>
-    <li><span class="dish-name">Lemon Chicken Filet</span><span class="price">$18.50</span></li>
-    <li><span class="dish-name">Sliced Chicken with Curry</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Diced Chicken with Cashew Nuts</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Chicken Chop Suey</span><span class="price">$16.95</span></li>
-    <li><span class="dish-name">Ginger Chicken</span><span class="price">$19.25</span></li>
-    <li><span class="dish-name">Chicken Wings</span><span class="price">$17.55</span></li>
-    <li><span class="dish-name">BBQ Pork</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Sweet & Sour Pork</span><span class="price">$18.25</span></li>
-    <li><span class="dish-name">Pork Dumplings</span><span class="price">$14.95</span></li>
-    <li><span class="dish-name">Dry Garlic Ribs</span><span class="price">$18.25</span></li>
-  </ul>
-</section>
-
-<section>
-  <h2>Foo Yong</h2>
-  <ul>
-    <li><span class="dish-name">Chicken Foo Yong</span><span class="price">$15.95</span></li>
-    <li><span class="dish-name">BBQ Pork Foo Yong</span><span class="price">$15.95</span></li>
-    <li><span class="dish-name">Shrimp Foo Yong</span><span class="price">$16.95</span></li>
-    <li><span class="dish-name">Special Foo Yong</span><span class="price">$16.95</span></li>
-    <li><span class="dish-name">Mushroom Foo Yong</span><span class="price">$15.95</span></li>
-  </ul>
-</section>
-
-<section>
-  <h2>Seafood</h2>
-  <ul>
-    <li><span class="dish-name">Deep Fried Shrimp</span><span class="price">$19.50</span></li>
-    <li><span class="dish-name">Shrimp Chop Suey</span><span class="price">$20.25</span></li>
-    <li><span class="dish-name">Shrimp with Green Pepper & Black Bean Sauce</span><span class="price">$20.25</span></li>
-    <li><span class="dish-name">Shrimp with Curry</span><span class="price">$20.25</span></li>
-    <li><span class="dish-name">Chili Tomato Shrimp</span><span class="price">$23.50</span></li>
-    <li><span class="dish-name">Salt & Pepper Shrimp</span><span class="price">$25.50</span></li>
-    <li><span class="dish-name">Salt & Pepper Squid</span><span class="price">$21.35</span></li>
-    <li><span class="dish-name">Salt & Pepper Shrimp & Squid</span><span class="price">$26.95</span></li>
-    <li><span class="dish-name">Fried Chrysanthemum Fish w/Sweet & Sour Sauce (Pre-Order)</span><span class="price">$27.75</span></li>
-  </ul>
-</section>
-
-<section>
-  <h2>Bean Cake</h2>
-  <ul>
-    <li><span class="dish-name">Bean Cake with Minced Beef (Hot)</span><span class="price">$16.95</span></li>
-    <li><span class="dish-name">Bean Cake with Sliced Beef</span><span class="price">$16.95</span></li>
-    <li><span class="dish-name">Bean Cake with Tomatoes</span><span class="price">$16.95</span></li>
-  </ul>
-</section>
-
-<section>
-  <h2>Duck / Chicken</h2>
-  <ul>
-    <li><span class="dish-name">BBQ Duck (Half)</span><span class="price">$20.95</span></li>
-    <li><span class="dish-name">BBQ Duck (Whole)</span><span class="price">$39.95</span></li>
-    <li><span class="dish-name">Deep Fried Chicken (Half)</span><span class="price">$19.25</span></li>
-    <li><span class="dish-name">Crispy Chicken (Whole)</span><span class="price">$36.50</span></li>
-  </ul>
-</section>
-
-<section>
-  <h2>Sauce</h2>
-  <ul>
-    <li><span class="dish-name">Sweet & Sour Sauce</span><span class="price">$2.05/$3.95/$6.25</span></li>
-    <li><span class="dish-name">Ginger Beef Sauce</span><span class="price">$2.15/$4.25/$6.25</span></li>
-    <li><span class="dish-name">Black Bean Sauce</span><span class="price">$4.25</span></li>
-  </ul>
-</section>
-    
-    <section>
-      <h2>Beverages</h2>
-      <ul>
-        <li><span class="dish-name">Coffee (free refills)</span><span class="price">$3.25</span></li>
-        <li><span class="dish-name">Tea</span><span class="price">$3.50</span></li>
-        <li><span class="dish-name">Hot Chocolate</span><span class="price">$4.25</span></li>
-        <li><span class="dish-name">Juice</span><span class="price">$4.25</span></li>
-        <li><span class="dish-name">Milk (Small)</span><span class="price">$3.75</span></li>
-        <li><span class="dish-name">Milk (Large)</span><span class="price">$5.85</span></li>
-        <li><span class="dish-name">Chocolate Milk (Small)</span><span class="price">$3.75</span></li>
-        <li><span class="dish-name">Chocolate Milk (Large)</span><span class="price">$5.85</span></li>
-        <li><span class="dish-name">Ice Tea</span><span class="price">$3.75</span></li>
-        <li><span class="dish-name">Pop (free refills)</span><span class="price">$3.75</span></li>
-        <li><span class="dish-name">Canned Pop</span><span class="price">$2.65</span></li>
-      </ul>
-    </section>
-  </main>
   <footer>
-    <p>&copy; 2025 Coyote Grill &amp; Wok. All prices are in Canadian dollars. Menu items and prices may vary.</p>
+    <p>© 2025 Your Name | Built with ❤️</p>
   </footer>
+
 </body>
 </html>
