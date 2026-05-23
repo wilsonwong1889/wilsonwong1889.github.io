@@ -40,6 +40,7 @@ body {
   font-family: "Inter", "Avenir Next", "Segoe UI", sans-serif;
   color: var(--ink);
   background: var(--bg);
+  overflow-x: clip;
 }
 
 button,
@@ -10441,5 +10442,112 @@ button.avail-cal-day:focus-visible {
 
   body[data-page] .site-header-brand-row {
     padding: 8px 12px;
+  }
+
+  /* Tighter frame padding on small phones */
+  .site-frame {
+    padding: 12px 10px 24px;
+  }
+
+  /* Cards, panels: smaller padding */
+  .site-header,
+  .hero-card,
+  .panel,
+  .status-chip,
+  .signal-panel,
+  .booking-checkout-shell,
+  .booking-checkout-panel,
+  .booking-checkout-summary,
+  .reserve-booking-sidebar,
+  .reserve-studio-shell,
+  .admin-bookings-shell,
+  .admin-bookings-results-shell,
+  .admin-room-calendar-shell,
+  .admin-account-detail,
+  .admin-command-center {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  /* Booking card: stack media above content */
+  .booking-card-main {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-card-media {
+    width: 100%;
+    height: 160px;
+  }
+
+  /* Reserve summary lines: allow wrap, smaller text */
+  .reserve-price-line,
+  .reserve-price-total {
+    flex-wrap: wrap;
+    font-size: 0.92rem;
+  }
+
+  /* Admin: tighter dashboard spacing */
+  .admin-page-shell {
+    padding: 12px;
+  }
+
+  .admin-dashboard-copy h1 {
+    font-size: clamp(1.8rem, 7vw, 2.4rem);
+  }
+
+  .admin-kpi-card {
+    padding: 14px;
+    min-height: auto;
+  }
+
+  /* Admin tab buttons: smaller text on phones */
+  .admin-tab-switcher button,
+  .admin-subpage-switcher button {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  /* Long content in cards shouldn't push width */
+  .admin-booking-record,
+  .admin-account-detail,
+  .admin-detail-field,
+  .booking-card-copy,
+  .reserve-summary-context,
+  .home-staff-card-body {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Admin promo / test case headers: stack */
+  .admin-promo-card-header,
+  .admin-test-case-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Forms: full-width inputs */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  textarea,
+  select {
+    max-width: 100%;
+  }
+
+  /* Reserve calendar: smaller cells */
+  .reserve-calendar-grid .calendar-cell {
+    min-height: 46px;
+    padding: 4px;
+  }
+
+  /* Booking detail / room detail headers shrink */
+  .reserve-studio-copy h1,
+  .rooms-catalog-header h1,
+  .booking-checkout-header-copy h1 {
+    font-size: clamp(1.9rem, 8vw, 2.6rem);
   }
 }
