@@ -8147,6 +8147,21 @@ body[data-page] .site-acknowledgement {
   body[data-page] .site-acknowledgement {
     width: calc(100% - 28px);
   }
+
+  .studio-footer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+  }
+
+  .studio-footer-brand {
+    grid-column: 1 / -1;
+  }
+
+  .studio-footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
 }
 
 /* Design system component lock: shared red/navy/white controls and surfaces. */
@@ -10549,5 +10564,23 @@ button.avail-cal-day:focus-visible {
   .rooms-catalog-header h1,
   .booking-checkout-header-copy h1 {
     font-size: clamp(1.9rem, 8vw, 2.6rem);
+  }
+
+  /* Footer: stack to single column on tiny phones */
+  .studio-footer-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .studio-footer-brand {
+    grid-column: auto;
+  }
+
+  body[data-page] .studio-footer,
+  body[data-page] .studio-footer.studio-footer-compact,
+  body[data-page] .site-acknowledgement {
+    width: calc(100% - 16px);
+    padding-left: 18px;
+    padding-right: 18px;
   }
 }
