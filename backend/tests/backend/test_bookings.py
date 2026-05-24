@@ -26,7 +26,7 @@ class BookingTest(BaseAppTest):
                 description="Room used for booking smoke tests",
                 capacity=3,
                 photos=[],
-                hourly_rate_cents=5000,
+                hourly_rate_cents=10000,
                 max_booking_duration_minutes=120,
             )
             db.add(room)
@@ -128,7 +128,7 @@ class BookingTest(BaseAppTest):
         self.assertEqual(resp.status_code, 201)
         booking = resp.json()
         self.assertEqual(booking["status"], "PendingPayment")
-        self.assertEqual(booking["price_cents"], 10500)
+        self.assertEqual(booking["price_cents"], self._room_price(10000, 60))
         self.assertTrue(booking["payment_intent_id"].startswith("pi_"))
         self.assertTrue(booking["booking_code"])
         self.assertEqual(booking["note"], "Podcast intro and guest setup")
@@ -205,7 +205,7 @@ class BookingTest(BaseAppTest):
         )
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.json()["duration_minutes"], 120)
-        self.assertEqual(resp.json()["price_cents"], 21000)
+        self.assertEqual(resp.json()["price_cents"], self._room_price(10000, 120))
 
         resp = self.client.post(
             "/api/bookings",
@@ -241,7 +241,7 @@ class BookingTest(BaseAppTest):
                 description="Room used for guest booking smoke tests",
                 capacity=2,
                 photos=[],
-                hourly_rate_cents=4500,
+                hourly_rate_cents=10000,
                 max_booking_duration_minutes=180,
             )
             db.add(room)
@@ -265,7 +265,7 @@ class BookingTest(BaseAppTest):
         payload = resp.json()
         self.assertTrue(payload["access_token"])
         self.assertEqual(payload["booking"]["status"], "PendingPayment")
-        self.assertEqual(payload["booking"]["price_cents"], 10500)
+        self.assertEqual(payload["booking"]["price_cents"], self._room_price(10000, 60))
 
         guest_headers = {"Authorization": f"Bearer {payload['access_token']}"}
         resp = self.client.get(f"/api/bookings/{payload['booking']['id']}", headers=guest_headers)

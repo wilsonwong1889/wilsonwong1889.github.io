@@ -149,7 +149,7 @@ class BookingPaymentE2ETest(unittest.TestCase):
                         "add_on_price_cents": 3500,
                     }
                 ],
-                hourly_rate_cents=5000,
+                hourly_rate_cents=10000,
             )
             db.add(room)
             db.commit()

@@ -92,9 +92,12 @@ class StaffTest(BaseAppTest):
         self.assertTrue(payload["access_token"])
         self.assertEqual(payload["booking"]["status"], "PendingPayment")
         self.assertEqual(payload["booking"]["service_type"], "Podcast support")
-        self.assertEqual(payload["booking"]["original_price_cents"], 6500)
-        self.assertEqual(payload["booking"]["discount_cents"], 3900)
-        self.assertEqual(payload["booking"]["price_cents"], 2600)
+        staff_rate, promo_pct = 6500, 60
+        expected_original = self._staff_price(staff_rate, 60)
+        expected_discount = expected_original * promo_pct // 100
+        self.assertEqual(payload["booking"]["original_price_cents"], expected_original)
+        self.assertEqual(payload["booking"]["discount_cents"], expected_discount)
+        self.assertEqual(payload["booking"]["price_cents"], expected_original - expected_discount)
         self.assertEqual(payload["booking"]["promo_code"], "SUMMER60")
         self.assertEqual(payload["booking"]["staff_profile"]["name"], "Podcast Engineer")
 

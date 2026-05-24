@@ -105,7 +105,7 @@ class PaymentTest(BaseAppTest):
                 description="Room used for webhook and admin tests",
                 capacity=5,
                 photos=[],
-                hourly_rate_cents=5000,
+                hourly_rate_cents=10000,
             )
             admin_room = Room(
                 name="Admin Unlimited Room",
@@ -385,7 +385,7 @@ class PaymentTest(BaseAppTest):
         room_summary = next(s for s in analytics["room_summaries"] if s["room_id"] == room_id)
         self.assertEqual(room_summary["total_bookings"], 3)
         self.assertGreaterEqual(room_summary["paid_bookings"], 2)
-        self.assertEqual(room_summary["revenue_cents"], 31500)
+        self.assertEqual(room_summary["revenue_cents"], 3 * self._room_price(10000, 60))
 
         resp = self.client.get("/api/admin/activity?limit=10", headers=admin_headers)
         self.assertEqual(resp.status_code, 200)

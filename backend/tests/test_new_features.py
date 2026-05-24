@@ -187,7 +187,7 @@ class NewFeaturesSmokeTest(unittest.TestCase):
             type(self)._cached_admin_token = resp.json()["access_token"]
         return type(self)._cached_admin_token
 
-    def _create_room(self, token: str, name: str = "Test Room", rate_cents: int = 5000) -> dict:
+    def _create_room(self, token: str, name: str = "Test Room", rate_cents: int = 10000) -> dict:
         resp = self.client.post(
             "/api/rooms",
             json={
@@ -432,7 +432,7 @@ class NewFeaturesSmokeTest(unittest.TestCase):
 
     def test_40_booking_room_stores_tax_cents(self) -> None:
         admin_token = self._admin_token()
-        room = self._create_room(admin_token, name=f"GST Room {uuid4().hex[:4]}", rate_cents=5000)
+        room = self._create_room(admin_token, name=f"GST Room {uuid4().hex[:4]}", rate_cents=10000)
         room_id = room["id"]
 
         email = f"gst-booker-{uuid4().hex[:6]}@example.com"
@@ -465,7 +465,7 @@ class NewFeaturesSmokeTest(unittest.TestCase):
 
     def test_41_booking_price_cents_equals_subtotal_plus_tax(self) -> None:
         admin_token = self._admin_token()
-        room = self._create_room(admin_token, name=f"Tax Check Room {uuid4().hex[:4]}", rate_cents=6000)
+        room = self._create_room(admin_token, name=f"Tax Check Room {uuid4().hex[:4]}", rate_cents=10000)
 
         email = f"tax-check-{uuid4().hex[:6]}@example.com"
         token = self._register_and_login(email)
@@ -514,7 +514,7 @@ class NewFeaturesSmokeTest(unittest.TestCase):
                 "description": "Room with staff",
                 "capacity": 3,
                 "photos": [],
-                "hourly_rate_cents": 5000,
+                "hourly_rate_cents": 10000,
                 "max_booking_duration_minutes": 300,
                 "staff_roles": [{"id": staff_id, "name": "Staff GST", "add_on_price_cents": 3000}],
             },

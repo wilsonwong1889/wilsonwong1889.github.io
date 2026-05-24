@@ -152,3 +152,14 @@ class BaseAppTest(unittest.TestCase):
             second,
             tzinfo=business_timezone,
         )
+
+    @staticmethod
+    def _room_price(hourly_rate_cents: int, duration_minutes: int) -> int:
+        from math import floor
+        subtotal = floor(hourly_rate_cents * duration_minutes / 60)
+        return subtotal + floor(subtotal * 0.05)
+
+    @staticmethod
+    def _staff_price(booking_rate_cents: int, duration_minutes: int) -> int:
+        from math import floor
+        return floor(booking_rate_cents * duration_minutes / 60)

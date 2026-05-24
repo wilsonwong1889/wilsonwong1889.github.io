@@ -40,6 +40,7 @@ body {
   font-family: "Inter", "Avenir Next", "Segoe UI", sans-serif;
   color: var(--ink);
   background: var(--bg);
+  overflow-x: clip;
 }
 
 button,
@@ -8146,6 +8147,21 @@ body[data-page] .site-acknowledgement {
   body[data-page] .site-acknowledgement {
     width: calc(100% - 28px);
   }
+
+  .studio-footer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+  }
+
+  .studio-footer-brand {
+    grid-column: 1 / -1;
+  }
+
+  .studio-footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
 }
 
 /* Design system component lock: shared red/navy/white controls and surfaces. */
@@ -9235,6 +9251,59 @@ body[data-page="account"] #account-profile-panel {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--brand-red);
+}
+.community-image-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.community-image-card,
+.community-program-image {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(24,33,39,0.1);
+  border-radius: 12px;
+  background: rgba(248,250,253,0.82);
+}
+.community-image-card img,
+.community-program-image img {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+}
+.community-image-card img {
+  aspect-ratio: 16 / 10;
+}
+.community-program-image {
+  margin-bottom: 0.4rem;
+}
+.community-program-image img {
+  aspect-ratio: 16 / 7;
+}
+.community-image-card figcaption {
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px 16px;
+}
+.community-image-card figcaption strong {
+  color: var(--ink);
+  font-size: 0.96rem;
+}
+.community-image-card figcaption span {
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.55;
+  opacity: 0.72;
+}
+@media (max-width: 980px) {
+  .community-image-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .community-image-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Home page brand mark — hub title + collab lockup */
@@ -10388,5 +10457,130 @@ button.avail-cal-day:focus-visible {
 
   body[data-page] .site-header-brand-row {
     padding: 8px 12px;
+  }
+
+  /* Tighter frame padding on small phones */
+  .site-frame {
+    padding: 12px 10px 24px;
+  }
+
+  /* Cards, panels: smaller padding */
+  .site-header,
+  .hero-card,
+  .panel,
+  .status-chip,
+  .signal-panel,
+  .booking-checkout-shell,
+  .booking-checkout-panel,
+  .booking-checkout-summary,
+  .reserve-booking-sidebar,
+  .reserve-studio-shell,
+  .admin-bookings-shell,
+  .admin-bookings-results-shell,
+  .admin-room-calendar-shell,
+  .admin-account-detail,
+  .admin-command-center {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  /* Booking card: stack media above content */
+  .booking-card-main {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-card-media {
+    width: 100%;
+    height: 160px;
+  }
+
+  /* Reserve summary lines: allow wrap, smaller text */
+  .reserve-price-line,
+  .reserve-price-total {
+    flex-wrap: wrap;
+    font-size: 0.92rem;
+  }
+
+  /* Admin: tighter dashboard spacing */
+  .admin-page-shell {
+    padding: 12px;
+  }
+
+  .admin-dashboard-copy h1 {
+    font-size: clamp(1.8rem, 7vw, 2.4rem);
+  }
+
+  .admin-kpi-card {
+    padding: 14px;
+    min-height: auto;
+  }
+
+  /* Admin tab buttons: smaller text on phones */
+  .admin-tab-switcher button,
+  .admin-subpage-switcher button {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  /* Long content in cards shouldn't push width */
+  .admin-booking-record,
+  .admin-account-detail,
+  .admin-detail-field,
+  .booking-card-copy,
+  .reserve-summary-context,
+  .home-staff-card-body {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Admin promo / test case headers: stack */
+  .admin-promo-card-header,
+  .admin-test-case-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* Forms: full-width inputs */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  textarea,
+  select {
+    max-width: 100%;
+  }
+
+  /* Reserve calendar: smaller cells */
+  .reserve-calendar-grid .calendar-cell {
+    min-height: 46px;
+    padding: 4px;
+  }
+
+  /* Booking detail / room detail headers shrink */
+  .reserve-studio-copy h1,
+  .rooms-catalog-header h1,
+  .booking-checkout-header-copy h1 {
+    font-size: clamp(1.9rem, 8vw, 2.6rem);
+  }
+
+  /* Footer: stack to single column on tiny phones */
+  .studio-footer-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .studio-footer-brand {
+    grid-column: auto;
+  }
+
+  body[data-page] .studio-footer,
+  body[data-page] .studio-footer.studio-footer-compact,
+  body[data-page] .site-acknowledgement {
+    width: calc(100% - 16px);
+    padding-left: 18px;
+    padding-right: 18px;
   }
 }

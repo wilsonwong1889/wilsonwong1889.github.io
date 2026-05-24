@@ -71,7 +71,7 @@ class AdminActionsTest(BaseAppTest):
                 description="Room used for admin free payment tests",
                 capacity=4,
                 photos=[],
-                hourly_rate_cents=5050,
+                hourly_rate_cents=10000,
             )
             db.add(room)
             db.commit()
@@ -133,7 +133,7 @@ class AdminActionsTest(BaseAppTest):
         self.assertEqual(resp.status_code, 201)
         booking = resp.json()
         self.assertEqual(booking["status"], "PendingPayment")
-        self.assertEqual(booking["price_cents"], 10500)
+        self.assertEqual(booking["price_cents"], self._room_price(10000, 60))
 
         resp = self.client.post(
             f"/api/admin/bookings/{booking['id']}/waive-payment", headers=admin_headers
@@ -395,3 +395,148 @@ class AdminActionsTest(BaseAppTest):
         self.assertIn("payment_marked_paid_by_admin", actions)
         self.assertIn("payment_waived_by_admin", actions)
         self.assertIn("booking_checked_in", actions)
+
+    def test_35_room_and_staff_rate_changes_reflect_in_bookings(self) -> None:
+        from app.models.room import Room
+        from app.models.staff_profile import StaffProfile
+
+        with self.SessionLocal() as db:
+            room = Room(
+                name="Rate Change Room",
+                description="Room for admin rate-change price verification",
+                capacity=4,
+                photos=[],
+                hourly_rate_cents=10000,
+            )
+            profile = StaffProfile(
+                name="Rate Change Engineer",
+                description="Staff for admin rate-change price verification",
+                skills=["Recording"],
+                talents=[],
+                booking_rate_cents=10000,
+                add_on_price_cents=0,
+                service_types=["Recording"],
+                booking_enabled=True,
+                active=True,
+            )
+            db.add(room)
+            db.add(profile)
+            db.commit()
+            db.refresh(room)
+            db.refresh(profile)
+            room_id = str(room.id)
+            profile_id = str(profile.id)
+
+        resp = self.client.post(
+            "/api/auth/signup",
+            json={
+                "email": "rate-admin@example.com",
+                "password": "Password123!",
+                "full_name": "Rate Admin",
+                "phone": "5559990001",
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        admin_id = resp.json()["id"]
+        with self.SessionLocal() as db:
+            u = db.query(self.User).filter(self.User.id == admin_id).first()
+            u.is_admin = True
+            db.commit()
+        resp = self.client.post(
+            "/api/auth/login",
+            data={"username": "rate-admin@example.com", "password": "Password123!"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        admin_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+        resp = self.client.post(
+            "/api/auth/signup",
+            json={
+                "email": "org-member@example.com",
+                "password": "Password123!",
+                "full_name": "Org Member",
+                "phone": "5559990002",
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        member_id = resp.json()["id"]
+        with self.SessionLocal() as db:
+            u = db.query(self.User).filter(self.User.id == member_id).first()
+            u.user_category = "organizational_member"
+            db.commit()
+        resp = self.client.post(
+            "/api/auth/login",
+            data={"username": "org-member@example.com", "password": "Password123!"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        member_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+        # Room booking at $100/hr — driven by room.hourly_rate_cents (admin-controlled)
+        resp = self.client.post(
+            "/api/bookings",
+            headers=member_headers,
+            json={
+                "room_id": room_id,
+                "start_time": self._future_time(day=1, hour=10, minute=0).isoformat(),
+                "duration_minutes": 60,
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.json()["price_cents"], self._room_price(10000, 60))
+
+        # Admin changes room to $50/hr
+        resp = self.client.put(
+            f"/api/admin/rooms/{room_id}",
+            headers=admin_headers,
+            json={"hourly_rate_cents": 5000},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["hourly_rate_cents"], 5000)
+
+        # New room booking reflects updated $50/hr rate
+        resp = self.client.post(
+            "/api/bookings",
+            headers=member_headers,
+            json={
+                "room_id": room_id,
+                "start_time": self._future_time(day=2, hour=10, minute=0).isoformat(),
+                "duration_minutes": 60,
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.json()["price_cents"], self._room_price(5000, 60))
+
+        # Staff booking at $100/hr
+        resp = self.client.post(
+            "/api/staff-bookings",
+            headers=member_headers,
+            json={
+                "staff_profile_id": profile_id,
+                "start_time": self._future_time(day=3, hour=10, minute=0).isoformat(),
+                "duration_minutes": 60,
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.json()["price_cents"], self._staff_price(10000, 60))
+
+        # Admin changes staff to $50/hr
+        resp = self.client.put(
+            f"/api/admin/staff/{profile_id}",
+            headers=admin_headers,
+            json={"booking_rate_cents": 5000},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["booking_rate_cents"], 5000)
+
+        # New staff booking reflects updated $50/hr rate
+        resp = self.client.post(
+            "/api/staff-bookings",
+            headers=member_headers,
+            json={
+                "staff_profile_id": profile_id,
+                "start_time": self._future_time(day=4, hour=10, minute=0).isoformat(),
+                "duration_minutes": 60,
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.json()["price_cents"], self._staff_price(5000, 60))

@@ -38,7 +38,7 @@ from app.services.payment_service import (
     create_refund,
     get_payment_intent_session,
 )
-from app.services.pricing_service import get_hourly_rate, DAILY_HOUR_LIMIT
+from app.services.pricing_service import DAILY_HOUR_LIMIT
 from app.services.promo_code_service import apply_promo_code_to_amount
 from app.services.reservation_service import ReservationHold, create_hold, release_hold, validate_hold
 
@@ -527,11 +527,8 @@ def _create_booking_record(
     except ValueError as exc:
         raise StaffSelectionError(str(exc)) from exc
     ensure_staff_assignments_available(db, staff_assignments, normalized_start, end_time)
-    category_hourly_rate = get_hourly_rate(
-        getattr(user, "user_category", None) or "general_public"
-    ) or room.hourly_rate_cents
     original_price_cents = calculate_booking_total_cents(
-        category_hourly_rate,
+        room.hourly_rate_cents,
         duration_minutes,
         staff_assignments,
     )

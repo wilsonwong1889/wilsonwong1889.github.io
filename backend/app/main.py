@@ -81,8 +81,17 @@ app.include_router(staff_bookings.router)
 app.include_router(admin.router)
 app.include_router(webhooks.router)
 
+class NoCacheStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+
 if FRONTEND_DIR.exists():
-    app.mount("/assets", StaticFiles(directory=FRONTEND_DIR), name="frontend-assets")
+    app.mount("/assets", NoCacheStaticFiles(directory=FRONTEND_DIR), name="frontend-assets")
 
     def build_frontend_handler(filename: str):
         def handler():

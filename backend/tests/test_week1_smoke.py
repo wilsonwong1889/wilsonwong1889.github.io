@@ -164,6 +164,17 @@ class AppSmokeTest(unittest.TestCase):
             tzinfo=business_timezone,
         )
 
+    @staticmethod
+    def _room_price(hourly_rate_cents: int, duration_minutes: int) -> int:
+        from math import floor
+        subtotal = floor(hourly_rate_cents * duration_minutes / 60)
+        return subtotal + floor(subtotal * 0.05)
+
+    @staticmethod
+    def _staff_price(booking_rate_cents: int, duration_minutes: int) -> int:
+        from math import floor
+        return floor(booking_rate_cents * duration_minutes / 60)
+
     def test_00_seed_helpers(self) -> None:
         with self.SessionLocal() as db:
             admin = type(self).ensure_admin_user(
@@ -779,7 +790,7 @@ class AppSmokeTest(unittest.TestCase):
                 description="Room used for booking smoke tests",
                 capacity=3,
                 photos=[],
-                hourly_rate_cents=5000,
+                hourly_rate_cents=10000,
                 max_booking_duration_minutes=120,
             )
             db.add(room)
@@ -887,7 +898,7 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         booking = response.json()
         self.assertEqual(booking["status"], "PendingPayment")
-        self.assertEqual(booking["price_cents"], 10500)
+        self.assertEqual(booking["price_cents"], self._room_price(10000, 60))
         self.assertTrue(booking["payment_intent_id"].startswith("pi_"))
         self.assertTrue(booking["payment_client_secret"])
         if settings.PAYMENT_BACKEND == "stub":
@@ -975,7 +986,7 @@ class AppSmokeTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 201, response.text)
         self.assertEqual(response.json()["duration_minutes"], 120)
-        self.assertEqual(response.json()["price_cents"], 21000)
+        self.assertEqual(response.json()["price_cents"], self._room_price(10000, 120))
 
         response = self.client.post(
             "/api/bookings",
@@ -1014,7 +1025,7 @@ class AppSmokeTest(unittest.TestCase):
                 description="Room used for guest booking smoke tests",
                 capacity=2,
                 photos=[],
-                hourly_rate_cents=4500,
+                hourly_rate_cents=10000,
                 max_booking_duration_minutes=180,
             )
             db.add(room)
@@ -1039,7 +1050,7 @@ class AppSmokeTest(unittest.TestCase):
         payload = response.json()
         self.assertTrue(payload["access_token"])
         self.assertEqual(payload["booking"]["status"], "PendingPayment")
-        self.assertEqual(payload["booking"]["price_cents"], 10500)
+        self.assertEqual(payload["booking"]["price_cents"], self._room_price(10000, 60))
 
         guest_headers = {"Authorization": f"Bearer {payload['access_token']}"}
         response = self.client.get(f"/api/bookings/{payload['booking']['id']}", headers=guest_headers)
@@ -1156,9 +1167,12 @@ class AppSmokeTest(unittest.TestCase):
         self.assertTrue(payload["access_token"])
         self.assertEqual(payload["booking"]["status"], "PendingPayment")
         self.assertEqual(payload["booking"]["service_type"], "Podcast support")
-        self.assertEqual(payload["booking"]["original_price_cents"], 6500)
-        self.assertEqual(payload["booking"]["discount_cents"], 3900)
-        self.assertEqual(payload["booking"]["price_cents"], 2600)
+        staff_rate, promo_pct = 6500, 60
+        expected_original = self._staff_price(staff_rate, 60)
+        expected_discount = expected_original * promo_pct // 100
+        self.assertEqual(payload["booking"]["original_price_cents"], expected_original)
+        self.assertEqual(payload["booking"]["discount_cents"], expected_discount)
+        self.assertEqual(payload["booking"]["price_cents"], expected_original - expected_discount)
         self.assertEqual(payload["booking"]["promo_code"], "SUMMER60")
         self.assertEqual(payload["booking"]["staff_profile"]["name"], "Podcast Engineer")
 
@@ -1420,7 +1434,7 @@ class AppSmokeTest(unittest.TestCase):
                 description="Room used for admin free payment tests",
                 capacity=4,
                 photos=[],
-                hourly_rate_cents=5050,
+                hourly_rate_cents=10000,
             )
             db.add(room)
             db.commit()
@@ -1491,7 +1505,7 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         booking = response.json()
         self.assertEqual(booking["status"], "PendingPayment")
-        self.assertEqual(booking["price_cents"], 10500)
+        self.assertEqual(booking["price_cents"], self._room_price(10000, 60))
 
         response = self.client.post(
             f"/api/admin/bookings/{booking['id']}/waive-payment",
@@ -1739,7 +1753,7 @@ class AppSmokeTest(unittest.TestCase):
                 description="Room used for webhook and admin tests",
                 capacity=5,
                 photos=[],
-                hourly_rate_cents=5000,
+                hourly_rate_cents=10000,
             )
             admin_room = Room(
                 name="Admin Unlimited Room",
@@ -2047,7 +2061,7 @@ class AppSmokeTest(unittest.TestCase):
         )
         self.assertEqual(room_summary["total_bookings"], 3)
         self.assertGreaterEqual(room_summary["paid_bookings"], 2)
-        self.assertEqual(room_summary["revenue_cents"], 31500)
+        self.assertEqual(room_summary["revenue_cents"], 3 * self._room_price(10000, 60))
 
         response = self.client.get("/api/admin/activity?limit=10", headers=admin_headers)
         self.assertEqual(response.status_code, 200, response.text)
@@ -2409,7 +2423,7 @@ class AppSmokeTest(unittest.TestCase):
                 description="Room used for Week 7 and 8 tests",
                 capacity=6,
                 photos=[],
-                hourly_rate_cents=5000,
+                hourly_rate_cents=10000,
             )
             db.add(room)
             db.commit()
@@ -2675,7 +2689,7 @@ class AppSmokeTest(unittest.TestCase):
             "description": "Room used for admin launch readiness checks",
             "capacity": 4,
             "photos": [],
-            "hourly_rate_cents": 5000,
+            "hourly_rate_cents": 10000,
             "max_booking_duration_minutes": 300,
         }
         response = self.client.post("/api/rooms", headers=user_headers, json=booking_room_payload)
@@ -2814,7 +2828,7 @@ class AppSmokeTest(unittest.TestCase):
         analytics = response.json()
         self.assertEqual(analytics["total_bookings"], 2)
         self.assertEqual(analytics["paid_bookings"], 1)
-        self.assertEqual(analytics["net_revenue_cents"], 10500)
+        self.assertEqual(analytics["net_revenue_cents"], self._room_price(10000, 60))
         self.assertEqual(analytics["refunded_revenue_cents"], 0)
         self.assertGreaterEqual(analytics["active_rooms"], 1)
 

@@ -23,24 +23,8 @@ const MEMBER_CATEGORY_LABELS = {
   organizational_member: "Organizational Member",
 };
 
-// Mirrors pricing_service.py ROOM_HOURLY_RATES — must stay in sync
-const CATEGORY_HOURLY_RATES = {
-  artist_member: 5000,
-  fellowship_artist: 5000,
-  artist_in_residence: 5000,
-  service_engineer: 5000,
-  bipoc_community_member: 7500,
-  venture_member: 5000,
-  organizational_member: null,
-  general_public: 10000,
-};
-
-function getCategoryRate(userCategory, fallbackCents) {
-  const rate = CATEGORY_HOURLY_RATES[userCategory];
-  if (rate === null || rate === undefined) {
-    return fallbackCents || 10000;
-  }
-  return rate;
+function getRoomHourlyRate(room) {
+  return room?.hourly_rate_cents ?? 0;
 }
 
 function getMemberCategoryLabel(category) {
@@ -480,7 +464,7 @@ function getSelectedStaffOptions(room) {
 }
 
 function calculateEstimatedTotal(room) {
-  const hourlyRate = getCategoryRate(state.currentUser?.user_category, room?.hourly_rate_cents);
+  const hourlyRate = getRoomHourlyRate(room);
   const baseRate = hourlyRate * (getSelectedDurationMinutes() / 60);
   const staffTotal = getSelectedStaffOptions(room).reduce(
     (total, role) => total + (role.add_on_price_cents || 0),
@@ -818,7 +802,7 @@ function renderSummary(currentState) {
   const memberBadge = categoryLabel
     ? `<div class="reserve-member-badge"><span class="reserve-member-badge-dot"></span>Booking as: ${escapeHtml(categoryLabel)}</div>`
     : "";
-  const hourlyRate = getCategoryRate(currentUser?.user_category, room.hourly_rate_cents);
+  const hourlyRate = getRoomHourlyRate(room);
   const rateLabel = `${formatCurrency(hourlyRate)} x ${formatDuration(getSelectedDurationMinutes())}`;
 
   if (!selectedStart) {
