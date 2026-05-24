@@ -2689,7 +2689,7 @@ class AppSmokeTest(unittest.TestCase):
             "description": "Room used for admin launch readiness checks",
             "capacity": 4,
             "photos": [],
-            "hourly_rate_cents": 5000,
+            "hourly_rate_cents": 10000,
             "max_booking_duration_minutes": 300,
         }
         response = self.client.post("/api/rooms", headers=user_headers, json=booking_room_payload)

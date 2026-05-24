@@ -294,7 +294,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
         *,
         name: str = "Matrix Room",
         max_booking_duration_minutes: int = 300,
-        hourly_rate_cents: int = 5000,
+        hourly_rate_cents: int = 10000,
         staff_roles=None,
         active: bool = True,
     ):
@@ -1109,7 +1109,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
     def test_139c_create_booking_applies_promo_code_discount(self) -> None:
         with self.SessionLocal() as db:
             user = self._create_user(db)
-            room = self._create_room(db, hourly_rate_cents=5000)
+            room = self._create_room(db, hourly_rate_cents=10000)
             self._create_promo_code(db, code="FOUNDATION10", percent_off=10)
 
             booking = self._create_pending_booking(

@@ -39,7 +39,7 @@ class OpsTest(BaseAppTest):
                 description="Room used for Week 7 and 8 tests",
                 capacity=6,
                 photos=[],
-                hourly_rate_cents=5000,
+                hourly_rate_cents=10000,
             )
             db.add(room)
             db.commit()
@@ -306,7 +306,7 @@ class OpsTest(BaseAppTest):
             "description": "Room used for admin launch readiness checks",
             "capacity": 4,
             "photos": [],
-            "hourly_rate_cents": 5000,
+            "hourly_rate_cents": 10000,
             "max_booking_duration_minutes": 300,
         }
         resp = self.client.post("/api/rooms", headers=user_headers, json=booking_room_payload)
