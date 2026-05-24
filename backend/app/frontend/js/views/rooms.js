@@ -7,7 +7,6 @@ let selectedCreateStaffIds = new Set();
 let roomsViewBound = false;
 let selectedRoomCategory = "all";
 let roomsCatalogSort = "recommended";
-let roomsFiltersOpen = false;
 let pendingUrlSearch = false;
 
 const ROOM_CATEGORY_ORDER = [
@@ -62,14 +61,6 @@ function roomsCategoryBar() {
 
 function roomsResultsCount() {
   return document.getElementById("rooms-results-count");
-}
-
-function roomsFilterToggleButton() {
-  return document.getElementById("rooms-filter-toggle");
-}
-
-function roomsFilterPanel() {
-  return document.getElementById("rooms-filter-panel");
 }
 
 function formatCurrency(cents) {
@@ -196,18 +187,6 @@ function renderCategoryFilterBar(rooms) {
       </button>
     `,
   ).join("");
-}
-
-function renderRoomsFilterPanelState() {
-  const panel = roomsFilterPanel();
-  const button = roomsFilterToggleButton();
-  if (!panel || !button) {
-    return;
-  }
-
-  panel.classList.toggle("hidden", !roomsFiltersOpen);
-  button.classList.toggle("is-active", roomsFiltersOpen);
-  button.setAttribute("aria-expanded", roomsFiltersOpen ? "true" : "false");
 }
 
 function getRoomPhotoUrlInput() {
@@ -379,7 +358,7 @@ function renderAvailabilityPreview(roomId) {
     return `
       <div class="availability-preview availability-preview-idle">
         <span class="availability-label">Live openings</span>
-        <p>Use filters to check a specific day, or book now to see today's openings.</p>
+        <p>Use the "When?" picker above to see this room's openings for a specific day.</p>
       </div>
     `;
   }
@@ -551,34 +530,6 @@ function renderRoomCard(room, canManageRooms) {
   `;
 }
 
-async function previewRoomsAvailability() {
-  if (!elements.roomsPreviewDate || !state.rooms.length) {
-    return;
-  }
-
-  const previewDate = elements.roomsPreviewDate.value;
-  if (!previewDate) {
-    setState({ message: "Choose a date to preview live openings." });
-    return;
-  }
-
-  try {
-    setState({ message: "Loading live room availability..." });
-    const previews = await Promise.all(
-      state.rooms
-        .filter((room) => room.active)
-        .map(async (room) => [room.id, await api.getAvailability(room.id, previewDate)]),
-    );
-    setState({
-      roomPreviewDate: previewDate,
-      roomAvailabilityPreview: Object.fromEntries(previews),
-      message: "Live availability loaded.",
-    });
-  } catch (error) {
-    setState({ message: error.message });
-  }
-}
-
 async function searchRoomsByAvailability() {
   const searchDate = elements.roomsSearchDate?.value;
   const searchTime = elements.roomsSearchTime?.value;
@@ -617,6 +568,8 @@ async function searchRoomsByAvailability() {
         matchingRoomIds,
         hasSearched: true,
       },
+      roomPreviewDate: searchDate,
+      roomAvailabilityPreview: Object.fromEntries(availabilityRows),
       message: matchingRoomIds.length
         ? `Found ${matchingRoomIds.length} matching room${matchingRoomIds.length === 1 ? "" : "s"}.`
         : "No rooms matched that time.",
@@ -866,13 +819,9 @@ function availCalRender() {
 
 function availCalPickDate(dateKey) {
   if (elements.roomsSearchDate) elements.roomsSearchDate.value = dateKey;
-  if (!roomsFiltersOpen) {
-    roomsFiltersOpen = true;
-    renderRoomsFilterPanelState();
-  }
-  const filterPanel = document.getElementById("rooms-filter-panel");
-  if (filterPanel) {
-    filterPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  const whenBar = document.querySelector(".rooms-when-bar");
+  if (whenBar) {
+    whenBar.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
 
@@ -910,7 +859,6 @@ export function initRoomsView(actions) {
   if (urlDate && !pendingUrlSearch) {
     if (elements.roomsSearchDate) elements.roomsSearchDate.value = urlDate;
     if (urlTime && elements.roomsSearchTime) elements.roomsSearchTime.value = urlTime;
-    roomsFiltersOpen = true;
     pendingUrlSearch = true;
   }
 
@@ -926,10 +874,6 @@ export function initRoomsView(actions) {
       roomsCatalogSort = event.target.value || "recommended";
       renderRoomsView(state);
     });
-    roomsFilterToggleButton()?.addEventListener("click", () => {
-      roomsFiltersOpen = !roomsFiltersOpen;
-      renderRoomsFilterPanelState();
-    });
     roomsCategoryBar()?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-room-category]");
       if (!button) {
@@ -939,8 +883,6 @@ export function initRoomsView(actions) {
       renderRoomsView(state);
     });
   }
-
-  renderRoomsFilterPanelState();
 
   if (elements.showInactiveToggle) {
     elements.showInactiveToggle.addEventListener("change", async (event) => {
@@ -953,9 +895,6 @@ export function initRoomsView(actions) {
     });
   }
 
-  if (elements.roomsPreviewDate) {
-    elements.roomsPreviewDate.value = state.roomPreviewDate;
-  }
   if (elements.roomsSearchDate) {
     elements.roomsSearchDate.value = state.roomAvailabilitySearch.date;
   }
@@ -966,11 +905,6 @@ export function initRoomsView(actions) {
     elements.roomsSearchDuration.value = String(state.roomAvailabilitySearch.duration);
   }
 
-  if (elements.roomsPreviewButton) {
-    elements.roomsPreviewButton.addEventListener("click", async () => {
-      await previewRoomsAvailability();
-    });
-  }
   elements.roomsSearchButton?.addEventListener("click", async () => {
     await searchRoomsByAvailability();
   });
@@ -1154,15 +1088,11 @@ export function initRoomsView(actions) {
 export function renderRoomsView(currentState) {
   const canManageRooms = Boolean(currentState.currentUser?.is_admin);
   renderCategoryFilterBar(currentState.rooms);
-  renderRoomsFilterPanelState();
   if (elements.roomsToolbar) {
     elements.roomsToolbar.classList.toggle("hidden", !canManageRooms);
   }
   if (elements.showInactiveToggle) {
     elements.showInactiveToggle.checked = currentState.showInactiveRooms;
-  }
-  if (elements.roomsPreviewDate && elements.roomsPreviewDate.value !== currentState.roomPreviewDate) {
-    elements.roomsPreviewDate.value = currentState.roomPreviewDate;
   }
   if (elements.roomsSearchDate && elements.roomsSearchDate.value !== currentState.roomAvailabilitySearch.date) {
     elements.roomsSearchDate.value = currentState.roomAvailabilitySearch.date;

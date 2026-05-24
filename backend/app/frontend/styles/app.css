@@ -2209,20 +2209,83 @@ body[data-page="home"] .site-acknowledgement {
   margin-bottom: 16px;
 }
 
-.rooms-preview-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: end;
-  margin-bottom: 18px;
+.rooms-admin-toolbar {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px dashed rgba(0, 38, 62, 0.16);
+  border-radius: 12px;
+  background: rgba(243, 247, 251, 0.6);
+  color: #4e6275;
+  font-size: 0.88rem;
 }
 
-.rooms-search-toolbar {
+.rooms-when-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   align-items: end;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 38, 62, 0.1);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(0, 38, 62, 0.04);
+}
+
+.rooms-when-label {
+  align-self: center;
+  padding: 0 6px 0 4px;
+  color: #00263e;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.rooms-when-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rooms-when-field > span {
+  color: #8a97ab;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rooms-when-field input,
+.rooms-when-field select {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid rgba(0, 38, 62, 0.14);
+  border-radius: 10px;
+  background: #fbfcfe;
+  color: #00263e;
+  font: inherit;
+}
+
+.rooms-when-field input[type="date"] {
+  min-width: 148px;
+}
+
+.rooms-when-field input[type="time"] {
+  min-width: 110px;
+}
+
+.rooms-when-field select {
+  min-width: 70px;
+  cursor: pointer;
+}
+
+.rooms-when-bar .primary-button,
+.rooms-when-bar .ghost-button {
+  min-height: 40px;
+}
+
+.rooms-when-clear {
+  background: transparent;
 }
 
 .rooms-page-grid-modern {
@@ -2365,6 +2428,22 @@ body[data-page="rooms"] .rooms-catalog-shell > div:not(.rooms-catalog-header) {
   color: #d71920;
 }
 
+.rooms-filter-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(0, 38, 62, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 36px rgba(0, 38, 62, 0.05);
+}
+
+.rooms-filter-sort-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .rooms-category-bar {
   display: flex;
   flex-wrap: wrap;
@@ -2394,22 +2473,6 @@ body[data-page="rooms"] .rooms-catalog-shell > div:not(.rooms-catalog-header) {
   margin-bottom: 16px;
   color: #00263e;
   font-size: 0.98rem;
-}
-
-.rooms-filter-panel {
-  display: grid;
-  gap: 16px;
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid rgba(0, 38, 62, 0.08);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 36px rgba(0, 38, 62, 0.05);
-}
-
-.rooms-filter-sort-row {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .rooms-grid-catalog {
