@@ -822,7 +822,8 @@ function renderReschedulePanel(booking) {
     return;
   }
 
-  const canReschedule = booking.status === "Paid" && !booking.checked_in_at;
+  const isAdmin = Boolean(state.currentUser?.is_admin);
+  const canReschedule = isAdmin && booking.status === "Paid" && !booking.checked_in_at;
   toggleHidden(elements.bookingReschedulePanel, !canReschedule);
   if (!canReschedule) {
     return;

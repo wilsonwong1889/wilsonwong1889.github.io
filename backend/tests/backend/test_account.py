@@ -235,9 +235,39 @@ class AccountTest(BaseAppTest):
         self.assertEqual(resp.status_code, 201)
         booking = resp.json()
 
+        # Customers can no longer reschedule themselves — only admins can.
         resp = self.client.post(
             f"/api/bookings/{booking['id']}/reschedule",
             headers=user_headers,
+            json={"start_time": self._future_time(day=20, hour=12, minute=0).isoformat()},
+        )
+        self.assertEqual(resp.status_code, 403)
+
+        resp = self.client.post(
+            "/api/auth/signup",
+            json={
+                "email": "reschedule-admin@example.com",
+                "password": "Password123!",
+                "full_name": "Reschedule Admin",
+                "phone": "5555554101",
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        admin_id = resp.json()["id"]
+        with self.SessionLocal() as db:
+            u = db.query(self.User).filter(self.User.id == admin_id).first()
+            u.is_admin = True
+            db.commit()
+        resp = self.client.post(
+            "/api/auth/login",
+            data={"username": "reschedule-admin@example.com", "password": "Password123!"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        admin_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+        resp = self.client.post(
+            f"/api/bookings/{booking['id']}/reschedule",
+            headers=admin_headers,
             json={"start_time": self._future_time(day=20, hour=12, minute=0).isoformat()},
         )
         self.assertEqual(resp.status_code, 200)

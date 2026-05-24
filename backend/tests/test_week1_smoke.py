@@ -2362,9 +2362,41 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         booking = response.json()
 
+        # Customers can no longer reschedule — admin-only now.
         response = self.client.post(
             f"/api/bookings/{booking['id']}/reschedule",
             headers=user_headers,
+            json={
+                "start_time": self._future_time(day=20, hour=12, minute=0).isoformat(),
+            },
+        )
+        self.assertEqual(response.status_code, 403, response.text)
+
+        response = self.client.post(
+            "/api/auth/signup",
+            json={
+                "email": "reschedule-admin-smoke@example.com",
+                "password": "Password123!",
+                "full_name": "Reschedule Admin",
+                "phone": "5555554199",
+            },
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        reschedule_admin_id = response.json()["id"]
+        with self.SessionLocal() as db:
+            u = db.query(self.User).filter(self.User.id == reschedule_admin_id).first()
+            u.is_admin = True
+            db.commit()
+        response = self.client.post(
+            "/api/auth/login",
+            data={"username": "reschedule-admin-smoke@example.com", "password": "Password123!"},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        admin_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+        response = self.client.post(
+            f"/api/bookings/{booking['id']}/reschedule",
+            headers=admin_headers,
             json={
                 "start_time": self._future_time(day=20, hour=12, minute=0).isoformat(),
             },

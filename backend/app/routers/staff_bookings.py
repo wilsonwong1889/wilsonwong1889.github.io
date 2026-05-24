@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_admin_user, get_current_user
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
+from app.models.staff_booking import StaffBooking
 from app.models.user import User
 from app.schemas.booking import BookingContactUpdate, PaymentSessionOut
 from app.schemas.staff_booking import (
@@ -158,18 +159,18 @@ def cancel_my_staff_booking(
 
 
 @router.post("/staff-bookings/{staff_booking_id}/reschedule", response_model=StaffBookingOut)
-def reschedule_my_staff_booking(
+def reschedule_staff_booking_admin_only(
     staff_booking_id: str,
     payload: StaffBookingRescheduleIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    admin: User = Depends(get_admin_user),
     _: None = Depends(booking_rate_limit),
 ):
-    booking = get_staff_booking_for_user(db, staff_booking_id, current_user)
+    booking = db.query(StaffBooking).filter(StaffBooking.id == staff_booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Staff booking not found")
     try:
-        return reschedule_staff_booking(db, booking, current_user, payload)
+        return reschedule_staff_booking(db, booking, admin, payload)
     except StaffBookingConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
