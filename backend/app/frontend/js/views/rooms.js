@@ -649,6 +649,40 @@ function clearRoomAvailabilitySearch() {
   });
 }
 
+function openRoomsWhenBar() {
+  const bar = document.getElementById("rooms-when-bar");
+  const btn = document.getElementById("rooms-when-toggle");
+  if (!bar || !btn) return;
+  bar.classList.remove("hidden");
+  btn.classList.add("is-open");
+  btn.setAttribute("aria-expanded", "true");
+}
+
+function closeRoomsWhenBar() {
+  const bar = document.getElementById("rooms-when-bar");
+  const btn = document.getElementById("rooms-when-toggle");
+  if (!bar || !btn) return;
+  bar.classList.add("hidden");
+  btn.classList.remove("is-open");
+  btn.setAttribute("aria-expanded", "false");
+}
+
+function renderRoomsWhenToggleChip(currentState) {
+  const btn = document.getElementById("rooms-when-toggle");
+  const chip = document.getElementById("rooms-when-toggle-chip");
+  if (!btn || !chip) return;
+  const search = currentState.roomAvailabilitySearch;
+  if (!search?.hasSearched) {
+    chip.classList.add("hidden");
+    chip.textContent = "";
+    btn.classList.remove("is-active");
+    return;
+  }
+  chip.classList.remove("hidden");
+  chip.textContent = `${formatSearchDateLabel(search.date)} · ${formatSearchTimeLabel(search.time)} · ${formatDuration(search.duration)}`;
+  btn.classList.add("is-active");
+}
+
 function initCarousel() {
   const AUTOPLAY_INTERVAL_MS = 6000;
   const carousel = document.querySelector("[data-home-carousel]");
@@ -876,10 +910,8 @@ function availCalRender() {
 
 function availCalPickDate(dateKey) {
   if (elements.roomsSearchDate) elements.roomsSearchDate.value = dateKey;
-  const whenBar = document.querySelector(".rooms-when-bar");
-  if (whenBar) {
-    whenBar.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  // Calendar click triggers a search; collapsed-by-default When bar stays
+  // closed — the active-filter chip on the toggle reflects the result.
   searchRoomsByAvailability();
 }
 
@@ -965,12 +997,26 @@ export function initRoomsView(actions) {
 
   elements.roomsSearchButton?.addEventListener("click", async () => {
     await searchRoomsByAvailability();
+    closeRoomsWhenBar();
   });
   elements.roomsSearchClearButton?.addEventListener("click", () => {
     clearRoomAvailabilitySearch();
+    closeRoomsWhenBar();
   });
   elements.roomsSearchTime?.addEventListener("change", () => {
     renderRoomsView(state);
+  });
+
+  const whenToggleBtn = document.getElementById("rooms-when-toggle");
+  whenToggleBtn?.addEventListener("click", () => {
+    const bar = document.getElementById("rooms-when-bar");
+    if (!bar) return;
+    const wasHidden = bar.classList.contains("hidden");
+    if (wasHidden) {
+      openRoomsWhenBar();
+    } else {
+      closeRoomsWhenBar();
+    }
   });
 
   if (elements.roomForm) {
@@ -1149,6 +1195,7 @@ export function initRoomsView(actions) {
 export function renderRoomsView(currentState) {
   const canManageRooms = Boolean(currentState.currentUser?.is_admin);
   renderCategoryFilterBar(currentState.rooms);
+  renderRoomsWhenToggleChip(currentState);
   if (elements.roomsToolbar) {
     elements.roomsToolbar.classList.toggle("hidden", !canManageRooms);
   }

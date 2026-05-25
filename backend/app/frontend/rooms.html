@@ -130,6 +130,24 @@
                 placeholder="Search studios by name or description..."
               />
             </label>
+            <button
+              id="rooms-when-toggle"
+              class="rooms-when-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="rooms-when-bar"
+            >
+              <span class="rooms-when-toggle-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="3" y="4.5" width="14" height="12" rx="2"/>
+                  <path d="M3 8.5h14"/>
+                  <path d="M7 3v3"/>
+                  <path d="M13 3v3"/>
+                </svg>
+              </span>
+              <span class="rooms-when-toggle-label">When?</span>
+              <span class="rooms-when-toggle-chip hidden" id="rooms-when-toggle-chip"></span>
+            </button>
             <label class="rooms-sort-shell" for="rooms-sort-select">
               <span class="rooms-sort-icon" aria-hidden="true">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -139,7 +157,7 @@
                   <path d="M11.5 13.5L14 16l2.5-2.5"></path>
                 </svg>
               </span>
-              <select id="rooms-sort-select">
+              <select id="rooms-sort-select" aria-label="Sort studios">
                 <option value="recommended">Recommended</option>
                 <option value="price-low">Price: Low to High</option>
                 <option value="price-high">Price: High to Low</option>
@@ -151,8 +169,7 @@
 
           <div id="rooms-category-bar" class="rooms-category-bar"></div>
 
-          <section class="rooms-when-bar" aria-label="Check availability">
-            <span class="rooms-when-label">When?</span>
+          <section id="rooms-when-bar" class="rooms-when-bar hidden" aria-label="Check availability">
             <label class="rooms-when-field">
               <span>Date</span>
               <input id="rooms-search-date" type="date" />
@@ -178,7 +195,7 @@
           <div id="rooms-toolbar" class="rooms-toolbar rooms-admin-toolbar hidden">
             <label class="checkbox-row rooms-filter">
               <input id="show-inactive-toggle" type="checkbox" />
-              <span>Include inactive rooms (admin)</span>
+              <span>Include inactive rooms (admin only)</span>
             </label>
           </div>
 
