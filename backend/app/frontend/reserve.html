@@ -180,12 +180,28 @@
               <p class="form-note">Continue as a guest with your name and phone number.</p>
               <div class="profile-grid profile-grid-tight">
                 <label>
-                  <span>Name</span>
-                  <input id="reserve-guest-name" type="text" autocomplete="name" />
+                  <span>Name <span class="form-required" aria-hidden="true">*</span></span>
+                  <input
+                    id="reserve-guest-name"
+                    type="text"
+                    autocomplete="name"
+                    maxlength="120"
+                    aria-required="true"
+                  />
                 </label>
                 <label>
-                  <span>Phone number</span>
-                  <input id="reserve-guest-phone" type="tel" autocomplete="tel" />
+                  <span>Phone number <span class="form-required" aria-hidden="true">*</span></span>
+                  <input
+                    id="reserve-guest-phone"
+                    type="tel"
+                    autocomplete="tel"
+                    inputmode="tel"
+                    maxlength="40"
+                    minlength="7"
+                    pattern="[0-9+\-\s().]{7,40}"
+                    aria-required="true"
+                    title="Enter a phone number with at least 7 digits."
+                  />
                 </label>
               </div>
             </div>
@@ -211,7 +227,7 @@
                 <div class="reserve-advanced-body">
                   <label class="profile-span-2">
                     <span>What are you creating?</span>
-                    <input id="reserve-session-purpose" type="text" placeholder="Recording vocals, podcast interview, photo shoot…" />
+                    <input id="reserve-session-purpose" type="text" maxlength="200" placeholder="Recording vocals, podcast interview, photo shoot…" />
                   </label>
                   <label>
                     <span>Attendees</span>
@@ -219,11 +235,11 @@
                   </label>
                   <label>
                     <span>Equipment needs</span>
-                    <input id="reserve-equipment-needs" type="text" placeholder="Condenser mic, pop filter…" />
+                    <input id="reserve-equipment-needs" type="text" maxlength="300" placeholder="Condenser mic, pop filter…" />
                   </label>
                   <label class="profile-span-2">
                     <span>Additional notes</span>
-                    <textarea id="reserve-note-input" name="note" rows="2" placeholder="Anything else we should know"></textarea>
+                    <textarea id="reserve-note-input" name="note" rows="2" maxlength="1200" placeholder="Anything else we should know"></textarea>
                   </label>
                   <div id="reserve-staff-section" class="profile-span-2 hidden">
                     <span>Additional staff</span>

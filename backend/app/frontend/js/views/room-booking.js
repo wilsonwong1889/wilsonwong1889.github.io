@@ -1277,7 +1277,19 @@ export function initRoomBookingView() {
         const guestName = getReserveGuestNameInput()?.value?.trim() || "";
         const guestPhone = getReserveGuestPhoneInput()?.value?.trim() || "";
         if (!guestName || !guestPhone) {
-          setState({ message: "Enter your name and phone number to continue as guest." });
+          const missing = !guestName && !guestPhone
+            ? "name and phone number"
+            : !guestName
+              ? "name"
+              : "phone number";
+          showReserveConflictAlert(`Please enter your ${missing} to continue as a guest.`);
+          const focusTarget = !guestName ? getReserveGuestNameInput() : getReserveGuestPhoneInput();
+          focusTarget?.focus();
+          return;
+        }
+        if (!/^[0-9+\-\s().]{7,40}$/.test(guestPhone)) {
+          showReserveConflictAlert("Phone number needs at least 7 digits. Use only numbers, spaces, +, - or parentheses.");
+          getReserveGuestPhoneInput()?.focus();
           return;
         }
         const guestSession = await api.createGuestBooking({
@@ -1312,7 +1324,10 @@ export function initRoomBookingView() {
       window.location.href = `/booking?id=${booking.id}`;
     } catch (error) {
       const message = error?.message || "Could not create the booking.";
+      const isNetwork = error instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(message);
       const isConflict = /no longer available|already.*hold|already.*booked/i.test(message);
+      const isPromo = /promo/i.test(message);
+      const isDailyLimit = /daily limit|hour\(s\) already booked/i.test(message);
       if (isConflict && state.selectedRoom) {
         await loadDayAvailability(String(state.selectedRoom.id), selectedDate);
         await loadMonthAvailability(String(state.selectedRoom.id), displayedMonth);
@@ -1322,8 +1337,15 @@ export function initRoomBookingView() {
         renderSummary(state);
         const slotList = document.getElementById("reserve-slot-list") || document.querySelector(".reserve-slot-grid");
         slotList?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (isNetwork) {
+        showReserveConflictAlert("We couldn't reach the server. Check your connection and try again.");
+      } else if (isPromo) {
+        showReserveConflictAlert(`${message} Remove or fix the promo code, then submit again.`);
+        getReservePromoCodeInput()?.focus();
+      } else if (isDailyLimit) {
+        showReserveConflictAlert(message);
       } else {
-        setState({ message });
+        showReserveConflictAlert(message);
       }
     } finally {
       reserveSubmitInFlight = false;
