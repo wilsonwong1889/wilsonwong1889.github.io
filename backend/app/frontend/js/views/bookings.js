@@ -306,6 +306,7 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
   const actionClass = pendingPayment ? "primary-button primary-link" : "ghost-button ghost-link";
   const canCancel = upcoming && ["PendingPayment", "Paid"].includes(booking.status);
   const detailHref = getBookingDetailHref(booking);
+  const hasLiveCountdown = pendingPayment && booking.payment_expires_at;
   const supportCopy = pendingPayment
     ? typeof booking.payment_seconds_remaining === "number"
       ? `Checkout expires in ${formatCountdown(booking.payment_seconds_remaining)}`
@@ -317,6 +318,9 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
       : booking.status === "Cancelled"
         ? "Reservation cancelled"
         : "Reservation history";
+  const supportNoteAttrs = hasLiveCountdown
+    ? ` data-payment-countdown="${escapeHtml(booking.payment_expires_at)}" data-booking-kind="${escapeHtml(kind)}"`
+    : "";
 
   return `
     <article class="booking-card ${pendingPayment ? "booking-card-pending" : "booking-card-secondary"}">
@@ -340,7 +344,7 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
       <div class="booking-card-side">
         <div class="booking-card-status-group">
           <span class="pill ${getStatusClassName(booking.status)}">${escapeHtml(bookingStatusLabel)}</span>
-          <span class="booking-card-status-note">${escapeHtml(supportCopy)}</span>
+          <span class="booking-card-status-note"${supportNoteAttrs}>${escapeHtml(supportCopy)}</span>
         </div>
         <div class="booking-card-actions">
           <a class="${actionClass}" href="${escapeHtml(detailHref)}">${escapeHtml(actionLabel)}</a>
@@ -351,10 +355,45 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
   `;
 }
 
+let bookingsCountdownTimer = null;
+let bookingsCountdownActions = null;
+function startBookingsCountdownTimer(actions) {
+  if (bookingsCountdownTimer) return;
+  bookingsCountdownActions = actions;
+  const tick = () => {
+    const nodes = document.querySelectorAll("[data-payment-countdown]");
+    if (!nodes.length) {
+      return;
+    }
+    const now = Date.now();
+    let anyExpired = false;
+    nodes.forEach((node) => {
+      const expiresAt = new Date(node.dataset.paymentCountdown).getTime();
+      if (Number.isNaN(expiresAt)) return;
+      const secondsRemaining = Math.max(0, Math.floor((expiresAt - now) / 1000));
+      if (secondsRemaining === 0) {
+        node.textContent = "Checkout window expired";
+        node.classList.add("booking-card-status-note-expired");
+        delete node.dataset.paymentCountdown;
+        anyExpired = true;
+      } else {
+        node.textContent = `Checkout expires in ${formatCountdown(secondsRemaining)}`;
+      }
+    });
+    if (anyExpired && bookingsCountdownActions?.refreshAvailabilityAndBookings) {
+      // Re-fetch so the card flips to Cancelled the next tick rather than staying "Pending payment".
+      void bookingsCountdownActions.refreshAvailabilityAndBookings();
+    }
+  };
+  bookingsCountdownTimer = window.setInterval(tick, 1000);
+  tick();
+}
+
 export function initBookingsView(actions) {
   if (!elements.bookingHistoryPanel || !elements.pendingBookingsList || !elements.recentBookingsList || !elements.recentBookingsShell) {
     return;
   }
+  startBookingsCountdownTimer(actions);
 
   elements.bookingHistoryPanel.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-booking-action='cancel']");

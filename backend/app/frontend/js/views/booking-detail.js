@@ -26,6 +26,59 @@ let rescheduleRequestToken = 0;
 let reviewFormFingerprint = null;
 let autoLoadingPaymentBookingId = null;
 let publicConfigPromise = null;
+let confirmPaymentInFlight = false;
+
+function getBookingPaymentAlertEl() {
+  let alertEl = document.getElementById("booking-payment-alert");
+  if (alertEl) return alertEl;
+  const panel = document.getElementById("booking-payment-panel");
+  if (!panel) return null;
+  alertEl = document.createElement("div");
+  alertEl.id = "booking-payment-alert";
+  alertEl.className = "booking-payment-alert hidden";
+  alertEl.setAttribute("role", "alert");
+  const deadline = document.getElementById("booking-payment-deadline");
+  panel.insertBefore(alertEl, deadline?.nextSibling || panel.firstChild);
+  return alertEl;
+}
+
+function showBookingPaymentAlert(message) {
+  const alertEl = getBookingPaymentAlertEl();
+  if (!alertEl) return;
+  alertEl.textContent = message;
+  alertEl.classList.remove("hidden");
+}
+
+function clearBookingPaymentAlert() {
+  const alertEl = document.getElementById("booking-payment-alert");
+  if (!alertEl) return;
+  alertEl.classList.add("hidden");
+  alertEl.textContent = "";
+}
+
+function humanizePaymentError(raw) {
+  const message = String(raw || "").trim();
+  if (!message) return "Payment didn't go through. Please try again.";
+  if (/card was declined|card_declined|generic_decline/i.test(message)) {
+    return "Your card was declined. Try a different card or contact your bank.";
+  }
+  if (/insufficient[_ ]funds/i.test(message)) {
+    return "There weren't enough funds available on that card. Try a different card.";
+  }
+  if (/incorrect[_ ](cvc|number)/i.test(message)) {
+    return "Card details look incorrect. Double-check the number, expiry, and CVC.";
+  }
+  if (/expired[_ ]card/i.test(message)) {
+    return "That card has expired. Try a different card.";
+  }
+  if (/PaymentIntent.*already.*confirmed|already been confirmed/i.test(message)) {
+    return "This payment was already submitted — refreshing your booking status now.";
+  }
+  if (/payment window expired|no longer.*pending/i.test(message)) {
+    return "The 5-minute payment window already passed. Start a new booking to try again.";
+  }
+  return message;
+}
 let paymentSessionStatus = "idle";
 let paymentSessionMessage = "";
 let bookingContactDraftId = null;
@@ -1147,27 +1200,45 @@ export function initBookingDetailView(actions) {
         if (!stripeClient || !stripeElements || !activePaymentSession) {
           throw new Error("Load the payment session first");
         }
-        await saveBookingIntakeToNote();
-        await saveBookingContactDetails({ silent: true });
-        setState({ message: "Confirming payment..." });
-        const successUrl = buildPaymentSuccessUrl(activePaymentSession.booking_id, getBookingKind(state.selectedBooking));
-        const submitResult = await stripeElements.submit();
-        if (submitResult?.error) {
-          throw new Error(submitResult.error.message || "Payment details are incomplete");
+        if (confirmPaymentInFlight) {
+          return;
         }
-        const result = await stripeClient.confirmPayment({
-          elements: stripeElements,
-          clientSecret: activePaymentSession.payment_client_secret,
-          confirmParams: {
-            return_url: successUrl.toString(),
-          },
-          redirect: "if_required",
-        });
-        if (result.error) {
-          throw new Error(result.error.message || "Payment confirmation failed");
+        confirmPaymentInFlight = true;
+        const payButton = button;
+        const originalLabel = payButton.textContent;
+        payButton.disabled = true;
+        payButton.textContent = "Processing payment…";
+        clearBookingPaymentAlert();
+        try {
+          await saveBookingIntakeToNote();
+          await saveBookingContactDetails({ silent: true });
+          setState({ message: "Confirming payment..." });
+          const successUrl = buildPaymentSuccessUrl(activePaymentSession.booking_id, getBookingKind(state.selectedBooking));
+          const submitResult = await stripeElements.submit();
+          if (submitResult?.error) {
+            throw new Error(submitResult.error.message || "Payment details are incomplete");
+          }
+          const result = await stripeClient.confirmPayment({
+            elements: stripeElements,
+            clientSecret: activePaymentSession.payment_client_secret,
+            confirmParams: {
+              return_url: successUrl.toString(),
+            },
+            redirect: "if_required",
+          });
+          if (result.error) {
+            throw new Error(result.error.message || "Payment confirmation failed");
+          }
+          window.location.assign(successUrl.toString());
+          return;
+        } catch (error) {
+          showBookingPaymentAlert(humanizePaymentError(error?.message));
+          payButton.disabled = false;
+          payButton.textContent = originalLabel;
+          throw error; // re-throw so the outer catch still logs
+        } finally {
+          confirmPaymentInFlight = false;
         }
-        window.location.assign(successUrl.toString());
-        return;
       }
 
       if (action === "waive-payment") {

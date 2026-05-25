@@ -4392,6 +4392,11 @@ textarea.booking-contact-value:focus {
   text-align: right;
 }
 
+.booking-card-status-note-expired {
+  color: var(--brand-red, #d71920);
+  font-weight: 600;
+}
+
 .booking-card-actions {
   display: flex;
   flex-wrap: wrap;
@@ -4427,6 +4432,30 @@ textarea.booking-contact-value:focus {
   border-radius: 10px;
   background: rgba(215, 25, 32, 0.08);
   color: #7a1216;
+}
+
+.booking-checkout-payment .payment-deadline-note {
+  position: sticky;
+  top: 12px;
+  z-index: 4;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(0, 38, 62, 0.08);
+}
+
+.booking-payment-alert {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(215, 25, 32, 0.3);
+  border-left: 4px solid var(--brand-red, #d71920);
+  border-radius: 10px;
+  background: rgba(215, 25, 32, 0.06);
+  color: #7a1216;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .reserve-planner,
