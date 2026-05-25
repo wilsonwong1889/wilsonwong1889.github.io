@@ -326,6 +326,18 @@ body[data-auth-pending="true"] .site-header .header-actions > * {
   line-height: 1.6;
 }
 
+.reserve-conflict-alert {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(215, 25, 32, 0.25);
+  border-left: 4px solid var(--brand-red, #d71920);
+  border-radius: 12px;
+  background: rgba(215, 25, 32, 0.06);
+  color: #7a1216;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .field-help,
 .staff-option-copy span {
   color: var(--muted);
@@ -4401,6 +4413,14 @@ textarea.booking-contact-value:focus {
   margin: 0 0 10px;
   color: var(--accent-deep);
   font-weight: 600;
+}
+
+.payment-deadline-note-urgent {
+  padding: 10px 14px;
+  border: 1px solid rgba(215, 25, 32, 0.3);
+  border-radius: 10px;
+  background: rgba(215, 25, 32, 0.08);
+  color: #7a1216;
 }
 
 .reserve-planner,

@@ -102,6 +102,20 @@ def create_reservation(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.delete("/bookings/reservations", status_code=204)
+def release_reservation(
+    token: str,
+    slot_keys: List[str] = Query(default_factory=list),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(booking_rate_limit),
+):
+    if not slot_keys:
+        return
+    from app.services.reservation_service import release_hold
+
+    release_hold(slot_keys, token)
+
+
 @router.post("/bookings", response_model=BookingOut, status_code=201)
 def create_booking_endpoint(
     payload: BookingCreate,

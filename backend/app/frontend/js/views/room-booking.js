@@ -44,6 +44,10 @@ let monthAvailabilityRequestToken = 0;
 let selectedStaffIds = new Set();
 let reservePromoPreview = null;
 let reservePromoMessage = "";
+let reserveSubmitInFlight = false;
+let reserveHold = null; // { token, room_id, start_time, duration_minutes, expires_at }
+let reserveHoldRefreshTimer = null;
+let reserveHoldRefreshToken = 0;
 
 function getReserveGuestFields() {
   return document.getElementById("reserve-guest-fields");
@@ -895,6 +899,11 @@ function renderSubmitButton(currentState) {
       ? reservePromoPreview
       : null;
   const totalLabel = formatCurrency(activePromo ? activePromo.final_amount_cents : estimatedTotal);
+  if (reserveSubmitInFlight) {
+    elements.reserveSubmitButton.disabled = true;
+    elements.reserveSubmitButton.textContent = "Reserving…";
+    return;
+  }
   elements.reserveSubmitButton.disabled = !canSubmit;
   elements.reserveSubmitButton.textContent = canSubmit
     ? `Continue to checkout ${totalLabel}`
@@ -956,11 +965,100 @@ function renderCalendar() {
   elements.reserveMonthGrid.innerHTML = cells.join("");
 }
 
+function clearReserveHold() {
+  if (reserveHold?.token && reserveHold?.slot_keys?.length) {
+    // Fire-and-forget; the hold will TTL out on its own if this fails.
+    api.releaseReservationHold(reserveHold.token, reserveHold.slot_keys).catch(() => {});
+  }
+  reserveHold = null;
+  if (reserveHoldRefreshTimer) {
+    window.clearTimeout(reserveHoldRefreshTimer);
+    reserveHoldRefreshTimer = null;
+  }
+}
+
+function holdMatchesCurrentSelection() {
+  if (!reserveHold || !state.selectedRoom) return false;
+  return (
+    reserveHold.room_id === state.selectedRoom.id &&
+    reserveHold.start_time === selectedStart &&
+    reserveHold.duration_minutes === getSelectedDurationMinutes()
+  );
+}
+
+async function refreshReserveHold() {
+  // Holds require auth (the backend endpoint uses get_current_user).
+  // Guests fall back to the optimistic flow (Layer 2 DB constraint catches races).
+  if (!state.currentUser || !state.selectedRoom) {
+    clearReserveHold();
+    return;
+  }
+  const selection = getCurrentSelectionValidity();
+  if (!selection.valid || !selectedStart) {
+    clearReserveHold();
+    return;
+  }
+  if (holdMatchesCurrentSelection()) {
+    return;
+  }
+  const requestToken = ++reserveHoldRefreshToken;
+  const desiredRoom = state.selectedRoom.id;
+  const desiredStart = selectedStart;
+  const desiredDuration = selection.duration;
+  // Release any prior hold first so overlapping slot keys don't collide.
+  clearReserveHold();
+  try {
+    const hold = await api.createReservationHold({
+      room_id: desiredRoom,
+      start_time: desiredStart,
+      duration_minutes: desiredDuration,
+    });
+    if (requestToken !== reserveHoldRefreshToken) {
+      // a later selection change supersedes this hold — release it
+      if (hold?.token && hold?.slot_keys?.length) {
+        api.releaseReservationHold(hold.token, hold.slot_keys).catch(() => {});
+      }
+      return;
+    }
+    reserveHold = {
+      token: hold.token,
+      room_id: desiredRoom,
+      start_time: desiredStart,
+      duration_minutes: desiredDuration,
+      expires_at: hold.expires_at,
+      slot_keys: hold.slot_keys || [],
+    };
+    // Renew before the 5-min TTL elapses so the customer keeps the slot if they
+    // linger on the form.
+    if (reserveHoldRefreshTimer) {
+      window.clearTimeout(reserveHoldRefreshTimer);
+    }
+    reserveHoldRefreshTimer = window.setTimeout(() => {
+      reserveHold = null;
+      refreshReserveHold();
+    }, 4 * 60 * 1000);
+  } catch (error) {
+    if (requestToken !== reserveHoldRefreshToken) {
+      return;
+    }
+    clearReserveHold();
+    const message = error?.message || "Could not reserve that slot.";
+    if (/already on hold|no longer available/i.test(message)) {
+      await loadDayAvailability(String(desiredRoom), selectedDate);
+      showReserveConflictAlert("Someone just started booking that exact time. We refreshed the openings — please pick another slot.");
+      selectedStart = "";
+      renderSlotList();
+      renderSummary(state);
+    }
+  }
+}
+
 async function selectDate(roomId, date) {
   selectedDate = clampBookingDate(date);
   selectedStart = "";
   dayAvailability = null;
   clearReservePromoState("");
+  clearReserveHold();
   if (elements.reserveDateInput) {
     elements.reserveDateInput.value = selectedDate;
   }
@@ -989,6 +1087,7 @@ export function initRoomBookingView() {
     renderSubmitButton(state);
     renderReserveStepStatus(state);
     updateDurationDisplay();
+    void refreshReserveHold();
   });
 
   elements.reserveDurationSelect?.addEventListener("change", () => {
@@ -998,6 +1097,7 @@ export function initRoomBookingView() {
     renderSubmitButton(state);
     renderReserveStepStatus(state);
     updateDurationDisplay();
+    void refreshReserveHold();
   });
 
   elements.reserveDurationDecrease?.addEventListener("click", () => {
@@ -1150,6 +1250,14 @@ export function initRoomBookingView() {
       setState({ message: "Choose today or a future date." });
       return;
     }
+    if (reserveSubmitInFlight) {
+      return;
+    }
+    reserveSubmitInFlight = true;
+    if (elements.reserveSubmitButton) {
+      elements.reserveSubmitButton.disabled = true;
+      elements.reserveSubmitButton.textContent = "Reserving…";
+    }
 
     try {
       setState({ message: "Creating booking..." });
@@ -1160,6 +1268,7 @@ export function initRoomBookingView() {
         promo_code: getReservePromoInputValue() || null,
         note: buildSessionNote(),
         staff_assignments: [...selectedStaffIds],
+        reservation_token: holdMatchesCurrentSelection() ? reserveHold.token : null,
       };
       let booking = null;
       if (state.currentUser) {
@@ -1202,9 +1311,43 @@ export function initRoomBookingView() {
       persistCheckoutDraft({ booking });
       window.location.href = `/booking?id=${booking.id}`;
     } catch (error) {
-      setState({ message: error.message });
+      const message = error?.message || "Could not create the booking.";
+      const isConflict = /no longer available|already.*hold|already.*booked/i.test(message);
+      if (isConflict && state.selectedRoom) {
+        await loadDayAvailability(String(state.selectedRoom.id), selectedDate);
+        await loadMonthAvailability(String(state.selectedRoom.id), displayedMonth);
+        showReserveConflictAlert("Sorry — that slot was taken while you were filling out the form. We refreshed the openings; please pick another time.");
+        selectedStart = "";
+        renderSlotList();
+        renderSummary(state);
+        const slotList = document.getElementById("reserve-slot-list") || document.querySelector(".reserve-slot-grid");
+        slotList?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        setState({ message });
+      }
+    } finally {
+      reserveSubmitInFlight = false;
+      renderSubmitButton(state);
     }
   });
+}
+
+function showReserveConflictAlert(message) {
+  let alertEl = document.getElementById("reserve-conflict-alert");
+  if (!alertEl) {
+    alertEl = document.createElement("div");
+    alertEl.id = "reserve-conflict-alert";
+    alertEl.className = "reserve-conflict-alert";
+    alertEl.setAttribute("role", "alert");
+    const planner = document.getElementById("reserve-planner-panel") || elements.reservePlannerPanel;
+    planner?.insertBefore(alertEl, planner.firstChild);
+  }
+  alertEl.textContent = message;
+  alertEl.classList.remove("hidden");
+  window.clearTimeout(showReserveConflictAlert._timer);
+  showReserveConflictAlert._timer = window.setTimeout(() => {
+    alertEl.classList.add("hidden");
+  }, 12000);
 }
 
 function updateDurationDisplay() {

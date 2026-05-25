@@ -233,6 +233,31 @@ def expire_pending_booking(
             "payment_expires_at": payment_expires_at.isoformat() if payment_expires_at else None,
         },
     )
+    create_notification_log(
+        db,
+        user_id=booking.user_id,
+        booking_id=booking.id,
+        notification_type="booking_expired",
+        status="Queued",
+        details={
+            "booking_code": booking.booking_code,
+            "expired_after_minutes": expiry_minutes,
+            "queued_tasks": [
+                "send_booking_cancellation_email",
+                "send_booking_cancellation_sms",
+            ],
+        },
+    )
+    try:
+        from app.tasks import (
+            send_booking_cancellation_email_task,
+            send_booking_cancellation_sms_task,
+        )
+
+        send_booking_cancellation_email_task.delay(str(booking.id))
+        send_booking_cancellation_sms_task.delay(str(booking.id))
+    except Exception:  # noqa: BLE001 — never let notification queueing block the expiry
+        pass
     return True
 
 
@@ -1651,6 +1676,41 @@ def mark_booking_paid(db: Session, booking: Booking, payment_intent_id: str) -> 
     return booking
 
 
+def _auto_refund_stale_payment(
+    db: Session,
+    booking: Booking,
+    payment_intent_id: Optional[str],
+) -> None:
+    """A payment_intent.succeeded arrived for a booking that is no longer
+    bookable (expired, cancelled, refunded). Issue a refund so the customer
+    isn't silently charged, and log the incident."""
+    refund_amount = booking.price_cents or 0
+    refund_id: Optional[str] = None
+    failure_message: Optional[str] = None
+    if payment_intent_id and refund_amount > 0:
+        try:
+            refund_id = create_refund(
+                payment_intent_id=payment_intent_id,
+                amount_cents=refund_amount,
+            )
+        except Exception as exc:  # noqa: BLE001
+            failure_message = str(exc)
+    create_audit_log(
+        db,
+        actor_id=None,
+        booking_id=booking.id,
+        action="payment_received_after_expiry",
+        details={
+            "payment_intent_id": payment_intent_id,
+            "booking_status": booking.status,
+            "amount_cents": refund_amount,
+            "stripe_refund_id": refund_id,
+            "refund_error": failure_message,
+        },
+    )
+    db.commit()
+
+
 def handle_payment_webhook_event(db: Session, event: dict) -> dict:
     event_type = event.get("type")
     data_object = event.get("data", {}).get("object", {})
@@ -1670,17 +1730,21 @@ def handle_payment_webhook_event(db: Session, event: dict) -> dict:
         if booking.status == "Paid":
             return {"received": True, "booking_id": str(booking.id), "status": booking.status}
         if booking.status != "PendingPayment":
+            _auto_refund_stale_payment(db, booking, payment_intent_id)
             return {
                 "received": True,
                 "ignored": True,
+                "auto_refunded": True,
                 "booking_id": str(booking.id),
                 "status": booking.status,
             }
         if expire_pending_booking(db, booking):
             db.commit()
+            _auto_refund_stale_payment(db, booking, payment_intent_id)
             return {
                 "received": True,
                 "ignored": True,
+                "auto_refunded": True,
                 "booking_id": str(booking.id),
                 "status": booking.status,
             }

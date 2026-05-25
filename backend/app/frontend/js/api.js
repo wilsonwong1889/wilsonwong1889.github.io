@@ -157,6 +157,20 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  createReservationHold(payload) {
+    return request("/api/bookings/reservations", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  releaseReservationHold(token, slotKeys) {
+    const params = new URLSearchParams();
+    params.set("token", token);
+    (slotKeys || []).forEach((key) => params.append("slot_keys", key));
+    return request(`/api/bookings/reservations?${params.toString()}`, {
+      method: "DELETE",
+    });
+  },
   createGuestBooking(payload) {
     return request("/api/bookings/guest", {
       method: "POST",

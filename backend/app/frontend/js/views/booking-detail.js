@@ -567,7 +567,30 @@ function renderPaymentDeadline(booking) {
     );
     deadlineElement.classList.remove("hidden");
     deadlineElement.className = "panel-copy payment-deadline-note";
-    deadlineElement.textContent = `This spot is saved until ${formatBookingDate(booking.payment_expires_at)}. Time left: ${formatCountdown(secondsRemaining)}.`;
+
+    const PAY_DISABLE_BUFFER_SECONDS = 30;
+    const payButton = document.querySelector(
+      '[data-booking-detail-action="confirm-payment"]',
+    );
+    if (payButton) {
+      if (secondsRemaining > 0 && secondsRemaining <= PAY_DISABLE_BUFFER_SECONDS) {
+        payButton.disabled = true;
+        payButton.dataset.expiryLocked = "true";
+        payButton.textContent = "Refreshing booking…";
+      } else if (payButton.dataset.expiryLocked === "true" && secondsRemaining > PAY_DISABLE_BUFFER_SECONDS) {
+        delete payButton.dataset.expiryLocked;
+        payButton.disabled = false;
+        payButton.textContent = booking.price_cents > 0 ? "Pay now" : "Confirm booking";
+      }
+    }
+
+    if (secondsRemaining <= PAY_DISABLE_BUFFER_SECONDS) {
+      deadlineElement.classList.add("payment-deadline-note-urgent");
+      deadlineElement.textContent = `Your hold expires at ${formatBookingDate(booking.payment_expires_at)}. Time left: ${formatCountdown(secondsRemaining)} — please don't start a new payment now.`;
+    } else {
+      deadlineElement.classList.remove("payment-deadline-note-urgent");
+      deadlineElement.textContent = `This spot is saved until ${formatBookingDate(booking.payment_expires_at)}. Time left: ${formatCountdown(secondsRemaining)}.`;
+    }
 
     if (secondsRemaining <= 0) {
       clearPaymentDeadlineTimer();
