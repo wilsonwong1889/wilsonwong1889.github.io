@@ -17,6 +17,7 @@ export const state = {
   },
   bookings: [],
   adminBookings: [],
+  adminTodayRoster: null,
   adminAnalytics: null,
   adminActivity: [],
   adminUsers: [],

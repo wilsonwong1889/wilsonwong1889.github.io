@@ -335,6 +335,26 @@ async function refreshAdminBookings(message) {
   }
 }
 
+async function refreshAdminToday(message) {
+  if (!currentRequirements().admin) {
+    return;
+  }
+  if (!state.currentUser?.is_admin) {
+    setState({ adminTodayRoster: null });
+    return;
+  }
+  try {
+    const adminTodayRoster = await api.adminGetTodayRoster();
+    setState({
+      adminTodayRoster,
+      // Avoid flicker on the snackbar when this is the polling tick (no message).
+      message: message ? message : state.message,
+    });
+  } catch (error) {
+    setState({ message: error.message });
+  }
+}
+
 async function refreshAdminAnalytics(message) {
   if (!currentRequirements().admin) {
     return;
@@ -621,6 +641,7 @@ async function refreshAvailabilityAndBookings(message) {
   await refreshRooms(message);
   await refreshBookings(message);
   await refreshAdminBookings(message);
+  await refreshAdminToday(message);
   await refreshAdminAnalytics(message);
   await refreshAdminActivity(message);
   await refreshAdminUsers(message);
@@ -642,6 +663,7 @@ async function loadPageData(message) {
   }
   if (requirements.admin) {
     await refreshAdminBookings(message || "Admin workspace ready.");
+    await refreshAdminToday(message || "Admin workspace ready.");
     await refreshAdminAnalytics(message || "Admin workspace ready.");
     await refreshAdminActivity(message || "Admin workspace ready.");
     await refreshAdminUsers(message || "Admin workspace ready.");
@@ -741,7 +763,7 @@ async function clearSession() {
 
 subscribe(renderApp);
 
-initAdminView({ refreshAll: refreshAvailabilityAndBookings, getState: () => state });
+initAdminView({ refreshAll: refreshAvailabilityAndBookings, refreshAdminToday, getState: () => state });
 initAuthView({ refreshSession, clearSession });
 initBookingsView({ refreshAvailabilityAndBookings });
 initBookingDetailView({ reloadBookingDetail: loadSelectedBooking });

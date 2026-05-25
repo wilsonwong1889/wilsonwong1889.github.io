@@ -273,6 +273,9 @@ export const api = {
     const suffix = params.toString() ? `?${params.toString()}` : "";
     return request(`/api/admin/bookings${suffix}`);
   },
+  adminGetTodayRoster() {
+    return request("/api/admin/today");
+  },
   adminClearBookingsForDay(payload) {
     return request("/api/admin/bookings/clear-day", {
       method: "POST",

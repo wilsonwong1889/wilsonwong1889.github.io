@@ -543,3 +543,155 @@ class AdminActionsTest(BaseAppTest):
         )
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.json()["price_cents"], self._staff_price(5000, 60))
+
+    def test_36_admin_today_endpoint_returns_roster_and_counters(self) -> None:
+        """GET /api/admin/today returns today's bookings (room + staff merged,
+        chronological) with pre-computed counters and a tomorrow / 7-day
+        outlook. Covers the new Admin Today Live Ops dashboard endpoint."""
+        from datetime import datetime as _dt, timezone as _tz
+        from uuid import UUID
+        from app.models.room import Room
+
+        with self.SessionLocal() as db:
+            room = Room(
+                name="Today Roster Room",
+                description="Room for today-endpoint coverage",
+                capacity=4,
+                photos=[],
+                hourly_rate_cents=10000,
+            )
+            db.add(room)
+            db.commit()
+            db.refresh(room)
+            room_id = str(room.id)
+
+        # admin user
+        resp = self.client.post(
+            "/api/auth/signup",
+            json={
+                "email": "today-admin@example.com",
+                "password": "Password123!",
+                "full_name": "Today Admin",
+                "phone": "5550000020",
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        admin_id = resp.json()["id"]
+        with self.SessionLocal() as db:
+            u = db.query(self.User).filter(self.User.id == admin_id).first()
+            u.is_admin = True
+            db.commit()
+        resp = self.client.post(
+            "/api/auth/login",
+            data={"username": "today-admin@example.com", "password": "Password123!"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        admin_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+        # regular customer
+        resp = self.client.post(
+            "/api/auth/signup",
+            json={
+                "email": "today-guest@example.com",
+                "password": "Password123!",
+                "full_name": "Today Guest",
+                "phone": "5550000021",
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        resp = self.client.post(
+            "/api/auth/login",
+            data={"username": "today-guest@example.com", "password": "Password123!"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        guest_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+        # Seed three bookings today (PendingPayment + Paid + Completed/checked-in)
+        # and one tomorrow. We bypass /api/bookings (which enforces the daily
+        # one-booking-per-day cap for non-admins) by inserting directly via
+        # the model so the test can build a multi-booking today set.
+        business_timezone = ZoneInfo("America/Edmonton")
+        today_local = datetime.now(business_timezone).date()
+        # If today happens to be a closed weekday (Sun/Mon/Tue) the day
+        # bounds still apply for our endpoint — we're just inserting rows.
+        from app.models.booking import Booking
+
+        def _row(hour: int, status: str, code: str, checked_in: bool = False) -> Booking:
+            start = datetime(
+                today_local.year, today_local.month, today_local.day,
+                hour, 0, tzinfo=business_timezone,
+            ).astimezone(_tz.utc)
+            return Booking(
+                user_id=UUID(resp.json().get("user_id", admin_id)) if False else None,
+                room_id=UUID(room_id),
+                start_time=start,
+                end_time=start + timedelta(hours=1),
+                duration_minutes=60,
+                price_cents=10500,
+                currency="CAD",
+                status=status,
+                booking_code=code,
+                user_full_name_snapshot="Today Guest",
+                user_phone_snapshot="5550000021",
+                user_email_snapshot="today-guest@example.com",
+                room_name_snapshot="Today Roster Room",
+                confirmed_at=_dt.now(_tz.utc) if status in {"Paid", "Completed"} else None,
+                checked_in_at=_dt.now(_tz.utc) if checked_in else None,
+            )
+
+        tomorrow = today_local + timedelta(days=1)
+        tomorrow_start = datetime(
+            tomorrow.year, tomorrow.month, tomorrow.day, 14, 0, tzinfo=business_timezone,
+        ).astimezone(_tz.utc)
+        with self.SessionLocal() as db:
+            db.add(_row(11, "PendingPayment", "TODAY001"))
+            db.add(_row(13, "Paid", "TODAY002"))
+            db.add(_row(15, "Completed", "TODAY003", checked_in=True))
+            db.add(
+                Booking(
+                    user_id=None,
+                    room_id=UUID(room_id),
+                    start_time=tomorrow_start,
+                    end_time=tomorrow_start + timedelta(hours=1),
+                    duration_minutes=60,
+                    price_cents=10500,
+                    currency="CAD",
+                    status="Paid",
+                    booking_code="TMRW001",
+                    user_full_name_snapshot="Today Guest",
+                    user_phone_snapshot="5550000021",
+                    user_email_snapshot="today-guest@example.com",
+                    room_name_snapshot="Today Roster Room",
+                    confirmed_at=_dt.now(_tz.utc),
+                )
+            )
+            db.commit()
+
+        resp = self.client.get("/api/admin/today", headers=admin_headers)
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.json()
+        # Counters
+        self.assertEqual(payload["counters"]["total"], 3)
+        self.assertEqual(payload["counters"]["arrived"], 1)
+        self.assertEqual(payload["counters"]["pending_arrival"], 1)
+        self.assertEqual(payload["counters"]["pending_payment"], 1)
+        self.assertEqual(payload["counters"]["cancelled"], 0)
+        # Today list is chronological
+        self.assertEqual(len(payload["today"]), 3)
+        today_codes = [b["booking_code"] for b in payload["today"]]
+        self.assertEqual(today_codes, ["TODAY001", "TODAY002", "TODAY003"])
+        # Each row exposes the customer details a front-desk admin needs
+        first = payload["today"][0]
+        self.assertEqual(first["user_full_name"], "Today Guest")
+        self.assertEqual(first["user_phone"], "5550000021")
+        self.assertEqual(first["room_name"], "Today Roster Room")
+        # Tomorrow + next-seven-days summary
+        self.assertEqual(payload["tomorrow_count"], 1)
+        self.assertEqual(len(payload["tomorrow_first_three"]), 1)
+        self.assertEqual(payload["tomorrow_first_three"][0]["booking_code"], "TMRW001")
+        self.assertEqual(payload["next_seven_days_count"], 4)
+        self.assertIn("generated_at", payload)
+
+        # Non-admin is rejected
+        resp = self.client.get("/api/admin/today", headers=guest_headers)
+        self.assertEqual(resp.status_code, 403)

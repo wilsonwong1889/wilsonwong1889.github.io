@@ -19,6 +19,7 @@ from app.schemas.booking import (
     AdminBookingLookupOut,
     AdminBookingBulkClearResultOut,
     AdminBookingClearByDateIn,
+    AdminTodayRosterOut,
     BookingOut,
     ManualBookingCreate,
     RefundCreate,
@@ -46,6 +47,7 @@ from app.services.booking_service import (
     create_audit_log,
     DailyBookingLimitError,
     get_admin_analytics_summary,
+    get_admin_today_roster,
     list_recent_admin_activity,
     lookup_bookings_for_admin,
     mark_booking_paid_manually,
@@ -362,6 +364,17 @@ def admin_bookings(
         key=lambda item: item["start_time"],
         reverse=True,
     )
+
+
+@router.get("/today", response_model=AdminTodayRosterOut)
+def admin_today_roster(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(admin_rate_limit),
+):
+    """Live-ops view: today's bookings (room+staff merged, chronological)
+    with pre-computed counters and a small tomorrow / 7-day outlook."""
+    return get_admin_today_roster(db)
 
 
 @router.get("/promo-codes", response_model=List[PromoCodeOut])

@@ -21,6 +21,10 @@ class JsAssetTest(BaseAppTest):
         self.assertIn('body[data-page="admin"] #room-form {', resp.text)
         self.assertIn('body[data-page="admin"].admin-room-modal-active #room-form:not(.hidden)', resp.text)
         self.assertIn("background: linear-gradient(135deg, var(--brand-red), #a70f16);", resp.text)
+        # Admin Today Live Ops dashboard styles
+        self.assertIn(".admin-today-counters", resp.text)
+        self.assertIn(".admin-today-row.is-imminent", resp.text)
+        self.assertIn("body.admin-printing-today", resp.text)
 
         resp = self.client.get("/assets/media/recording-studio.svg")
         self.assertEqual(resp.status_code, 200)
@@ -45,6 +49,9 @@ class JsAssetTest(BaseAppTest):
         self.assertNotIn("?v=", resp.text)
         # From test_41
         self.assertIn("api.getAdminAnalyticsSummary()", resp.text)
+        # Admin Today Live Ops dashboard — main.js fetches the new endpoint
+        self.assertIn("api.adminGetTodayRoster", resp.text)
+        self.assertIn("refreshAdminToday", resp.text)
 
     def test_02_bookings_js(self) -> None:
         resp = self.client.get("/assets/js/views/bookings.js")
@@ -142,6 +149,16 @@ class JsAssetTest(BaseAppTest):
             'window.confirm(`Delete ${profileName}? This will also remove the profile from any rooms.`)',
             resp.text,
         )
+        # Admin Today Live Ops dashboard — renders + polling + print live in admin.js
+        self.assertIn("renderAdminTodayCounters(currentState)", resp.text)
+        self.assertIn("renderAdminTodayRoster(currentState)", resp.text)
+        self.assertIn("renderAdminUpcomingRoster(currentState)", resp.text)
+        self.assertIn("startAdminTodayPolling", resp.text)
+        self.assertIn("stopAdminTodayPolling", resp.text)
+        self.assertIn("window.print()", resp.text)
+        self.assertIn('data-today-counter="', resp.text)
+        self.assertIn("Pending arrival", resp.text)
+        self.assertIn("Already arrived", resp.text)
 
     def test_08_rooms_js(self) -> None:
         resp = self.client.get("/assets/js/views/rooms.js")

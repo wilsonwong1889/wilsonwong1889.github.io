@@ -138,10 +138,21 @@
                   <p class="panel-copy">A quick summary of what needs attention today before anything else.</p>
                 </div>
                 <div id="admin-analytics-grid" class="admin-summary-grid"></div>
-                <div class="admin-room-breakdown-shell">
-                  <h3>Today at a glance</h3>
-                  <p class="panel-copy">All bookings scheduled for today, colour-coded by status.</p>
+                <div class="admin-room-breakdown-shell admin-today-shell">
+                  <div class="admin-today-header">
+                    <div>
+                      <h3>Today's live roster</h3>
+                      <p class="panel-copy">Everyone scheduled today — tap to call, check in, or open the booking. Refreshes every minute.</p>
+                    </div>
+                    <button id="admin-today-print" class="ghost-button" type="button">Print today's roster</button>
+                  </div>
+                  <div id="admin-today-counters" class="admin-today-counters"></div>
                   <div id="admin-today-glance" class="admin-today-glance"></div>
+                </div>
+                <div class="admin-room-breakdown-shell">
+                  <h3>Coming up</h3>
+                  <p class="panel-copy">Tomorrow and the rest of the week.</p>
+                  <div id="admin-upcoming-glance" class="admin-upcoming-glance"></div>
                 </div>
                 <div class="admin-room-breakdown-shell">
                   <h3>Room breakdown</h3>
