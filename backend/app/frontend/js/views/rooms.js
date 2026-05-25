@@ -98,6 +98,45 @@ function formatDuration(minutes) {
   return `${hours} hour${hours === 1 ? "" : "s"}`;
 }
 
+function formatSearchDateLabel(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("en-CA", { weekday: "short", month: "short", day: "numeric" })
+    .format(new Date(`${value}T00:00:00`));
+}
+
+function formatSearchTimeLabel(value) {
+  if (!value) return "";
+  const [h, m] = String(value).split(":").map(Number);
+  const date = new Date();
+  date.setHours(h || 0, m || 0, 0, 0);
+  return new Intl.DateTimeFormat("en-CA", { hour: "numeric", minute: "2-digit" }).format(date);
+}
+
+const STUDIO_CLOSED_WEEKDAYS = new Set([0, 1, 2]); // Sun, Mon, Tue
+const STUDIO_CLOSE_HOUR = 20;
+const CLOSED_WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday"];
+
+function getWeekdayForIsoDate(value) {
+  if (!value) return null;
+  const [y, mo, d] = value.split("-").map(Number);
+  if (!y || !mo || !d) return null;
+  return new Date(y, mo - 1, d).getDay();
+}
+
+function isPastIsoDate(value) {
+  if (!value) return false;
+  const today = availCalTodayLocal();
+  return value < today;
+}
+
+function maxDurationMinutesForStartTime(startTime) {
+  if (!startTime) return 300;
+  const [h] = String(startTime).split(":").map(Number);
+  if (Number.isNaN(h)) return 300;
+  const hoursUntilClose = Math.max(0, STUDIO_CLOSE_HOUR - h);
+  return Math.min(300, Math.max(60, hoursUntilClose * 60));
+}
+
 function getPrimaryPhoto(room) {
   return Array.isArray(room.photos) && room.photos.length ? room.photos[0] : null;
 }
@@ -538,8 +577,26 @@ async function searchRoomsByAvailability() {
     setState({ message: "Choose a date and start time to search for rooms." });
     return;
   }
+  if (isPastIsoDate(searchDate)) {
+    setState({ message: "That date has already passed. Pick a future date." });
+    return;
+  }
+  const weekday = getWeekdayForIsoDate(searchDate);
+  if (weekday !== null && STUDIO_CLOSED_WEEKDAYS.has(weekday)) {
+    setState({
+      message: `The studio is closed on ${CLOSED_WEEKDAY_NAMES[weekday]}. Pick a Wednesday through Saturday.`,
+    });
+    return;
+  }
   if (searchTime < "12:00" || searchTime > "19:00") {
     setState({ message: "Choose a start time between 12:00 PM and 7:00 PM." });
+    return;
+  }
+  const maxDuration = maxDurationMinutesForStartTime(searchTime);
+  if (duration > maxDuration) {
+    setState({
+      message: `A ${formatDuration(duration)} session starting at ${formatSearchTimeLabel(searchTime)} would run past 8:00 PM. Shorten the duration or pick an earlier start time.`,
+    });
     return;
   }
 
@@ -823,6 +880,7 @@ function availCalPickDate(dateKey) {
   if (whenBar) {
     whenBar.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+  searchRoomsByAvailability();
 }
 
 function initAvailCal() {
@@ -910,6 +968,9 @@ export function initRoomsView(actions) {
   });
   elements.roomsSearchClearButton?.addEventListener("click", () => {
     clearRoomAvailabilitySearch();
+  });
+  elements.roomsSearchTime?.addEventListener("change", () => {
+    renderRoomsView(state);
   });
 
   if (elements.roomForm) {
@@ -1094,14 +1155,29 @@ export function renderRoomsView(currentState) {
   if (elements.showInactiveToggle) {
     elements.showInactiveToggle.checked = currentState.showInactiveRooms;
   }
-  if (elements.roomsSearchDate && elements.roomsSearchDate.value !== currentState.roomAvailabilitySearch.date) {
-    elements.roomsSearchDate.value = currentState.roomAvailabilitySearch.date;
+  if (elements.roomsSearchDate) {
+    const todayKey = availCalTodayLocal();
+    if (elements.roomsSearchDate.min !== todayKey) {
+      elements.roomsSearchDate.min = todayKey;
+    }
+    if (elements.roomsSearchDate.value !== currentState.roomAvailabilitySearch.date) {
+      elements.roomsSearchDate.value = currentState.roomAvailabilitySearch.date;
+    }
   }
   if (elements.roomsSearchTime && elements.roomsSearchTime.value !== currentState.roomAvailabilitySearch.time) {
     elements.roomsSearchTime.value = currentState.roomAvailabilitySearch.time;
   }
-  if (elements.roomsSearchDuration && elements.roomsSearchDuration.value !== String(currentState.roomAvailabilitySearch.duration)) {
-    elements.roomsSearchDuration.value = String(currentState.roomAvailabilitySearch.duration);
+  if (elements.roomsSearchDuration) {
+    const selectedTime = elements.roomsSearchTime?.value || currentState.roomAvailabilitySearch.time;
+    const maxDuration = maxDurationMinutesForStartTime(selectedTime);
+    Array.from(elements.roomsSearchDuration.options).forEach((opt) => {
+      opt.disabled = Number(opt.value) > maxDuration;
+    });
+    const currentDuration = Number(currentState.roomAvailabilitySearch.duration || 60);
+    const targetDuration = currentDuration > maxDuration ? maxDuration : currentDuration;
+    if (elements.roomsSearchDuration.value !== String(targetDuration)) {
+      elements.roomsSearchDuration.value = String(targetDuration);
+    }
   }
 
   renderCreateRoomStaffOptions(currentState);
@@ -1114,26 +1190,6 @@ export function renderRoomsView(currentState) {
 
   if (!elements.roomsGrid) {
     return;
-  }
-
-  if (elements.roomsSearchSummary) {
-    const search = currentState.roomAvailabilitySearch;
-    if (!search.hasSearched) {
-      elements.roomsSearchSummary.classList.add("hidden");
-      elements.roomsSearchSummary.innerHTML = "";
-    } else if (!search.matchingRoomIds.length) {
-      elements.roomsSearchSummary.classList.remove("hidden");
-      elements.roomsSearchSummary.innerHTML = `
-        <strong>No rooms available</strong>
-        <span>No active rooms are open on ${escapeHtml(search.date)} at ${escapeHtml(search.time)} for ${formatDuration(search.duration)}.</span>
-      `;
-    } else {
-      elements.roomsSearchSummary.classList.remove("hidden");
-      elements.roomsSearchSummary.innerHTML = `
-        <strong>${search.matchingRoomIds.length} matching room${search.matchingRoomIds.length === 1 ? "" : "s"}</strong>
-        <span>Showing rooms available on ${escapeHtml(search.date)} at ${escapeHtml(search.time)} for ${formatDuration(search.duration)}.</span>
-      `;
-    }
   }
 
   const availabilityScopedRooms = currentState.roomAvailabilitySearch.hasSearched
@@ -1150,6 +1206,30 @@ export function renderRoomsView(currentState) {
     }
     return true;
   });
+
+  if (elements.roomsSearchSummary) {
+    const search = currentState.roomAvailabilitySearch;
+    if (!search.hasSearched) {
+      elements.roomsSearchSummary.classList.add("hidden");
+      elements.roomsSearchSummary.innerHTML = "";
+    } else {
+      const dateLabel = formatSearchDateLabel(search.date);
+      const timeLabel = formatSearchTimeLabel(search.time);
+      const durationLabel = formatDuration(search.duration);
+      elements.roomsSearchSummary.classList.remove("hidden");
+      if (!visibleRooms.length) {
+        elements.roomsSearchSummary.innerHTML = `
+          <strong>No studios available</strong>
+          <span>No studios are open on ${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)} for ${escapeHtml(durationLabel)}.</span>
+        `;
+      } else {
+        elements.roomsSearchSummary.innerHTML = `
+          <strong>${visibleRooms.length} studio${visibleRooms.length === 1 ? "" : "s"} available</strong>
+          <span>On ${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)} for ${escapeHtml(durationLabel)}.</span>
+        `;
+      }
+    }
+  }
 
   visibleRooms = [...visibleRooms].sort((left, right) => {
     if (roomsCatalogSort === "price-low") {
@@ -1178,14 +1258,21 @@ export function renderRoomsView(currentState) {
   }
 
   if (!visibleRooms.length) {
+    const hasSearched = currentState.roomAvailabilitySearch.hasSearched;
+    const hasTextFilter = Boolean(searchText);
+    const hasCategoryFilter = selectedRoomCategory !== "all";
+    let emptyCopy;
+    if (hasSearched) {
+      emptyCopy = "No studios match this time slot. Try a different date, time, or duration.";
+    } else if (hasTextFilter || hasCategoryFilter) {
+      emptyCopy = "No studios match these filters. Try a different category or clear the search.";
+    } else if (canManageRooms) {
+      emptyCopy = "No studios yet. Create one from the admin panel to get started.";
+    } else {
+      emptyCopy = "No studios are available right now. Please check back soon.";
+    }
     elements.roomsGrid.innerHTML = `
-      <div class="empty-state">
-        ${
-          currentState.roomAvailabilitySearch.hasSearched
-            ? "No rooms match the current availability search. Change the date, time, or duration and try again."
-            : "No rooms match this view yet. Turn off the inactive filter or create a room from the admin panel."
-        }
-      </div>
+      <div class="empty-state">${escapeHtml(emptyCopy)}</div>
     `;
   } else {
     elements.roomsGrid.innerHTML = visibleRooms

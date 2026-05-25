@@ -830,6 +830,11 @@ function renderReschedulePanel(booking) {
   }
 
   const nextDate = rescheduleDateValue || getDateInputValue(booking.start_time);
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  if (elements.bookingRescheduleDate.min !== todayKey) {
+    elements.bookingRescheduleDate.min = todayKey;
+  }
   if (elements.bookingRescheduleDate.value !== nextDate) {
     elements.bookingRescheduleDate.value = nextDate;
   }
