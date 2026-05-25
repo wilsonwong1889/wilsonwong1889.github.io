@@ -38,6 +38,8 @@ class Booking(Base):
     user_email_snapshot = Column(String)
     user_full_name_snapshot = Column(String)
     user_phone_snapshot = Column(String)
+    room_name_snapshot = Column(String)
+    room_description_snapshot = Column(String)
     payment_intent_id = Column(String)
     confirmed_at = Column(DateTime(timezone=True))
     checked_in_at = Column(DateTime(timezone=True))

@@ -367,13 +367,15 @@ def list_bookings_for_user(db: Session, user: User) -> list[Booking]:
 
 def build_booking_feed_item(db: Session, booking: Booking) -> dict:
     room = get_room_or_404(db, booking.room_id, include_inactive=True)
+    display_name = booking.room_name_snapshot or room.name
+    display_description = booking.room_description_snapshot or room.description
     return {
         "id": booking.id,
         "booking_kind": "room",
         "room_id": booking.room_id,
-        "room_name": room.name,
-        "title": room.name,
-        "subtitle": room.description,
+        "room_name": display_name,
+        "title": display_name,
+        "subtitle": display_description,
         "status": booking.status,
         "start_time": booking.start_time,
         "end_time": booking.end_time,
@@ -588,6 +590,8 @@ def _create_booking_record(
         user_email_snapshot=user.email,
         user_full_name_snapshot=user.full_name,
         user_phone_snapshot=user.phone,
+        room_name_snapshot=room.name,
+        room_description_snapshot=room.description,
         payment_intent_id=payment_intent_id,
         confirmed_at=datetime.now(timezone.utc) if mark_confirmed else None,
         note=note,
@@ -875,7 +879,7 @@ def create_manual_booking(db: Session, admin: User, payload: ManualBookingCreate
         user_email=user.email,
         user_full_name=user.full_name,
         user_phone=user.phone,
-        room_name=get_room_or_404(db, booking.room_id, include_inactive=True).name,
+        room_name=booking.room_name_snapshot or get_room_or_404(db, booking.room_id, include_inactive=True).name,
     )
 
 
@@ -1634,7 +1638,7 @@ def lookup_bookings_for_admin(
             user_email=user_email,
             user_full_name=user_full_name,
             user_phone=user_phone,
-            room_name=room_name,
+            room_name=booking.room_name_snapshot or room_name,
         )
         for booking, user_email, user_full_name, user_phone, room_name in results
     ]

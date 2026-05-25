@@ -88,6 +88,8 @@ class BookingOut(BaseModel):
     user_email: Optional[str] = None
     user_full_name: Optional[str] = None
     user_phone: Optional[str] = None
+    room_name_snapshot: Optional[str] = None
+    room_description_snapshot: Optional[str] = None
     staff_assignments: List[StaffOption] = Field(default_factory=list)
     created_at: datetime
     updated_at: Optional[datetime] = None
