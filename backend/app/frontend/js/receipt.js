@@ -6,6 +6,14 @@ function getDownloadFilename(contentDisposition, fallback) {
   return match?.[1] || fallback;
 }
 
+function isMobileSafariLike() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+  const isMobileSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+  return isMobileSafari;
+}
+
 export async function downloadBookingReceiptPdf(bookingId, bookingCode = "booking") {
   const headers = new Headers();
   if (state.token) {
@@ -30,13 +38,27 @@ export async function downloadBookingReceiptPdf(bookingId, bookingCode = "bookin
   }
 
   const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = getDownloadFilename(
+  const filename = getDownloadFilename(
     response.headers.get("content-disposition"),
     `studio-booking-receipt-${bookingCode}.pdf`,
   );
+  const url = window.URL.createObjectURL(blob);
+
+  if (isMobileSafariLike()) {
+    // iOS Safari blocks blob downloads via <a download>. Opening in a new tab
+    // lets the customer use the native viewer's Share → Save to Files action.
+    const win = window.open(url, "_blank");
+    if (!win) {
+      // Pop-up blocked — fall back to top-level navigation so they still get the file.
+      window.location.assign(url);
+    }
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();

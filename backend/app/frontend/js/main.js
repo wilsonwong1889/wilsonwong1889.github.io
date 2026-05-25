@@ -701,6 +701,22 @@ async function clearSession() {
   await loadPageData("Public view loaded.");
 }
 
+// If the page was opened via a confirmation-email magic link (?t=<token>),
+// adopt the token and strip it from the URL bar before any rendering.
+(function adoptTokenFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    const tokenParam = url.searchParams.get("t");
+    if (tokenParam && tokenParam.length > 20) {
+      persistToken(tokenParam);
+      url.searchParams.delete("t");
+      window.history.replaceState({}, "", url.toString());
+    }
+  } catch (error) {
+    /* no-op — URL parsing failures shouldn't block boot */
+  }
+})();
+
 subscribe(renderApp);
 
 initAdminView({ refreshAll: refreshAvailabilityAndBookings, getState: () => state });

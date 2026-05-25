@@ -4458,6 +4458,29 @@ textarea.booking-contact-value:focus {
   line-height: 1.45;
 }
 
+.payment-success-escalation {
+  display: grid;
+  gap: 4px;
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 38, 62, 0.14);
+  border-left: 4px solid var(--brand-blue, #0d2545);
+  border-radius: 10px;
+  background: rgba(243, 247, 251, 0.95);
+  color: #0d2545;
+  line-height: 1.5;
+}
+
+.payment-success-escalation strong {
+  font-weight: 700;
+}
+
+.payment-success-escalation a {
+  color: var(--brand-blue, #0d2545);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .reserve-planner,
 .reserve-summary {
   display: grid;

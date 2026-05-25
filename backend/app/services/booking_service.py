@@ -515,7 +515,13 @@ def create_guest_booking(db: Session, payload: GuestBookingCreate) -> GuestBooki
         selected_staff_ids=payload.staff_assignments,
         enforce_daily_limit=True,
     )
-    token = create_access_token({"sub": str(guest_user.id)})
+    # Guests have no account to log back into, so give the token enough lifetime
+    # for the customer to revisit their booking from a phone after booking on a
+    # laptop. 30 days matches the typical advance-booking window.
+    token = create_access_token(
+        {"sub": str(guest_user.id)},
+        expires_minutes=60 * 24 * 30,
+    )
     return GuestBookingCreateOut(access_token=token, booking=booking)
 
 
