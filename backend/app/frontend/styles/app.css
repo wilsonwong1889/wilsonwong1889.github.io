@@ -10448,6 +10448,20 @@ button.avail-cal-day:focus-visible {
   border-color: var(--brand-blue);
 }
 
+/* Both icons live inside the button; CSS swaps which one is visible based on
+   .nav-open. This avoids the per-tap innerHTML reflow the old code did. */
+.mobile-nav-icon-close {
+  display: none;
+}
+
+.site-header.nav-open .mobile-nav-icon-open {
+  display: none;
+}
+
+.site-header.nav-open .mobile-nav-icon-close {
+  display: inline-block;
+}
+
 @media (max-width: 768px) {
   /* Show hamburger, adjust brand row to 3 cols: brand | title | hamburger */
   body[data-page] .site-header-brand-row {
@@ -10584,6 +10598,39 @@ button.avail-cal-day:focus-visible {
   .admin-studio-row,
   .admin-booking-record {
     overflow-x: auto;
+  }
+
+  /* Mobile perf: kill backdrop-filter everywhere.
+     iOS Safari has to rebuild every blurred layer on the GPU during any
+     reflow (opening the nav drawer, scrolling past a sticky element, etc.).
+     With 6+ blurred elements per page this is the single biggest cause of
+     "lag when I tap the menu". The opaque backgrounds below look identical
+     at phone DPI and skip the GPU pass entirely. */
+  .site-header-glass,
+  .panel,
+  .hero-card,
+  .status-chip,
+  .signal-panel,
+  .carousel-slide-announcement,
+  .home-information-panel,
+  .booking-checkout-payment .payment-deadline-note,
+  .reserve-booking-sidebar,
+  .booking-checkout-summary {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Make the sticky header its own paint-isolated layer so opening the
+     drawer only repaints inside the header, not the whole page. */
+  body[data-page] .site-header {
+    contain: layout paint;
+    will-change: transform;
+  }
+
+  /* Removes the synthetic ~300ms delay iOS adds before firing a click on
+     non-form elements, even with viewport-meta. */
+  .mobile-nav-toggle {
+    touch-action: manipulation;
   }
 }
 
