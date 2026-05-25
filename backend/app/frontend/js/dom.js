@@ -54,8 +54,6 @@ export const elements = {
   passwordForm: document.getElementById("password-form"),
   profilePasswordMatchFeedback: document.getElementById("profile-password-match-feedback"),
   roomsToolbar: document.getElementById("rooms-toolbar"),
-  roomsPreviewDate: document.getElementById("rooms-preview-date"),
-  roomsPreviewButton: document.getElementById("rooms-preview-button"),
   roomsSearchDate: document.getElementById("rooms-search-date"),
   roomsSearchTime: document.getElementById("rooms-search-time"),
   roomsSearchDuration: document.getElementById("rooms-search-duration"),

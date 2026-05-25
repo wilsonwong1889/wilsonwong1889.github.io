@@ -120,8 +120,23 @@ function ensurePolling(booking) {
     await reloadPaymentSuccessAction("Confirming your booking...");
     if (paymentSuccessPollCount >= 10) {
       stopPolling();
+      renderPollTimeoutEscalation();
     }
   }, 3000);
+}
+
+function renderPollTimeoutEscalation() {
+  if (!elements.paymentSuccessActions) return;
+  if (document.getElementById("payment-success-escalation")) return;
+  const banner = document.createElement("div");
+  banner.id = "payment-success-escalation";
+  banner.className = "payment-success-escalation";
+  banner.innerHTML = `
+    <strong>Still confirming.</strong>
+    <span>Stripe or our worker may be running slow. Try refreshing — if your booking still isn't confirmed in a few minutes, call <a href="tel:+14033938857">403-393-8857</a> and quote your booking code.</span>
+  `;
+  const actions = elements.paymentSuccessActions;
+  actions.parentNode?.insertBefore(banner, actions);
 }
 
 export function initPaymentSuccessView(actions) {

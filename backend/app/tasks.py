@@ -293,7 +293,7 @@ def send_booking_created_email_task(booking_id: str):
             record_task_run("send_booking_created_email")
             record_task_items("send_booking_created_email", "skipped", 1)
             return {"sent": False}
-        room_name = _get_room_name(db, booking.room_id)
+        room_name = getattr(booking, "room_name_snapshot", None) or _get_room_name(db, booking.room_id)
         end_dt = booking.start_time + timedelta(minutes=booking.duration_minutes)
         delivery = booking_created_email(
             to_email=user.email,
@@ -363,19 +363,47 @@ def send_booking_confirmation_email_task(booking_id: str):
             record_task_run("send_booking_confirmation_email")
             record_task_items("send_booking_confirmation_email", "skipped", 1)
             return {"sent": False}
-        room_name = _get_room_name(db, booking.room_id)
+        room_name = getattr(booking, "room_name_snapshot", None) or _get_room_name(db, booking.room_id)
         end_dt = booking.start_time + timedelta(minutes=booking.duration_minutes)
-        delivery = booking_confirmation_email(
-            to_email=user.email,
-            booking_code=booking.booking_code,
-            start_time=booking.start_time.isoformat(),
-            full_name=user.full_name,
-            room_name=room_name,
-            duration_minutes=booking.duration_minutes,
-            price_cents=booking.price_cents,
-            start_dt=booking.start_time,
-            end_dt=end_dt,
-        )
+        # For guest users (auto-generated email), mint a fresh long-lived token
+        # so the email link works on any device they open it on.
+        guest_token = None
+        try:
+            from app.core.security import create_access_token
+            if user.email and "@guest.studiobooking.local" in user.email:
+                guest_token = create_access_token(
+                    {"sub": str(user.id)},
+                    expires_minutes=60 * 24 * 30,
+                )
+        except Exception:  # noqa: BLE001 — never let token minting block the email
+            guest_token = None
+        try:
+            delivery = booking_confirmation_email(
+                to_email=user.email,
+                booking_code=booking.booking_code,
+                start_time=booking.start_time.isoformat(),
+                full_name=user.full_name,
+                room_name=room_name,
+                duration_minutes=booking.duration_minutes,
+                price_cents=booking.price_cents,
+                start_dt=booking.start_time,
+                end_dt=end_dt,
+                booking_id=str(booking.id),
+                guest_access_token=guest_token,
+            )
+        except Exception as exc:  # noqa: BLE001 — record the failure so admins can see it
+            create_notification_log(
+                db,
+                user_id=user.id,
+                booking_id=booking.id,
+                notification_type="booking_confirmation_email_worker",
+                status="Failed",
+                details={"error": str(exc)},
+            )
+            db.commit()
+            record_task_run("send_booking_confirmation_email")
+            record_task_items("send_booking_confirmation_email", "failed", 1)
+            raise
         create_notification_log(
             db,
             user_id=user.id,
@@ -431,7 +459,7 @@ def send_booking_cancellation_email_task(booking_id: str):
             record_task_run("send_booking_cancellation_email")
             record_task_items("send_booking_cancellation_email", "skipped", 1)
             return {"sent": False}
-        room_name = _get_room_name(db, booking.room_id)
+        room_name = getattr(booking, "room_name_snapshot", None) or _get_room_name(db, booking.room_id)
         delivery = booking_cancellation_email(
             to_email=user.email,
             booking_code=booking.booking_code,
@@ -576,7 +604,7 @@ def dispatch_due_reminders_task(hours_before: int):
                     .first()
                 )
                 if not existing_email:
-                    room_name = _get_room_name(db, booking.room_id)
+                    room_name = getattr(booking, "room_name_snapshot", None) or _get_room_name(db, booking.room_id)
                     delivery = booking_reminder_email(
                         to_email=user.email,
                         booking_code=booking.booking_code,
@@ -663,7 +691,7 @@ def send_booking_staff_notification_email_task(booking_id: str, event_type: str)
             record_task_items("send_booking_staff_notification_email", "skipped", 1)
             return {"sent": False, "reason": "booking_not_found"}
 
-        room_name = _get_room_name(db, booking.room_id)
+        room_name = getattr(booking, "room_name_snapshot", None) or _get_room_name(db, booking.room_id)
         end_dt = booking.start_time + timedelta(minutes=booking.duration_minutes)
 
         delivery = booking_staff_notification_email(

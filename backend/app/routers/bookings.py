@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_admin_user, get_current_user
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
+from app.models.booking import Booking
 from app.models.user import User
 from app.schemas.booking import (
     BookingAvailabilityOut,
@@ -99,6 +100,20 @@ def create_reservation(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.delete("/bookings/reservations", status_code=204)
+def release_reservation(
+    token: str,
+    slot_keys: List[str] = Query(default_factory=list),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(booking_rate_limit),
+):
+    if not slot_keys:
+        return
+    from app.services.reservation_service import release_hold
+
+    release_hold(slot_keys, token)
 
 
 @router.post("/bookings", response_model=BookingOut, status_code=201)
@@ -279,18 +294,18 @@ def cancel_my_booking(
 
 
 @router.post("/bookings/{booking_id}/reschedule", response_model=BookingOut)
-def reschedule_my_booking(
+def reschedule_booking_admin_only(
     booking_id: str,
     payload: BookingRescheduleIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    admin: User = Depends(get_admin_user),
     _: None = Depends(booking_rate_limit),
 ):
-    booking = get_booking_for_user(db, booking_id, current_user)
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     try:
-        return reschedule_booking(db, booking, current_user, payload)
+        return reschedule_booking(db, booking, admin, payload)
     except BookingConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:

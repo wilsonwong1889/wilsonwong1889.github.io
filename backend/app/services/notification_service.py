@@ -412,6 +412,8 @@ def booking_confirmation_email(
     price_cents: Optional[int] = None,
     start_dt: Optional[datetime] = None,
     end_dt: Optional[datetime] = None,
+    booking_id: Optional[str] = None,
+    guest_access_token: Optional[str] = None,
 ) -> dict:
     greeting = full_name or to_email
     local_time = _fmt_local(start_dt) if start_dt else start_time
@@ -425,13 +427,22 @@ def booking_confirmation_email(
         rows += _detail_row("Total paid", _fmt_money(price_cents))
     rows += _detail_row("Location", STUDIO_ADDRESS)
 
+    booking_link_base = settings.APP_BASE_URL.rstrip("/")
+    if booking_id:
+        link_params = f"?id={booking_id}"
+        if guest_access_token:
+            link_params += f"&t={guest_access_token}"
+        view_booking_url = f"{booking_link_base}/booking{link_params}"
+    else:
+        view_booking_url = f"{booking_link_base}/bookings"
+
     body = _html_wrap(
         f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">You\'re booked! ✓</h2>'
         f'<p style="margin:0 0 4px;color:#444;font-size:15px;">Hi {greeting},</p>'
         f'<p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">'
         f'Your booking is confirmed. We\'ve attached a calendar invite to add to your calendar.</p>'
         + _details_table(rows) +
-        _button("View My Booking", f"{settings.APP_BASE_URL.rstrip('/')}/bookings") +
+        _button("View My Booking", view_booking_url) +
         f'<p style="margin:20px 0 0;color:#888;font-size:13px;">'
         f'Plan to arrive 10–15 minutes early. '
         f'Questions? Call {STUDIO_PHONE} or reply to this email.</p>'
@@ -483,6 +494,19 @@ def booking_cancellation_email(
     if local_time:
         rows += _detail_row("Original date", local_time)
     rows += _detail_row("Reason", reason or "No reason provided")
+    is_expiry = bool(reason and "expired" in reason.lower())
+    charge_warning_html = (
+        f'<p style="margin:16px 0 0;color:#7a1216;font-size:14px;line-height:1.55;">'
+        f'<strong>If you completed payment</strong> but never saw a confirmation, your card may still '
+        f'have been charged. Reply to this email or call {STUDIO_PHONE} and we will look it up and refund '
+        f'within one business day.</p>'
+        if is_expiry else ""
+    )
+    charge_warning_text = (
+        "\nIf you completed payment but never saw a confirmation, your card may still have been charged. "
+        f"Reply to this email or call {STUDIO_PHONE} and we will look it up and refund within one business day.\n"
+        if is_expiry else ""
+    )
 
     body = _html_wrap(
         f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">Booking cancelled</h2>'
@@ -491,6 +515,7 @@ def booking_cancellation_email(
         f'Your booking has been cancelled. See details below.</p>'
         + _details_table(rows) +
         _button("Book Again", f"{settings.APP_BASE_URL.rstrip('/')}/rooms") +
+        charge_warning_html +
         f'<p style="margin:20px 0 0;color:#888;font-size:13px;">'
         f'Questions about the cancellation? Contact us at {STUDIO_PHONE}.</p>'
     )
@@ -501,8 +526,9 @@ def booking_cancellation_email(
             f"Hi {greeting},\n\n"
             f"Your booking {booking_code} has been cancelled.\n"
             + (f"Original date: {local_time}\n" if local_time else "")
-            + f"Reason: {reason or 'No reason provided'}\n\n"
-            f"Book again at: {settings.APP_BASE_URL.rstrip('/')}/rooms\n"
+            + f"Reason: {reason or 'No reason provided'}\n"
+            + charge_warning_text +
+            f"\nBook again at: {settings.APP_BASE_URL.rstrip('/')}/rooms\n"
         ),
         html_content=body,
     )

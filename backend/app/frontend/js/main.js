@@ -59,31 +59,53 @@ document.querySelectorAll("img").forEach((img) => {
   const nav = document.getElementById("site-nav");
   if (!toggle || !header || !nav) return;
 
-  const OPEN_SVG = '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="4" x2="18" y2="18"/><line x1="18" y1="4" x2="4" y2="18"/></svg>';
-  const CLOSED_SVG = '<svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="6" x2="19" y2="6"/><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="16" x2="19" y2="16"/></svg>';
+  // Pre-render BOTH icons into the button once. CSS swaps which one shows
+  // based on .nav-open — no per-tap innerHTML mutation, no reflow.
+  const HAMBURGER_SVG = '<svg class="mobile-nav-icon mobile-nav-icon-open" width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="19" y2="6"/><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="16" x2="19" y2="16"/></svg>';
+  const CLOSE_SVG = '<svg class="mobile-nav-icon mobile-nav-icon-close" width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="18" y2="18"/><line x1="18" y1="4" x2="4" y2="18"/></svg>';
+  toggle.innerHTML = HAMBURGER_SVG + CLOSE_SVG;
+
+  // Document-level click handler is only attached while the drawer is open,
+  // so we're not running a global handler on every tap elsewhere on the page.
+  let outsideClickHandler = null;
+
+  function attachOutsideClick() {
+    if (outsideClickHandler) return;
+    outsideClickHandler = (e) => {
+      if (!header.contains(e.target)) closeNav();
+    };
+    // capture phase + microtask delay so the same click that opened the
+    // drawer doesn't immediately close it.
+    window.setTimeout(() => {
+      document.addEventListener("click", outsideClickHandler, { capture: true });
+    }, 0);
+  }
+
+  function detachOutsideClick() {
+    if (!outsideClickHandler) return;
+    document.removeEventListener("click", outsideClickHandler, { capture: true });
+    outsideClickHandler = null;
+  }
 
   function openNav() {
     header.classList.add("nav-open");
     toggle.setAttribute("aria-expanded", "true");
-    toggle.innerHTML = OPEN_SVG;
+    attachOutsideClick();
   }
 
   function closeNav() {
     header.classList.remove("nav-open");
     toggle.setAttribute("aria-expanded", "false");
-    toggle.innerHTML = CLOSED_SVG;
+    detachOutsideClick();
   }
 
-  toggle.addEventListener("click", () => {
+  toggle.addEventListener("click", (event) => {
+    event.stopPropagation();
     if (header.classList.contains("nav-open")) closeNav(); else openNav();
   });
 
   nav.querySelectorAll(".nav-link").forEach((link) => {
     link.addEventListener("click", closeNav);
-  });
-
-  document.addEventListener("click", (e) => {
-    if (header.classList.contains("nav-open") && !header.contains(e.target)) closeNav();
   });
 }());
 
@@ -700,6 +722,22 @@ async function clearSession() {
   });
   await loadPageData("Public view loaded.");
 }
+
+// If the page was opened via a confirmation-email magic link (?t=<token>),
+// adopt the token and strip it from the URL bar before any rendering.
+(function adoptTokenFromUrl() {
+  try {
+    const url = new URL(window.location.href);
+    const tokenParam = url.searchParams.get("t");
+    if (tokenParam && tokenParam.length > 20) {
+      persistToken(tokenParam);
+      url.searchParams.delete("t");
+      window.history.replaceState({}, "", url.toString());
+    }
+  } catch (error) {
+    /* no-op — URL parsing failures shouldn't block boot */
+  }
+})();
 
 subscribe(renderApp);
 

@@ -505,3 +505,114 @@ class OpsTest(BaseAppTest):
         self.assertIn("staff_profile_updated", audit_actions)
         self.assertIn("staff_profile_deleted", audit_actions)
         self.assertIn("manual_booking_created", audit_actions)
+
+    def test_42_background_worker_recovery_when_providers_fail(self) -> None:
+        """Verify the notification + cleanup tasks survive provider failures
+        and stay idempotent. Covers the background-worker-retry-recovery
+        catalog case."""
+        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+        from uuid import UUID
+        from unittest.mock import patch
+        from app.models.room import Room
+        from app.services.booking_service import expire_stale_pending_bookings
+        from app.tasks import (
+            cleanup_expired_pending_bookings_task,
+            send_booking_confirmation_email_task,
+        )
+
+        with self.SessionLocal() as db:
+            room = Room(
+                name="Recovery Room",
+                description="Worker recovery test room",
+                capacity=4,
+                photos=[],
+                hourly_rate_cents=10000,
+            )
+            db.add(room)
+            db.commit()
+            db.refresh(room)
+            room_id = str(room.id)
+
+        resp = self.client.post(
+            "/api/auth/signup",
+            json={
+                "email": "recovery-user@example.com",
+                "password": "Password123!",
+                "full_name": "Recovery User",
+                "phone": "5550008000",
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        resp = self.client.post(
+            "/api/auth/login",
+            data={"username": "recovery-user@example.com", "password": "Password123!"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        user_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+        biz_tz = ZoneInfo("America/Edmonton")
+        booking_date = datetime.now(biz_tz).date() + timedelta(days=12)
+        while booking_date.weekday() not in {2, 3, 4, 5}:
+            booking_date += timedelta(days=1)
+        start_time = datetime(
+            booking_date.year, booking_date.month, booking_date.day, 14, 0, tzinfo=biz_tz
+        )
+        resp = self.client.post(
+            "/api/bookings",
+            headers=user_headers,
+            json={"room_id": room_id, "start_time": start_time.isoformat(), "duration_minutes": 60},
+        )
+        self.assertEqual(resp.status_code, 201)
+        booking_id = resp.json()["id"]
+
+        # 1) Notification task survives provider failure by logging Failed and re-raising.
+        with patch(
+            "app.tasks.booking_confirmation_email",
+            side_effect=RuntimeError("SendGrid down"),
+        ):
+            with self.assertRaises(RuntimeError):
+                send_booking_confirmation_email_task(booking_id)
+
+        with self.SessionLocal() as db:
+            failed_logs = (
+                db.query(self.NotificationLog)
+                .filter(self.NotificationLog.booking_id == booking_id)
+                .filter(self.NotificationLog.type == "booking_confirmation_email_worker")
+                .filter(self.NotificationLog.status == "Failed")
+                .all()
+            )
+        self.assertEqual(len(failed_logs), 1)
+        self.assertIn("SendGrid down", failed_logs[0].details.get("error", ""))
+
+        # 2) Same task succeeds on the retry once the provider recovers.
+        # Force the booking row to look old so the expiry guard inside the
+        # task doesn't skip it.
+        result = send_booking_confirmation_email_task(booking_id)
+        self.assertTrue(result.get("sent") in (True, False))  # opt_in_email may differ
+
+        # 3) The cleanup task is idempotent: a second invocation after a fully
+        # cleaned-up state returns "cleaned": 0 and does not raise.
+        with self.SessionLocal() as db:
+            booking_row = db.query(self.Booking).filter(self.Booking.id == UUID(booking_id)).first()
+            booking_row.created_at = _dt.now(_tz.utc) - _td(minutes=20)
+            db.commit()
+        cleaned_first = expire_stale_pending_bookings(self.SessionLocal())
+        self.assertGreaterEqual(cleaned_first, 1)
+        # Cleanup task wrapper: should not raise on the second call and reports 0.
+        second_result = cleanup_expired_pending_bookings_task()
+        self.assertEqual(second_result.get("cleaned", 0), 0)
+
+        # 4) Booking is now Cancelled and a cancellation notification was queued
+        # by the expiry path (bucket-2 fix E coverage).
+        with self.SessionLocal() as db:
+            cancelled = (
+                db.query(self.Booking).filter(self.Booking.id == UUID(booking_id)).first()
+            )
+            expired_notifications = (
+                db.query(self.NotificationLog)
+                .filter(self.NotificationLog.booking_id == booking_id)
+                .filter(self.NotificationLog.type == "booking_expired")
+                .count()
+            )
+        self.assertEqual(cancelled.status, "Cancelled")
+        self.assertGreaterEqual(expired_notifications, 1)

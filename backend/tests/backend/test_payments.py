@@ -468,3 +468,115 @@ class PaymentTest(BaseAppTest):
         self.assertIn("booking_confirmation_sms_worker", webhook_notification_types)
         self.assertIn("booking_cancellation_sms_worker", webhook_notification_types)
         self.assertIn("refund_processed_sms_worker", webhook_notification_types)
+
+    def test_31_webhook_duplicate_storm_is_idempotent(self) -> None:
+        """A flood of duplicate payment_intent.succeeded deliveries for the same
+        booking must only mark the booking Paid once, only write one
+        payment_confirmed audit entry, and only queue one confirmation email.
+        Covers the payment-webhook-idempotency-storm catalog case."""
+        from app.config import settings
+        from app.models.room import Room
+
+        with self.SessionLocal() as db:
+            room = Room(
+                name="Idempotency Storm Room",
+                description="Webhook idempotency soak room",
+                capacity=4,
+                photos=[],
+                hourly_rate_cents=10000,
+            )
+            db.add(room)
+            db.commit()
+            db.refresh(room)
+            room_id = str(room.id)
+
+        resp = self.client.post(
+            "/api/auth/signup",
+            json={
+                "email": "storm-user@example.com",
+                "password": "Password123!",
+                "full_name": "Storm User",
+                "phone": "5552220000",
+            },
+        )
+        self.assertEqual(resp.status_code, 201)
+        resp = self.client.post(
+            "/api/auth/login",
+            data={"username": "storm-user@example.com", "password": "Password123!"},
+        )
+        self.assertEqual(resp.status_code, 200)
+        user_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
+
+        business_timezone = ZoneInfo("America/Edmonton")
+        booking_date = datetime.now(business_timezone).date() + timedelta(days=14)
+        while booking_date.weekday() not in {2, 3, 4, 5}:
+            booking_date += timedelta(days=1)
+        start_time = datetime(
+            booking_date.year, booking_date.month, booking_date.day,
+            13, 0, tzinfo=business_timezone,
+        )
+        resp = self.client.post(
+            "/api/bookings",
+            headers=user_headers,
+            json={"room_id": room_id, "start_time": start_time.isoformat(), "duration_minutes": 60},
+        )
+        self.assertEqual(resp.status_code, 201)
+        booking = resp.json()
+        self.assertEqual(booking["status"], "PendingPayment")
+
+        event = {
+            "type": "payment_intent.succeeded",
+            "data": {
+                "object": {
+                    "id": booking["payment_intent_id"],
+                    "metadata": {"booking_id": booking["id"]},
+                }
+            },
+        }
+        payload = json.dumps(event)
+        timestamp = str(int(time.time()))
+        signature = hmac.new(
+            settings.STRIPE_WEBHOOK_SECRET.encode("utf-8"),
+            f"{timestamp}.{payload}".encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+        # Storm the endpoint with 20 duplicate deliveries.
+        storm_statuses = []
+        for _ in range(20):
+            r = self.client.post(
+                "/api/webhooks/stripe",
+                data=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Stripe-Signature": f"t={timestamp},v1={signature}",
+                },
+            )
+            self.assertEqual(r.status_code, 200)
+            storm_statuses.append(r.json().get("status"))
+
+        # Every delivery should report the booking as Paid (idempotent).
+        self.assertTrue(all(status == "Paid" for status in storm_statuses))
+
+        resp = self.client.get(f"/api/bookings/{booking['id']}", headers=user_headers)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["status"], "Paid")
+
+        with self.SessionLocal() as db:
+            paid_audits = (
+                db.query(self.AuditLog)
+                .filter(self.AuditLog.booking_id == booking["id"])
+                .filter(self.AuditLog.action == "payment_confirmed")
+                .count()
+            )
+            confirmation_notifications = (
+                db.query(self.NotificationLog)
+                .filter(self.NotificationLog.booking_id == booking["id"])
+                .filter(self.NotificationLog.type == "booking_confirmation_email")
+                .count()
+            )
+
+        # Exactly one paid-audit entry and one confirmation-email queue entry
+        # despite 20 duplicate deliveries.
+        self.assertEqual(paid_audits, 1)
+        self.assertEqual(confirmation_notifications, 1)

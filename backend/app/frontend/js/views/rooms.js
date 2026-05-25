@@ -7,7 +7,6 @@ let selectedCreateStaffIds = new Set();
 let roomsViewBound = false;
 let selectedRoomCategory = "all";
 let roomsCatalogSort = "recommended";
-let roomsFiltersOpen = false;
 let pendingUrlSearch = false;
 
 const ROOM_CATEGORY_ORDER = [
@@ -64,14 +63,6 @@ function roomsResultsCount() {
   return document.getElementById("rooms-results-count");
 }
 
-function roomsFilterToggleButton() {
-  return document.getElementById("rooms-filter-toggle");
-}
-
-function roomsFilterPanel() {
-  return document.getElementById("rooms-filter-panel");
-}
-
 function formatCurrency(cents) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -105,6 +96,45 @@ function extractStudioTime(startTime) {
 function formatDuration(minutes) {
   const hours = minutes / 60;
   return `${hours} hour${hours === 1 ? "" : "s"}`;
+}
+
+function formatSearchDateLabel(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("en-CA", { weekday: "short", month: "short", day: "numeric" })
+    .format(new Date(`${value}T00:00:00`));
+}
+
+function formatSearchTimeLabel(value) {
+  if (!value) return "";
+  const [h, m] = String(value).split(":").map(Number);
+  const date = new Date();
+  date.setHours(h || 0, m || 0, 0, 0);
+  return new Intl.DateTimeFormat("en-CA", { hour: "numeric", minute: "2-digit" }).format(date);
+}
+
+const STUDIO_CLOSED_WEEKDAYS = new Set([0, 1, 2]); // Sun, Mon, Tue
+const STUDIO_CLOSE_HOUR = 20;
+const CLOSED_WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday"];
+
+function getWeekdayForIsoDate(value) {
+  if (!value) return null;
+  const [y, mo, d] = value.split("-").map(Number);
+  if (!y || !mo || !d) return null;
+  return new Date(y, mo - 1, d).getDay();
+}
+
+function isPastIsoDate(value) {
+  if (!value) return false;
+  const today = availCalTodayLocal();
+  return value < today;
+}
+
+function maxDurationMinutesForStartTime(startTime) {
+  if (!startTime) return 300;
+  const [h] = String(startTime).split(":").map(Number);
+  if (Number.isNaN(h)) return 300;
+  const hoursUntilClose = Math.max(0, STUDIO_CLOSE_HOUR - h);
+  return Math.min(300, Math.max(60, hoursUntilClose * 60));
 }
 
 function getPrimaryPhoto(room) {
@@ -196,18 +226,6 @@ function renderCategoryFilterBar(rooms) {
       </button>
     `,
   ).join("");
-}
-
-function renderRoomsFilterPanelState() {
-  const panel = roomsFilterPanel();
-  const button = roomsFilterToggleButton();
-  if (!panel || !button) {
-    return;
-  }
-
-  panel.classList.toggle("hidden", !roomsFiltersOpen);
-  button.classList.toggle("is-active", roomsFiltersOpen);
-  button.setAttribute("aria-expanded", roomsFiltersOpen ? "true" : "false");
 }
 
 function getRoomPhotoUrlInput() {
@@ -379,7 +397,7 @@ function renderAvailabilityPreview(roomId) {
     return `
       <div class="availability-preview availability-preview-idle">
         <span class="availability-label">Live openings</span>
-        <p>Use filters to check a specific day, or book now to see today's openings.</p>
+        <p>Use the "When?" picker above to see this room's openings for a specific day.</p>
       </div>
     `;
   }
@@ -551,34 +569,6 @@ function renderRoomCard(room, canManageRooms) {
   `;
 }
 
-async function previewRoomsAvailability() {
-  if (!elements.roomsPreviewDate || !state.rooms.length) {
-    return;
-  }
-
-  const previewDate = elements.roomsPreviewDate.value;
-  if (!previewDate) {
-    setState({ message: "Choose a date to preview live openings." });
-    return;
-  }
-
-  try {
-    setState({ message: "Loading live room availability..." });
-    const previews = await Promise.all(
-      state.rooms
-        .filter((room) => room.active)
-        .map(async (room) => [room.id, await api.getAvailability(room.id, previewDate)]),
-    );
-    setState({
-      roomPreviewDate: previewDate,
-      roomAvailabilityPreview: Object.fromEntries(previews),
-      message: "Live availability loaded.",
-    });
-  } catch (error) {
-    setState({ message: error.message });
-  }
-}
-
 async function searchRoomsByAvailability() {
   const searchDate = elements.roomsSearchDate?.value;
   const searchTime = elements.roomsSearchTime?.value;
@@ -587,8 +577,26 @@ async function searchRoomsByAvailability() {
     setState({ message: "Choose a date and start time to search for rooms." });
     return;
   }
+  if (isPastIsoDate(searchDate)) {
+    setState({ message: "That date has already passed. Pick a future date." });
+    return;
+  }
+  const weekday = getWeekdayForIsoDate(searchDate);
+  if (weekday !== null && STUDIO_CLOSED_WEEKDAYS.has(weekday)) {
+    setState({
+      message: `The studio is closed on ${CLOSED_WEEKDAY_NAMES[weekday]}. Pick a Wednesday through Saturday.`,
+    });
+    return;
+  }
   if (searchTime < "12:00" || searchTime > "19:00") {
     setState({ message: "Choose a start time between 12:00 PM and 7:00 PM." });
+    return;
+  }
+  const maxDuration = maxDurationMinutesForStartTime(searchTime);
+  if (duration > maxDuration) {
+    setState({
+      message: `A ${formatDuration(duration)} session starting at ${formatSearchTimeLabel(searchTime)} would run past 8:00 PM. Shorten the duration or pick an earlier start time.`,
+    });
     return;
   }
 
@@ -617,6 +625,8 @@ async function searchRoomsByAvailability() {
         matchingRoomIds,
         hasSearched: true,
       },
+      roomPreviewDate: searchDate,
+      roomAvailabilityPreview: Object.fromEntries(availabilityRows),
       message: matchingRoomIds.length
         ? `Found ${matchingRoomIds.length} matching room${matchingRoomIds.length === 1 ? "" : "s"}.`
         : "No rooms matched that time.",
@@ -866,14 +876,11 @@ function availCalRender() {
 
 function availCalPickDate(dateKey) {
   if (elements.roomsSearchDate) elements.roomsSearchDate.value = dateKey;
-  if (!roomsFiltersOpen) {
-    roomsFiltersOpen = true;
-    renderRoomsFilterPanelState();
+  const whenBar = document.querySelector(".rooms-when-bar");
+  if (whenBar) {
+    whenBar.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  const filterPanel = document.getElementById("rooms-filter-panel");
-  if (filterPanel) {
-    filterPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  searchRoomsByAvailability();
 }
 
 function initAvailCal() {
@@ -910,7 +917,6 @@ export function initRoomsView(actions) {
   if (urlDate && !pendingUrlSearch) {
     if (elements.roomsSearchDate) elements.roomsSearchDate.value = urlDate;
     if (urlTime && elements.roomsSearchTime) elements.roomsSearchTime.value = urlTime;
-    roomsFiltersOpen = true;
     pendingUrlSearch = true;
   }
 
@@ -926,10 +932,6 @@ export function initRoomsView(actions) {
       roomsCatalogSort = event.target.value || "recommended";
       renderRoomsView(state);
     });
-    roomsFilterToggleButton()?.addEventListener("click", () => {
-      roomsFiltersOpen = !roomsFiltersOpen;
-      renderRoomsFilterPanelState();
-    });
     roomsCategoryBar()?.addEventListener("click", (event) => {
       const button = event.target.closest("[data-room-category]");
       if (!button) {
@@ -939,8 +941,6 @@ export function initRoomsView(actions) {
       renderRoomsView(state);
     });
   }
-
-  renderRoomsFilterPanelState();
 
   if (elements.showInactiveToggle) {
     elements.showInactiveToggle.addEventListener("change", async (event) => {
@@ -953,9 +953,6 @@ export function initRoomsView(actions) {
     });
   }
 
-  if (elements.roomsPreviewDate) {
-    elements.roomsPreviewDate.value = state.roomPreviewDate;
-  }
   if (elements.roomsSearchDate) {
     elements.roomsSearchDate.value = state.roomAvailabilitySearch.date;
   }
@@ -966,16 +963,14 @@ export function initRoomsView(actions) {
     elements.roomsSearchDuration.value = String(state.roomAvailabilitySearch.duration);
   }
 
-  if (elements.roomsPreviewButton) {
-    elements.roomsPreviewButton.addEventListener("click", async () => {
-      await previewRoomsAvailability();
-    });
-  }
   elements.roomsSearchButton?.addEventListener("click", async () => {
     await searchRoomsByAvailability();
   });
   elements.roomsSearchClearButton?.addEventListener("click", () => {
     clearRoomAvailabilitySearch();
+  });
+  elements.roomsSearchTime?.addEventListener("change", () => {
+    renderRoomsView(state);
   });
 
   if (elements.roomForm) {
@@ -1154,24 +1149,35 @@ export function initRoomsView(actions) {
 export function renderRoomsView(currentState) {
   const canManageRooms = Boolean(currentState.currentUser?.is_admin);
   renderCategoryFilterBar(currentState.rooms);
-  renderRoomsFilterPanelState();
   if (elements.roomsToolbar) {
     elements.roomsToolbar.classList.toggle("hidden", !canManageRooms);
   }
   if (elements.showInactiveToggle) {
     elements.showInactiveToggle.checked = currentState.showInactiveRooms;
   }
-  if (elements.roomsPreviewDate && elements.roomsPreviewDate.value !== currentState.roomPreviewDate) {
-    elements.roomsPreviewDate.value = currentState.roomPreviewDate;
-  }
-  if (elements.roomsSearchDate && elements.roomsSearchDate.value !== currentState.roomAvailabilitySearch.date) {
-    elements.roomsSearchDate.value = currentState.roomAvailabilitySearch.date;
+  if (elements.roomsSearchDate) {
+    const todayKey = availCalTodayLocal();
+    if (elements.roomsSearchDate.min !== todayKey) {
+      elements.roomsSearchDate.min = todayKey;
+    }
+    if (elements.roomsSearchDate.value !== currentState.roomAvailabilitySearch.date) {
+      elements.roomsSearchDate.value = currentState.roomAvailabilitySearch.date;
+    }
   }
   if (elements.roomsSearchTime && elements.roomsSearchTime.value !== currentState.roomAvailabilitySearch.time) {
     elements.roomsSearchTime.value = currentState.roomAvailabilitySearch.time;
   }
-  if (elements.roomsSearchDuration && elements.roomsSearchDuration.value !== String(currentState.roomAvailabilitySearch.duration)) {
-    elements.roomsSearchDuration.value = String(currentState.roomAvailabilitySearch.duration);
+  if (elements.roomsSearchDuration) {
+    const selectedTime = elements.roomsSearchTime?.value || currentState.roomAvailabilitySearch.time;
+    const maxDuration = maxDurationMinutesForStartTime(selectedTime);
+    Array.from(elements.roomsSearchDuration.options).forEach((opt) => {
+      opt.disabled = Number(opt.value) > maxDuration;
+    });
+    const currentDuration = Number(currentState.roomAvailabilitySearch.duration || 60);
+    const targetDuration = currentDuration > maxDuration ? maxDuration : currentDuration;
+    if (elements.roomsSearchDuration.value !== String(targetDuration)) {
+      elements.roomsSearchDuration.value = String(targetDuration);
+    }
   }
 
   renderCreateRoomStaffOptions(currentState);
@@ -1184,26 +1190,6 @@ export function renderRoomsView(currentState) {
 
   if (!elements.roomsGrid) {
     return;
-  }
-
-  if (elements.roomsSearchSummary) {
-    const search = currentState.roomAvailabilitySearch;
-    if (!search.hasSearched) {
-      elements.roomsSearchSummary.classList.add("hidden");
-      elements.roomsSearchSummary.innerHTML = "";
-    } else if (!search.matchingRoomIds.length) {
-      elements.roomsSearchSummary.classList.remove("hidden");
-      elements.roomsSearchSummary.innerHTML = `
-        <strong>No rooms available</strong>
-        <span>No active rooms are open on ${escapeHtml(search.date)} at ${escapeHtml(search.time)} for ${formatDuration(search.duration)}.</span>
-      `;
-    } else {
-      elements.roomsSearchSummary.classList.remove("hidden");
-      elements.roomsSearchSummary.innerHTML = `
-        <strong>${search.matchingRoomIds.length} matching room${search.matchingRoomIds.length === 1 ? "" : "s"}</strong>
-        <span>Showing rooms available on ${escapeHtml(search.date)} at ${escapeHtml(search.time)} for ${formatDuration(search.duration)}.</span>
-      `;
-    }
   }
 
   const availabilityScopedRooms = currentState.roomAvailabilitySearch.hasSearched
@@ -1220,6 +1206,30 @@ export function renderRoomsView(currentState) {
     }
     return true;
   });
+
+  if (elements.roomsSearchSummary) {
+    const search = currentState.roomAvailabilitySearch;
+    if (!search.hasSearched) {
+      elements.roomsSearchSummary.classList.add("hidden");
+      elements.roomsSearchSummary.innerHTML = "";
+    } else {
+      const dateLabel = formatSearchDateLabel(search.date);
+      const timeLabel = formatSearchTimeLabel(search.time);
+      const durationLabel = formatDuration(search.duration);
+      elements.roomsSearchSummary.classList.remove("hidden");
+      if (!visibleRooms.length) {
+        elements.roomsSearchSummary.innerHTML = `
+          <strong>No studios available</strong>
+          <span>No studios are open on ${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)} for ${escapeHtml(durationLabel)}.</span>
+        `;
+      } else {
+        elements.roomsSearchSummary.innerHTML = `
+          <strong>${visibleRooms.length} studio${visibleRooms.length === 1 ? "" : "s"} available</strong>
+          <span>On ${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)} for ${escapeHtml(durationLabel)}.</span>
+        `;
+      }
+    }
+  }
 
   visibleRooms = [...visibleRooms].sort((left, right) => {
     if (roomsCatalogSort === "price-low") {
@@ -1248,14 +1258,21 @@ export function renderRoomsView(currentState) {
   }
 
   if (!visibleRooms.length) {
+    const hasSearched = currentState.roomAvailabilitySearch.hasSearched;
+    const hasTextFilter = Boolean(searchText);
+    const hasCategoryFilter = selectedRoomCategory !== "all";
+    let emptyCopy;
+    if (hasSearched) {
+      emptyCopy = "No studios match this time slot. Try a different date, time, or duration.";
+    } else if (hasTextFilter || hasCategoryFilter) {
+      emptyCopy = "No studios match these filters. Try a different category or clear the search.";
+    } else if (canManageRooms) {
+      emptyCopy = "No studios yet. Create one from the admin panel to get started.";
+    } else {
+      emptyCopy = "No studios are available right now. Please check back soon.";
+    }
     elements.roomsGrid.innerHTML = `
-      <div class="empty-state">
-        ${
-          currentState.roomAvailabilitySearch.hasSearched
-            ? "No rooms match the current availability search. Change the date, time, or duration and try again."
-            : "No rooms match this view yet. Turn off the inactive filter or create a room from the admin panel."
-        }
-      </div>
+      <div class="empty-state">${escapeHtml(emptyCopy)}</div>
     `;
   } else {
     elements.roomsGrid.innerHTML = visibleRooms

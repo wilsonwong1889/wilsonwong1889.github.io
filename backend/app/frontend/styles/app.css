@@ -326,6 +326,18 @@ body[data-auth-pending="true"] .site-header .header-actions > * {
   line-height: 1.6;
 }
 
+.reserve-conflict-alert {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(215, 25, 32, 0.25);
+  border-left: 4px solid var(--brand-red, #d71920);
+  border-radius: 12px;
+  background: rgba(215, 25, 32, 0.06);
+  color: #7a1216;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .field-help,
 .staff-option-copy span {
   color: var(--muted);
@@ -2209,20 +2221,83 @@ body[data-page="home"] .site-acknowledgement {
   margin-bottom: 16px;
 }
 
-.rooms-preview-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: end;
-  margin-bottom: 18px;
+.rooms-admin-toolbar {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px dashed rgba(0, 38, 62, 0.16);
+  border-radius: 12px;
+  background: rgba(243, 247, 251, 0.6);
+  color: #4e6275;
+  font-size: 0.88rem;
 }
 
-.rooms-search-toolbar {
+.rooms-when-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   align-items: end;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 38, 62, 0.1);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(0, 38, 62, 0.04);
+}
+
+.rooms-when-label {
+  align-self: center;
+  padding: 0 6px 0 4px;
+  color: #00263e;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+}
+
+.rooms-when-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rooms-when-field > span {
+  color: #8a97ab;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rooms-when-field input,
+.rooms-when-field select {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid rgba(0, 38, 62, 0.14);
+  border-radius: 10px;
+  background: #fbfcfe;
+  color: #00263e;
+  font: inherit;
+}
+
+.rooms-when-field input[type="date"] {
+  min-width: 148px;
+}
+
+.rooms-when-field input[type="time"] {
+  min-width: 110px;
+}
+
+.rooms-when-field select {
+  min-width: 70px;
+  cursor: pointer;
+}
+
+.rooms-when-bar .primary-button,
+.rooms-when-bar .ghost-button {
+  min-height: 40px;
+}
+
+.rooms-when-clear {
+  background: transparent;
 }
 
 .rooms-page-grid-modern {
@@ -2365,6 +2440,22 @@ body[data-page="rooms"] .rooms-catalog-shell > div:not(.rooms-catalog-header) {
   color: #d71920;
 }
 
+.rooms-filter-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(0, 38, 62, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 36px rgba(0, 38, 62, 0.05);
+}
+
+.rooms-filter-sort-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .rooms-category-bar {
   display: flex;
   flex-wrap: wrap;
@@ -2394,22 +2485,6 @@ body[data-page="rooms"] .rooms-catalog-shell > div:not(.rooms-catalog-header) {
   margin-bottom: 16px;
   color: #00263e;
   font-size: 0.98rem;
-}
-
-.rooms-filter-panel {
-  display: grid;
-  gap: 16px;
-  padding: 20px;
-  margin-bottom: 20px;
-  border: 1px solid rgba(0, 38, 62, 0.08);
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 36px rgba(0, 38, 62, 0.05);
-}
-
-.rooms-filter-sort-row {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .rooms-grid-catalog {
@@ -2978,6 +3053,12 @@ body[data-page="rooms"] .rooms-catalog-shell > div:not(.rooms-catalog-header) {
   margin: 0 0 14px;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.form-required {
+  color: var(--brand-red, #d71920);
+  font-weight: 700;
+  margin-left: 2px;
 }
 
 .account-summary {
@@ -4311,6 +4392,11 @@ textarea.booking-contact-value:focus {
   text-align: right;
 }
 
+.booking-card-status-note-expired {
+  color: var(--brand-red, #d71920);
+  font-weight: 600;
+}
+
 .booking-card-actions {
   display: flex;
   flex-wrap: wrap;
@@ -4338,6 +4424,61 @@ textarea.booking-contact-value:focus {
   margin: 0 0 10px;
   color: var(--accent-deep);
   font-weight: 600;
+}
+
+.payment-deadline-note-urgent {
+  padding: 10px 14px;
+  border: 1px solid rgba(215, 25, 32, 0.3);
+  border-radius: 10px;
+  background: rgba(215, 25, 32, 0.08);
+  color: #7a1216;
+}
+
+.booking-checkout-payment .payment-deadline-note {
+  position: sticky;
+  top: 12px;
+  z-index: 4;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(0, 38, 62, 0.08);
+}
+
+.booking-payment-alert {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(215, 25, 32, 0.3);
+  border-left: 4px solid var(--brand-red, #d71920);
+  border-radius: 10px;
+  background: rgba(215, 25, 32, 0.06);
+  color: #7a1216;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.payment-success-escalation {
+  display: grid;
+  gap: 4px;
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 38, 62, 0.14);
+  border-left: 4px solid var(--brand-blue, #0d2545);
+  border-radius: 10px;
+  background: rgba(243, 247, 251, 0.95);
+  color: #0d2545;
+  line-height: 1.5;
+}
+
+.payment-success-escalation strong {
+  font-weight: 700;
+}
+
+.payment-success-escalation a {
+  color: var(--brand-blue, #0d2545);
+  font-weight: 700;
+  text-decoration: underline;
 }
 
 .reserve-planner,
@@ -10307,6 +10448,20 @@ button.avail-cal-day:focus-visible {
   border-color: var(--brand-blue);
 }
 
+/* Both icons live inside the button; CSS swaps which one is visible based on
+   .nav-open. This avoids the per-tap innerHTML reflow the old code did. */
+.mobile-nav-icon-close {
+  display: none;
+}
+
+.site-header.nav-open .mobile-nav-icon-open {
+  display: none;
+}
+
+.site-header.nav-open .mobile-nav-icon-close {
+  display: inline-block;
+}
+
 @media (max-width: 768px) {
   /* Show hamburger, adjust brand row to 3 cols: brand | title | hamburger */
   body[data-page] .site-header-brand-row {
@@ -10443,6 +10598,39 @@ button.avail-cal-day:focus-visible {
   .admin-studio-row,
   .admin-booking-record {
     overflow-x: auto;
+  }
+
+  /* Mobile perf: kill backdrop-filter everywhere.
+     iOS Safari has to rebuild every blurred layer on the GPU during any
+     reflow (opening the nav drawer, scrolling past a sticky element, etc.).
+     With 6+ blurred elements per page this is the single biggest cause of
+     "lag when I tap the menu". The opaque backgrounds below look identical
+     at phone DPI and skip the GPU pass entirely. */
+  .site-header-glass,
+  .panel,
+  .hero-card,
+  .status-chip,
+  .signal-panel,
+  .carousel-slide-announcement,
+  .home-information-panel,
+  .booking-checkout-payment .payment-deadline-note,
+  .reserve-booking-sidebar,
+  .booking-checkout-summary {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Make the sticky header its own paint-isolated layer so opening the
+     drawer only repaints inside the header, not the whole page. */
+  body[data-page] .site-header {
+    contain: layout paint;
+    will-change: transform;
+  }
+
+  /* Removes the synthetic ~300ms delay iOS adds before firing a click on
+     non-form elements, even with viewport-meta. */
+  .mobile-nav-toggle {
+    touch-action: manipulation;
   }
 }
 

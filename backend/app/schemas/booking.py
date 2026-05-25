@@ -29,7 +29,7 @@ class BookingCreate(BaseModel):
     payment_method_id: Optional[str] = None
     reservation_token: Optional[str] = None
     promo_code: Optional[str] = None
-    note: Optional[str] = None
+    note: Optional[str] = Field(default=None, max_length=2000)
     staff_assignments: List[str] = Field(default_factory=list)
     with_engineer: bool = False
     user_category: str = "general_public"
@@ -88,6 +88,8 @@ class BookingOut(BaseModel):
     user_email: Optional[str] = None
     user_full_name: Optional[str] = None
     user_phone: Optional[str] = None
+    room_name_snapshot: Optional[str] = None
+    room_description_snapshot: Optional[str] = None
     staff_assignments: List[StaffOption] = Field(default_factory=list)
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -142,7 +144,7 @@ class BookingContactUpdate(BaseModel):
     full_name: Optional[str] = Field(default=None, max_length=120)
     email: Optional[str] = Field(default=None, max_length=255)
     phone: Optional[str] = Field(default=None, max_length=40)
-    note: Optional[str] = Field(default=None, max_length=500)
+    note: Optional[str] = Field(default=None, max_length=2000)
 
     @field_validator("full_name", "email", "phone", "note", mode="before")
     @classmethod
