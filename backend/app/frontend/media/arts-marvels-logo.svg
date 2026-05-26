@@ -1,35 +1,44 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 835 215" role="img" aria-label="Arts Marvels">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1090 580" role="img" aria-label="Arts Marvels — powered by BIPOC Foundation">
 
   <!--
-    Icon: two overlapping "A" letterforms.
-    Each A is drawn as a 7-point outer path + inner hollow triangle,
-    using fill-rule="evenodd" so the center cuts out correctly.
-    Red A is drawn first (behind). Black A is drawn second (in front).
+    Arts Marvels logo, powered by BIPOC Foundation.
+    Layout (units = viewBox px):
+      - Left mark: two overlapping triangular A letterforms (red + black)
+      - Vertical separator
+      - Right text block: ARTS (red) over MARVELS (black)
+      - Tagline below the whole logo: "powered by BIPOC Foundation"
   -->
 
-  <!-- Red "A" — left, behind black A -->
+  <!-- ===== Left mark: AA letterforms ===== -->
+  <!-- Red "A" — drawn first (behind) -->
   <path fill-rule="evenodd"
-        d="M 80,7 L 155,207 L 118,207 L 105,143 L 55,143 L 42,207 L 5,207 Z
-           M 80,12 L 105,127 L 55,127 Z"
+        d="M 175,20 L 350,420 L 270,420 L 240,330 L 130,330 L 100,420 L 20,420 Z
+           M 175,90 L 220,290 L 150,290 Z"
         fill="#e31e24"/>
 
-  <!-- Black "A" — right, overlaps red A's right leg -->
+  <!-- Black "A" — drawn second (in front), shifted right to overlap red A's right leg -->
   <path fill-rule="evenodd"
-        d="M 141,7 L 216,207 L 179,207 L 166,143 L 116,143 L 103,207 L 66,207 Z
-           M 141,12 L 166,127 L 116,127 Z"
+        d="M 295,20 L 470,420 L 390,420 L 360,330 L 250,330 L 220,420 L 140,420 Z
+           M 295,90 L 340,290 L 270,290 Z"
         fill="#111111"/>
 
-  <!-- Thin vertical separator -->
-  <line x1="236" y1="14" x2="236" y2="205" stroke="#111111" stroke-width="3"/>
+  <!-- ===== Vertical separator ===== -->
+  <line x1="510" y1="30" x2="510" y2="410" stroke="#111111" stroke-width="6"/>
 
+  <!-- ===== Right text block ===== -->
   <!-- "ARTS" in red -->
-  <text x="256" y="100"
+  <text x="550" y="210"
         font-family="Impact, Haettenschweiler, 'Arial Black', sans-serif"
-        font-size="125" fill="#e31e24">ARTS</text>
+        font-size="200" font-weight="900" fill="#e31e24" letter-spacing="-2">ARTS</text>
 
   <!-- "MARVELS" in black -->
-  <text x="256" y="210"
+  <text x="550" y="410"
         font-family="Impact, Haettenschweiler, 'Arial Black', sans-serif"
-        font-size="138" fill="#111111">MARVELS</text>
+        font-size="200" font-weight="900" fill="#111111" letter-spacing="-2">MARVELS</text>
+
+  <!-- ===== Tagline ===== -->
+  <text x="20" y="540"
+        font-family="'Helvetica Neue', Arial, sans-serif"
+        font-size="62" font-weight="400" fill="#111111" letter-spacing="0.5">powered by BIPOC Foundation</text>
 
 </svg>

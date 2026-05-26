@@ -8317,7 +8317,7 @@ body[data-page] .header-brand-block {
 }
 
 body[data-page] .header-am-logo {
-  height: 52px;
+  height: 64px;
   width: auto;
   object-fit: contain;
 }
@@ -9485,7 +9485,7 @@ body[data-page="account"] #account-profile-panel {
 }
 
 .home-collab-logo {
-  height: 32px;
+  height: 44px;
   width: auto;
   display: block;
   object-fit: contain;
@@ -9551,7 +9551,7 @@ body[data-page="account"] #account-profile-panel {
   background: rgba(248,250,253,0.8);
 }
 .home-collab-org-logo {
-  height: 36px;
+  height: 64px;
   width: auto;
   object-fit: contain;
 }
@@ -9608,7 +9608,7 @@ body[data-page="account"] #account-profile-panel {
   margin-bottom: 10px;
 }
 .studio-footer-collab-logo {
-  height: 28px;
+  height: 40px;
   width: auto;
   object-fit: contain;
   filter: brightness(0) invert(1);
@@ -10902,7 +10902,7 @@ button.avail-cal-day:focus-visible {
 
 @media (max-width: 480px) {
   body[data-page] .header-am-logo {
-    height: 38px;
+    height: 48px;
   }
 
   body[data-page] .header-bipoc-inline {
