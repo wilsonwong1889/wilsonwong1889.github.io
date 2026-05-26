@@ -7770,10 +7770,12 @@ body:not([data-page="home"]) .home-top-utility {
 /* BIPOC Foundation logo on the right side of the white header (replaces the
    Log in / Book Now buttons that moved to the utility bar). */
 .header-bipoc-side-logo {
-  height: 56px;
+  height: 38px;
   width: auto;
   object-fit: contain;
   justify-self: end;
+  margin-left: auto;
+  margin-right: 4px;
 }
 
 body[data-page="home"] .home-layout-full {
