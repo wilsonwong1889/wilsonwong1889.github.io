@@ -7734,12 +7734,46 @@ body:not([data-page="home"]) .home-top-utility {
 }
 
 .home-utility-actions .home-header-book-button {
-  min-height: 40px;
-  padding: 10px 20px;
-  border-radius: 6px;
+  min-height: 36px;
+  padding: 6px 18px;
+  border-radius: 999px;
   background: var(--brand-red);
   color: #ffffff;
   box-shadow: none;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-utility-actions .home-header-book-button:hover {
+  background: #b30f15;
+  color: #ffffff;
+}
+
+.home-utility-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.home-utility-actions .ghost-button {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 0.92rem;
+  border-radius: 999px;
+}
+
+/* BIPOC Foundation logo on the right side of the white header (replaces the
+   Log in / Book Now buttons that moved to the utility bar). */
+.header-bipoc-side-logo {
+  height: 56px;
+  width: auto;
+  object-fit: contain;
+  justify-self: end;
 }
 
 body[data-page="home"] .home-layout-full {
