@@ -240,7 +240,7 @@ class AppSmokeTest(unittest.TestCase):
         self.assertIn("home-booking-search", response.text)
         self.assertIn("Book now", response.text)
         self.assertNotIn("home-stats-band", response.text)
-        self.assertIn("BIPOC Foundation Digital Media & Creative Innovation Hub", response.text)
+        self.assertIn("BIPOC Digital Media &amp; Creative Innovation Hub", response.text)
         self.assertIn("home-carousel-button-prev", response.text)
         self.assertIn("home-carousel-dots", response.text)
         self.assertIn("Studio location on Google Maps", response.text)

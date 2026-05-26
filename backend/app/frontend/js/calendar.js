@@ -21,7 +21,7 @@ function buildBookingCalendarContent(booking) {
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//BIPOC Foundation Hub//EN",
+    "PRODID:-//BIPOC Hub//EN",
     "CALSCALE:GREGORIAN",
     "BEGIN:VEVENT",
     `UID:${booking.id}@studiobookingsoftware`,
