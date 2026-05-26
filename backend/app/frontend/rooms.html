@@ -130,24 +130,50 @@
                 placeholder="Search studios by name or description..."
               />
             </label>
-            <button
-              id="rooms-when-toggle"
-              class="rooms-when-toggle"
-              type="button"
-              aria-expanded="false"
-              aria-controls="rooms-when-bar"
-            >
-              <span class="rooms-when-toggle-icon" aria-hidden="true">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
-                  <rect x="3" y="4.5" width="14" height="12" rx="2"/>
-                  <path d="M3 8.5h14"/>
-                  <path d="M7 3v3"/>
-                  <path d="M13 3v3"/>
-                </svg>
-              </span>
-              <span class="rooms-when-toggle-label">When?</span>
-              <span class="rooms-when-toggle-chip hidden" id="rooms-when-toggle-chip"></span>
-            </button>
+            <div class="rooms-when-wrap">
+              <button
+                id="rooms-when-toggle"
+                class="rooms-when-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="rooms-when-bar"
+              >
+                <span class="rooms-when-toggle-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <rect x="3" y="4.5" width="14" height="12" rx="2"/>
+                    <path d="M3 8.5h14"/>
+                    <path d="M7 3v3"/>
+                    <path d="M13 3v3"/>
+                  </svg>
+                </span>
+                <span class="rooms-when-toggle-label">When?</span>
+                <span class="rooms-when-toggle-chip hidden" id="rooms-when-toggle-chip"></span>
+              </button>
+              <section id="rooms-when-bar" class="rooms-when-bar rooms-when-popover hidden" aria-label="Check availability">
+                <label class="rooms-when-field">
+                  <span>Date</span>
+                  <input id="rooms-search-date" type="date" />
+                </label>
+                <label class="rooms-when-field">
+                  <span>Time</span>
+                  <input id="rooms-search-time" type="time" value="15:00" min="12:00" max="19:00" step="3600" />
+                </label>
+                <label class="rooms-when-field">
+                  <span>Hours</span>
+                  <select id="rooms-search-duration">
+                    <option value="60">1</option>
+                    <option value="120">2</option>
+                    <option value="180">3</option>
+                    <option value="240">4</option>
+                    <option value="300">5</option>
+                  </select>
+                </label>
+                <div class="rooms-when-actions">
+                  <button id="rooms-search-button" class="primary-button" type="button">Find rooms</button>
+                  <button id="rooms-search-clear-button" class="ghost-button rooms-when-clear" type="button">Clear</button>
+                </div>
+              </section>
+            </div>
             <label class="rooms-sort-shell" for="rooms-sort-select">
               <span class="rooms-sort-icon" aria-hidden="true">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -168,29 +194,6 @@
           </div>
 
           <div id="rooms-category-bar" class="rooms-category-bar"></div>
-
-          <section id="rooms-when-bar" class="rooms-when-bar hidden" aria-label="Check availability">
-            <label class="rooms-when-field">
-              <span>Date</span>
-              <input id="rooms-search-date" type="date" />
-            </label>
-            <label class="rooms-when-field">
-              <span>Time</span>
-              <input id="rooms-search-time" type="time" value="15:00" min="12:00" max="19:00" step="3600" />
-            </label>
-            <label class="rooms-when-field">
-              <span>Hours</span>
-              <select id="rooms-search-duration">
-                <option value="60">1</option>
-                <option value="120">2</option>
-                <option value="180">3</option>
-                <option value="240">4</option>
-                <option value="300">5</option>
-              </select>
-            </label>
-            <button id="rooms-search-button" class="primary-button" type="button">Find rooms</button>
-            <button id="rooms-search-clear-button" class="ghost-button rooms-when-clear" type="button">Clear</button>
-          </section>
 
           <div id="rooms-toolbar" class="rooms-toolbar rooms-admin-toolbar hidden">
             <label class="checkbox-row rooms-filter">

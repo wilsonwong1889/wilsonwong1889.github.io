@@ -2290,6 +2290,10 @@ body[data-page="home"] .site-acknowledgement {
   white-space: nowrap;
 }
 
+.rooms-when-wrap {
+  position: relative;
+}
+
 .rooms-when-bar {
   display: flex;
   flex-wrap: wrap;
@@ -2301,12 +2305,63 @@ body[data-page="home"] .site-acknowledgement {
   border-radius: 14px;
   background: #ffffff;
   box-shadow: 0 6px 18px rgba(0, 38, 62, 0.04);
-  animation: rooms-when-bar-enter 0.18s ease-out;
 }
 
-@keyframes rooms-when-bar-enter {
-  from { opacity: 0; transform: translateY(-4px); }
+.rooms-when-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  margin-bottom: 0;
+  min-width: 420px;
+  border-color: rgba(0, 38, 62, 0.14);
+  box-shadow: 0 18px 36px rgba(0, 38, 62, 0.14);
+  animation: rooms-when-popover-enter 0.16s ease-out;
+}
+
+.rooms-when-popover::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  right: 22px;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 38, 62, 0.14);
+  border-left: 1px solid rgba(0, 38, 62, 0.14);
+  transform: rotate(45deg);
+}
+
+.rooms-when-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@keyframes rooms-when-popover-enter {
+  from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* On phones, the popover becomes a full-width slide-down below the toolbar
+   so it can't run off the screen. */
+@media (max-width: 720px) {
+  .rooms-when-popover {
+    position: static;
+    min-width: 0;
+    margin: 8px 0 12px;
+  }
+  .rooms-when-popover::before {
+    display: none;
+  }
+  .rooms-when-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+  .rooms-when-actions .primary-button,
+  .rooms-when-actions .ghost-button {
+    flex: 1;
+  }
 }
 
 .rooms-when-field {

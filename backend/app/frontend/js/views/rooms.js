@@ -649,6 +649,8 @@ function clearRoomAvailabilitySearch() {
   });
 }
 
+let roomsWhenOutsideClickHandler = null;
+
 function openRoomsWhenBar() {
   const bar = document.getElementById("rooms-when-bar");
   const btn = document.getElementById("rooms-when-toggle");
@@ -656,6 +658,16 @@ function openRoomsWhenBar() {
   bar.classList.remove("hidden");
   btn.classList.add("is-open");
   btn.setAttribute("aria-expanded", "true");
+  if (roomsWhenOutsideClickHandler) return;
+  const wrap = btn.closest(".rooms-when-wrap");
+  roomsWhenOutsideClickHandler = (event) => {
+    if (wrap && wrap.contains(event.target)) return;
+    closeRoomsWhenBar();
+  };
+  // Defer one tick so the click that opened the popover doesn't close it.
+  window.setTimeout(() => {
+    document.addEventListener("click", roomsWhenOutsideClickHandler, { capture: true });
+  }, 0);
 }
 
 function closeRoomsWhenBar() {
@@ -665,6 +677,10 @@ function closeRoomsWhenBar() {
   bar.classList.add("hidden");
   btn.classList.remove("is-open");
   btn.setAttribute("aria-expanded", "false");
+  if (roomsWhenOutsideClickHandler) {
+    document.removeEventListener("click", roomsWhenOutsideClickHandler, { capture: true });
+    roomsWhenOutsideClickHandler = null;
+  }
 }
 
 function renderRoomsWhenToggleChip(currentState) {
