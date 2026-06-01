@@ -478,10 +478,7 @@ function calculateEstimatedTotal(room) {
 }
 
 function getDepositCents(room) {
-  const hasEngineer = getSelectedStaffOptions(room).some((role) =>
-    /engineer/i.test(role.name || ""),
-  );
-  return hasEngineer ? 2000 : 1000;
+  return 2000;
 }
 
 function renderSelectedStaffBreakdown(room) {

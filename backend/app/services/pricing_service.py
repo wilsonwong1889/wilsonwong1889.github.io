@@ -72,7 +72,7 @@ MEMBERSHIP_FEES: dict[str, dict[str, Optional[int]]] = {
 # Deposit amounts
 # ---------------------------------------------------------------------------
 
-DEPOSIT_SPACE_ONLY_CENTS: int = 1000   # $10
+DEPOSIT_SPACE_ONLY_CENTS: int = 2000   # $20
 DEPOSIT_WITH_ENGINEER_CENTS: int = 2000  # $20
 
 # ---------------------------------------------------------------------------
