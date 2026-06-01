@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, Integer, String, func
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database import Base
@@ -37,5 +37,19 @@ class PromoCode(Base):
     max_redemptions = Column(Integer)
     starts_at = Column(DateTime(timezone=True))
     expires_at = Column(DateTime(timezone=True))
+    # Membership scoping (used by the monthly member-code generator):
+    #   member_category  — restrict to a membership category (e.g. artist_member)
+    #   member_unique    — true for a personal, single-member code
+    #   assigned_user_id — the member a unique code belongs to
+    #   valid_month      — "YYYY-MM" the code was issued for
+    member_category = Column(String, index=True)
+    member_unique = Column(Boolean, nullable=False, default=False)
+    assigned_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    valid_month = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

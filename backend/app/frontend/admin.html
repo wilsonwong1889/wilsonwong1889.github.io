@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin | BIPOC Foundation Hub</title>
+    <title>Admin | BIPOC Hub</title>
     <link rel="stylesheet" href="/assets/styles/app.css?v=20260520c" />
   </head>
   <body data-page="admin">
@@ -41,10 +41,9 @@
       <header class="site-header site-header-simple site-header-public admin-site-header">
         <div class="site-header-brand-row">
           <div class="header-brand-block">
-            <img class="header-am-logo" src="/assets/media/arts-marvels-logo.svg" alt="Arts Marvels" />
-            <p class="header-powered-by">powered by <img class="header-bipoc-inline" src="/assets/media/bipoc-foundation-logo.svg" alt="BIPOC Foundation" /></p>
+            <img class="header-am-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" />
           </div>
-          <a class="header-hub-title" href="/">BIPOC Foundation Digital Media &amp; Creative Innovation Hub</a>
+          <a class="header-hub-title" href="/">BIPOC Digital Media &amp; Creative Innovation Hub</a>
         </div>
         <nav id="site-nav" class="site-nav" aria-label="Primary">
           <a class="nav-link" href="/">Home</a>
@@ -94,6 +93,7 @@
                 <button id="admin-tab-accounts" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-accounts" tabindex="-1" data-admin-tab="accounts">Customers</button>
                 <button id="admin-tab-staff" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-staff" tabindex="-1" data-admin-tab="staff">Staff catalog</button>
                 <button id="admin-tab-roles" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-roles" tabindex="-1" data-admin-tab="roles">Roles</button>
+                <button id="admin-tab-intakes" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-intakes" tabindex="-1" data-admin-tab="intakes">Leads</button>
                 <button id="admin-tab-qa" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-qa" tabindex="-1" data-admin-tab="qa">Tests</button>
               </div>
               <label class="inline-field admin-workspace-picker">
@@ -105,6 +105,7 @@
                   <option value="accounts">Customers</option>
                   <option value="staff">Staff catalog</option>
                   <option value="roles">Roles</option>
+                  <option value="intakes">Leads</option>
                   <option value="qa">Tests</option>
                 </select>
               </label>
@@ -138,10 +139,21 @@
                   <p class="panel-copy">A quick summary of what needs attention today before anything else.</p>
                 </div>
                 <div id="admin-analytics-grid" class="admin-summary-grid"></div>
-                <div class="admin-room-breakdown-shell">
-                  <h3>Today at a glance</h3>
-                  <p class="panel-copy">All bookings scheduled for today, colour-coded by status.</p>
+                <div class="admin-room-breakdown-shell admin-today-shell">
+                  <div class="admin-today-header">
+                    <div>
+                      <h3>Today's live roster</h3>
+                      <p class="panel-copy">Everyone scheduled today — tap to call, check in, or open the booking. Refreshes every minute.</p>
+                    </div>
+                    <button id="admin-today-print" class="ghost-button" type="button">Print today's roster</button>
+                  </div>
+                  <div id="admin-today-counters" class="admin-today-counters"></div>
                   <div id="admin-today-glance" class="admin-today-glance"></div>
+                </div>
+                <div class="admin-room-breakdown-shell">
+                  <h3>Coming up</h3>
+                  <p class="panel-copy">Tomorrow and the rest of the week.</p>
+                  <div id="admin-upcoming-glance" class="admin-upcoming-glance"></div>
                 </div>
                 <div class="admin-room-breakdown-shell">
                   <h3>Room breakdown</h3>
@@ -219,6 +231,35 @@
                 <input type="search" placeholder="Search by name or user ID..." disabled />
               </div>
               <div id="admin-roles-list" class="admin-roles-list"></div>
+            </section>
+
+            <section id="admin-panel-intakes" class="admin-tab-panel hidden" role="tabpanel" aria-labelledby="admin-tab-intakes" aria-hidden="true" data-admin-panel="intakes">
+              <div class="panel-header">
+                <p class="panel-kicker">Leads &amp; applications</p>
+                <h3>Intake submissions</h3>
+                <p class="panel-copy">Membership interest and studio-engineer applications submitted from the public site. Each submission also emails the team.</p>
+              </div>
+              <div class="admin-intakes-filters">
+                <label class="inline-field">
+                  <span>Type</span>
+                  <select id="admin-intakes-type-filter">
+                    <option value="">All types</option>
+                    <option value="membership_interest">Membership interest</option>
+                    <option value="engineer_application">Engineer application</option>
+                  </select>
+                </label>
+                <label class="inline-field">
+                  <span>Status</span>
+                  <select id="admin-intakes-status-filter">
+                    <option value="">All statuses</option>
+                    <option value="new">New</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </label>
+                <button id="admin-intakes-refresh" class="ghost-button" type="button">Refresh</button>
+              </div>
+              <div id="admin-intakes-list" class="admin-intakes-list"></div>
             </section>
 
             <section id="admin-panel-qa" class="admin-tab-panel hidden" role="tabpanel" aria-labelledby="admin-tab-qa" aria-hidden="true" data-admin-panel="qa">
@@ -454,6 +495,33 @@
                         <button id="admin-promo-cancel-edit" class="ghost-button" type="button">Clear form</button>
                       </div>
                     </form>
+
+                    <form id="admin-monthly-codes-form" class="stack-form admin-monthly-codes-form">
+                      <h4>Generate monthly member codes</h4>
+                      <p class="field-help">Creates one unique, single-use code per member in the selected category for the chosen month. Re-running skips members who already have a code that month — codes do not stack.</p>
+                      <p id="admin-monthly-codes-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
+                      <div class="intake-form-grid">
+                        <label>
+                          <span>Member category</span>
+                          <select name="member_category" required>
+                            <option value="artist_member">Artist Member</option>
+                            <option value="venture_member">Venture Member</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span>Month</span>
+                          <input type="month" name="month" required />
+                        </label>
+                        <label>
+                          <span>Percent off</span>
+                          <input type="number" name="percent_off" min="1" max="100" value="50" required />
+                        </label>
+                      </div>
+                      <div class="room-actions">
+                        <button class="primary-button" type="submit">Generate codes</button>
+                      </div>
+                    </form>
+
                     <div id="admin-promo-codes-list" class="admin-promo-codes-list"></div>
                 </section>
 
@@ -514,8 +582,28 @@
                     <textarea name="talents" rows="2" placeholder="Vocal comping, Lighting setups, Interview coaching"></textarea>
                   </label>
                   <label>
+                    <span>Services offered</span>
+                    <textarea name="services" rows="2" placeholder="Full mix, Podcast editing, Photo retouching"></textarea>
+                  </label>
+                  <label>
+                    <span>Bio</span>
+                    <textarea name="bio" rows="4" placeholder="Longer background and story for the public profile."></textarea>
+                  </label>
+                  <label>
+                    <span>Portfolio URL</span>
+                    <input type="url" name="portfolio_url" placeholder="https://example.com/portfolio" />
+                  </label>
+                  <label>
+                    <span>Headshot URLs</span>
+                    <textarea name="headshot_urls" rows="2" placeholder="One image URL per line, or comma-separated"></textarea>
+                  </label>
+                  <label>
                     <span>Add-on price (cents)</span>
                     <input type="number" name="add_on_price_cents" min="0" value="0" />
+                  </label>
+                  <label>
+                    <span>Equipment rental cost (cents)</span>
+                    <input type="number" name="equipment_rental_cost_cents" min="0" value="0" />
                   </label>
                   <label>
                     <span>Profile picture</span>
@@ -657,11 +745,11 @@
         <div class="studio-footer-grid">
           <div class="studio-footer-brand">
             <div class="studio-footer-collab-lockup">
-              <img class="studio-footer-collab-logo" src="/assets/media/arts-marvels-logo.svg" alt="Arts Marvels" />
+              <img class="studio-footer-collab-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" />
               <span class="studio-footer-collab-x">×</span>
-              <img class="studio-footer-collab-logo studio-footer-bipoc-logo" src="/assets/media/bipoc-foundation-logo.svg" alt="BIPOC Foundation" />
+              <img class="studio-footer-collab-logo studio-footer-bipoc-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" />
             </div>
-            <p class="studio-footer-collab-label">BIPOC Foundation Digital Media & Creative Innovation Hub</p>
+            <p class="studio-footer-collab-label">BIPOC Digital Media & Creative Innovation Hub</p>
             <p>A community-first creative studio in Lethbridge, powered by Arts Marvels and supported by BIPOC Foundation.</p>
             <p class="studio-footer-support-copy">
               Questions about booking or studio availability?<br />
@@ -689,7 +777,7 @@
           </div>
         </div>
         <div class="studio-footer-bottom">
-          <p>© 2026 BIPOC Foundation Digital Media &amp; Creative Innovation Hub. All rights reserved.</p>
+          <p>© 2026 BIPOC Digital Media &amp; Creative Innovation Hub. All rights reserved.</p>
           <div class="studio-footer-inline-links">
             <a href="/faq">Privacy</a>
             <a href="/faq">Terms</a>

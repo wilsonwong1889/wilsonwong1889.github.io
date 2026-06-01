@@ -313,3 +313,20 @@ class AdminBookingLookupOut(BaseModel):
     location_label: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class AdminTodayCounters(BaseModel):
+    total: int = 0
+    arrived: int = 0
+    pending_arrival: int = 0
+    cancelled: int = 0
+    pending_payment: int = 0
+
+
+class AdminTodayRosterOut(BaseModel):
+    counters: AdminTodayCounters
+    today: List[AdminBookingLookupOut] = Field(default_factory=list)
+    tomorrow_first_three: List[AdminBookingLookupOut] = Field(default_factory=list)
+    tomorrow_count: int = 0
+    next_seven_days_count: int = 0
+    generated_at: datetime

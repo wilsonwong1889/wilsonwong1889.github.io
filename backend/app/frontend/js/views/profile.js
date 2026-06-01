@@ -516,7 +516,7 @@ export function renderProfileView(state) {
 }
 
 const MEMBERSHIP_INFO = {
-  artist_member:         { label: "Artist Member",         roomRate: "$50/hr",  spaceRate: "$100/hr", fee: "$15/mo or $120/yr", benefits: ["Reduced studio rate", "Book 4 sessions, get the 5th free", "Community programming access"] },
+  artist_member:         { label: "Artist Member",         roomRate: "$50/hr",  spaceRate: "$100/hr", fee: "$15/mo or $120/yr", benefits: ["Reduced studio rate", "Book 4 hours, get the 5th free", "Community programming access"] },
   fellowship_artist:     { label: "Fellowship Artist",     roomRate: "$50/hr",  spaceRate: "$100/hr", fee: "Free",              benefits: ["Complimentary membership", "Reduced studio rate", "Community programming access"] },
   artist_in_residence:   { label: "Artist in Residence",   roomRate: "$50/hr",  spaceRate: "$100/hr", fee: "Free",              benefits: ["Complimentary membership", "Reduced studio rate", "Community programming access"] },
   service_engineer:      { label: "Service Engineer",      roomRate: "$50/hr",  spaceRate: "$100/hr", fee: "Free",              benefits: ["Complimentary membership", "Reduced studio rate", "Community programming access"] },

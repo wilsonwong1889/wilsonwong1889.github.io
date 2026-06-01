@@ -78,11 +78,16 @@ def create_staff_profile(db: Session, payload: StaffProfileCreate) -> StaffProfi
     profile = StaffProfile(
         name=name,
         description=payload.description.strip() if payload.description else None,
+        bio=payload.bio.strip() if payload.bio else None,
         skills=normalize_string_list(payload.skills),
         talents=normalize_string_list(payload.talents),
+        services=normalize_string_list(payload.services),
         photo_url=payload.photo_url,
+        headshot_urls=normalize_string_list(payload.headshot_urls),
+        portfolio_url=payload.portfolio_url.strip() if payload.portfolio_url else None,
         add_on_price_cents=payload.add_on_price_cents,
         booking_rate_cents=payload.booking_rate_cents,
+        equipment_rental_cost_cents=payload.equipment_rental_cost_cents,
         service_types=normalize_string_list(payload.service_types),
         booking_enabled=payload.booking_enabled,
         active=payload.active,
@@ -105,16 +110,26 @@ def update_staff_profile(db: Session, profile_id: str, payload: StaffProfileUpda
         _ensure_unique_name(db, profile.name, exclude_profile_id=profile.id)
     if "description" in update_data:
         profile.description = update_data["description"].strip() if update_data["description"] else None
+    if "bio" in update_data:
+        profile.bio = update_data["bio"].strip() if update_data["bio"] else None
     if "skills" in update_data and update_data["skills"] is not None:
         profile.skills = normalize_string_list(update_data["skills"])
     if "talents" in update_data and update_data["talents"] is not None:
         profile.talents = normalize_string_list(update_data["talents"])
+    if "services" in update_data and update_data["services"] is not None:
+        profile.services = normalize_string_list(update_data["services"])
     if "photo_url" in update_data:
         profile.photo_url = update_data["photo_url"]
+    if "headshot_urls" in update_data and update_data["headshot_urls"] is not None:
+        profile.headshot_urls = normalize_string_list(update_data["headshot_urls"])
+    if "portfolio_url" in update_data:
+        profile.portfolio_url = update_data["portfolio_url"].strip() if update_data["portfolio_url"] else None
     if "add_on_price_cents" in update_data and update_data["add_on_price_cents"] is not None:
         profile.add_on_price_cents = update_data["add_on_price_cents"]
     if "booking_rate_cents" in update_data and update_data["booking_rate_cents"] is not None:
         profile.booking_rate_cents = update_data["booking_rate_cents"]
+    if "equipment_rental_cost_cents" in update_data and update_data["equipment_rental_cost_cents"] is not None:
+        profile.equipment_rental_cost_cents = update_data["equipment_rental_cost_cents"]
     if "service_types" in update_data and update_data["service_types"] is not None:
         profile.service_types = normalize_string_list(update_data["service_types"])
     if "booking_enabled" in update_data and update_data["booking_enabled"] is not None:

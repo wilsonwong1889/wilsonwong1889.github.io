@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Placeholder — production studio photo coming soon">
+  <defs>
+    <pattern id="grid3" x="0" y="0" width="80" height="80" patternUnits="userSpaceOnUse">
+      <path d="M 80 0 L 0 0 0 80" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f1f1f"/>
+      <stop offset="100%" stop-color="#3a3a3a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg3)"/>
+  <rect width="1600" height="900" fill="url(#grid3)"/>
+  <g transform="translate(800,420)" text-anchor="middle" font-family="'Helvetica Neue', Arial, sans-serif" fill="#ffffff">
+    <text font-size="42" font-weight="600" letter-spacing="6" opacity="0.6">PLACEHOLDER</text>
+    <text y="100" font-size="110" font-weight="800" letter-spacing="-2">Production Studio</text>
+    <text y="180" font-size="40" font-weight="400" opacity="0.7">Real studio photography coming soon</text>
+    <g transform="translate(0,260)">
+      <rect x="-110" y="-30" width="220" height="60" rx="30" fill="#d71920"/>
+      <text y="6" font-size="20" font-weight="700" letter-spacing="2">NOT A REAL PHOTO</text>
+    </g>
+  </g>
+</svg>

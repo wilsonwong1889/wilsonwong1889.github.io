@@ -47,6 +47,8 @@ class BaseAppTest(unittest.TestCase):
         from app.database import Base, SessionLocal, engine
         from app.main import app
         from app.models.booking import AuditLog, Booking, BookingSlot, NotificationLog, Refund, Review
+        from app.models.intake import Intake
+        from app.models.membership import UserMembership
         from app.models.promo_code import PromoCode
         from app.models.room import Room
         from app.models.staff_booking import StaffBooking
@@ -63,6 +65,8 @@ class BaseAppTest(unittest.TestCase):
         cls.NotificationLog = NotificationLog
         cls.Refund = Refund
         cls.Review = Review
+        cls.Intake = Intake
+        cls.UserMembership = UserMembership
         cls.PromoCode = PromoCode
         cls.Room = Room
         cls.StaffBooking = StaffBooking
@@ -91,7 +95,9 @@ class BaseAppTest(unittest.TestCase):
                 self.NotificationLog,
                 self.Refund,
                 self.Review,
+                self.Intake,
                 self.PromoCode,
+                self.UserMembership,
                 self.BookingSlot,
                 self.Booking,
                 self.StaffBooking,

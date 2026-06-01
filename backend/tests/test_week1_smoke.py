@@ -240,7 +240,7 @@ class AppSmokeTest(unittest.TestCase):
         self.assertIn("home-booking-search", response.text)
         self.assertIn("Book now", response.text)
         self.assertNotIn("home-stats-band", response.text)
-        self.assertIn("BIPOC Foundation Digital Media & Creative Innovation Hub", response.text)
+        self.assertIn("BIPOC Digital Media &amp; Creative Innovation Hub", response.text)
         self.assertIn("home-carousel-button-prev", response.text)
         self.assertIn("home-carousel-dots", response.text)
         self.assertIn("Studio location on Google Maps", response.text)
@@ -1410,9 +1410,11 @@ class AppSmokeTest(unittest.TestCase):
         self.assertTrue(all("health" in item for item in payload))
         self.assertTrue(all(item["health"] in {"working", "needs_fix", "not_working"} for item in payload))
         self.assertTrue(any(item["health"] == "working" for item in payload))
-        # `not_working` covers the live SendGrid/Twilio verification gap that
-        # can't be automated without external sandboxes.
-        self.assertTrue(any(item["health"] == "not_working" for item in payload))
+        # We don't demand a `not_working` example here — preserving an
+        # antipattern just to keep the assertion happy is silly. The admin
+        # UI still renders all three health states; the prior placeholder
+        # `not_working` entry (live provider verification) now ships green
+        # via tests/backend/test_notification_providers.py.
         self.assertTrue(any(item["title"] == "Payment confirmation end-to-end" for item in payload))
         self.assertTrue(any(item["title"] == "Runtime config rejects placeholder production secrets" for item in payload))
 

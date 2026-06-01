@@ -565,7 +565,7 @@ def _create_booking_record(
         duration_minutes,
         staff_assignments,
     )
-    promo_result = apply_promo_code_to_amount(db, promo_code, original_price_cents)
+    promo_result = apply_promo_code_to_amount(db, promo_code, original_price_cents, user)
     subtotal_after_discount = promo_result["final_amount_cents"]
     tax_cents = calculate_tax_cents(subtotal_after_discount)
     total_cents = subtotal_after_discount + tax_cents
@@ -1642,6 +1642,135 @@ def lookup_bookings_for_admin(
         )
         for booking, user_email, user_full_name, user_phone, room_name in results
     ]
+
+
+def get_admin_today_roster(db: Session) -> dict:
+    """Today-focused roster + counters + outlook for the admin Overview tab.
+
+    Returns today's bookings (room + staff combined, chronological), a small
+    counter strip so the dashboard can show 'arrived / pending arrival / etc.'
+    without re-scanning the list client-side, and a 7-day outlook (tomorrow's
+    first three + total tomorrow count + total next-seven-days count).
+    """
+    from app.services.staff_booking_service import (
+        expire_stale_pending_staff_bookings,
+        list_staff_bookings_for_admin,
+    )
+
+    expire_stale_pending_bookings(db)
+    expire_stale_pending_staff_bookings(db)
+
+    business_timezone = get_business_timezone()
+    now_utc = datetime.now(timezone.utc)
+    today_local = now_utc.astimezone(business_timezone).date()
+    today_start, today_end = get_day_bounds(today_local)
+    tomorrow_start, tomorrow_end = get_day_bounds(today_local + timedelta(days=1))
+    week_end = today_start + timedelta(days=7)
+
+    def _select_room(start: datetime, end: datetime) -> list[dict]:
+        rows = (
+            db.query(Booking, User.email, User.full_name, User.phone, Room.name)
+            .outerjoin(User, Booking.user_id == User.id)
+            .join(Room, Booking.room_id == Room.id)
+            .filter(Booking.start_time >= start)
+            .filter(Booking.start_time < end)
+            .order_by(Booking.start_time.asc())
+            .all()
+        )
+        return [
+            serialize_admin_booking(
+                booking,
+                user_email=user_email,
+                user_full_name=user_full_name,
+                user_phone=user_phone,
+                room_name=booking.room_name_snapshot or room_name,
+            )
+            for booking, user_email, user_full_name, user_phone, room_name in rows
+        ]
+
+    def _select_staff(start: datetime, end: datetime) -> list[dict]:
+        from app.services.staff_booking_service import serialize_admin_staff_booking
+        from app.models.staff_booking import StaffBooking
+        from app.models.staff_profile import StaffProfile
+
+        rows = (
+            db.query(StaffBooking, User.email, User.full_name, User.phone, StaffProfile)
+            .outerjoin(User, StaffBooking.user_id == User.id)
+            .outerjoin(StaffProfile, StaffBooking.staff_profile_id == StaffProfile.id)
+            .filter(StaffBooking.start_time >= start)
+            .filter(StaffBooking.start_time < end)
+            .order_by(StaffBooking.start_time.asc())
+            .all()
+        )
+        return [
+            serialize_admin_staff_booking(
+                booking,
+                user_email=user_email,
+                user_full_name=user_full_name,
+                user_phone=user_phone,
+                profile=profile,
+            )
+            for booking, user_email, user_full_name, user_phone, profile in rows
+        ]
+
+    def _merge_sorted(*lists: list[dict]) -> list[dict]:
+        return sorted(
+            [item for sublist in lists for item in sublist],
+            key=lambda item: item["start_time"],
+        )
+
+    today_items = _merge_sorted(
+        _select_room(today_start, today_end),
+        _select_staff(today_start, today_end),
+    )
+    tomorrow_items = _merge_sorted(
+        _select_room(tomorrow_start, tomorrow_end),
+        _select_staff(tomorrow_start, tomorrow_end),
+    )
+
+    # Count next-seven-days bookings cheaply via two scalar queries (no need
+    # to serialize anything we won't render).
+    room_next_seven = (
+        db.query(func.count(Booking.id))
+        .filter(Booking.start_time >= today_start)
+        .filter(Booking.start_time < week_end)
+        .scalar()
+        or 0
+    )
+    from app.models.staff_booking import StaffBooking
+
+    staff_next_seven = (
+        db.query(func.count(StaffBooking.id))
+        .filter(StaffBooking.start_time >= today_start)
+        .filter(StaffBooking.start_time < week_end)
+        .scalar()
+        or 0
+    )
+
+    counters = {
+        "total": len(today_items),
+        "arrived": sum(
+            1 for item in today_items if item.get("checked_in_at") or item["status"] == "Completed"
+        ),
+        "pending_arrival": sum(
+            1 for item in today_items if item["status"] == "Paid" and not item.get("checked_in_at")
+        ),
+        "cancelled": sum(
+            1 for item in today_items if item["status"] in {"Cancelled", "Refunded"}
+        ),
+        "pending_payment": sum(
+            1 for item in today_items if item["status"] == "PendingPayment"
+        ),
+    }
+
+    return {
+        "counters": counters,
+        "today": today_items,
+        "tomorrow_first_three": tomorrow_items[:3],
+        "tomorrow_count": len(tomorrow_items),
+        "next_seven_days_count": int(room_next_seven) + int(staff_next_seven),
+        "generated_at": now_utc,
+    }
 
 
 def mark_booking_paid(db: Session, booking: Booking, payment_intent_id: str) -> Booking:

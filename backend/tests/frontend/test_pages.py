@@ -30,7 +30,7 @@ class PageContentTest(BaseAppTest):
         self.assertIn("home-booking-search", resp.text)
         self.assertIn("Book now", resp.text)
         self.assertNotIn("home-stats-band", resp.text)
-        self.assertIn("BIPOC Foundation Digital Media & Creative Innovation Hub", resp.text)
+        self.assertIn("BIPOC Digital Media &amp; Creative Innovation Hub", resp.text)
         self.assertIn("home-carousel-button-prev", resp.text)
         self.assertIn("home-carousel-dots", resp.text)
         self.assertIn("Studio location on Google Maps", resp.text)

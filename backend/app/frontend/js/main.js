@@ -16,6 +16,7 @@ import { initBookingDetailView, renderBookingDetailView } from "./views/booking-
 import { initBookingsView, renderBookingsView } from "./views/bookings.js";
 import { initHomeView, renderHomeView } from "./views/home.js";
 import { initInfoView, renderInfoView } from "./views/info.js";
+import { initIntakeView, renderIntakeView } from "./views/intake.js";
 import { initPaymentSuccessView, renderPaymentSuccessView } from "./views/payment-success.js";
 import { initProfileView, renderProfileView } from "./views/profile.js";
 import { initRoomBookingView, renderRoomBookingView } from "./views/room-booking.js";
@@ -176,6 +177,7 @@ function renderApp(currentState) {
   renderBookingsView(currentState);
   renderBookingDetailView(currentState);
   renderInfoView(currentState);
+  renderIntakeView(currentState);
   renderPaymentSuccessView(currentState);
   renderProfileView(currentState);
   renderRoomBookingView(currentState);
@@ -251,6 +253,7 @@ function resetScopedData() {
     patch.adminTestCases = [];
     patch.adminStaffProfiles = [];
     patch.adminPromoCodes = [];
+    patch.adminIntakes = [];
   }
   if (!requirements.publicStaff) {
     patch.publicStaffProfiles = [];
@@ -330,6 +333,26 @@ async function refreshAdminBookings(message) {
   try {
     const adminBookings = await api.adminLookupBookings({});
     setState({ adminBookings, message: message || "Admin bookings loaded." });
+  } catch (error) {
+    setState({ message: error.message });
+  }
+}
+
+async function refreshAdminToday(message) {
+  if (!currentRequirements().admin) {
+    return;
+  }
+  if (!state.currentUser?.is_admin) {
+    setState({ adminTodayRoster: null });
+    return;
+  }
+  try {
+    const adminTodayRoster = await api.adminGetTodayRoster();
+    setState({
+      adminTodayRoster,
+      // Avoid flicker on the snackbar when this is the polling tick (no message).
+      message: message ? message : state.message,
+    });
   } catch (error) {
     setState({ message: error.message });
   }
@@ -438,6 +461,24 @@ async function refreshAdminPromoCodes(message) {
   try {
     const adminPromoCodes = await api.getAdminPromoCodes();
     setState({ adminPromoCodes, message: message || "Promo codes loaded." });
+  } catch (error) {
+    setState({ message: error.message });
+  }
+}
+
+async function refreshAdminIntakes(message) {
+  if (!currentRequirements().admin) {
+    return;
+  }
+
+  if (!state.currentUser?.is_admin) {
+    setState({ adminIntakes: [], message: message || state.message });
+    return;
+  }
+
+  try {
+    const adminIntakes = await api.getAdminIntakes();
+    setState({ adminIntakes, message: message || "Leads loaded." });
   } catch (error) {
     setState({ message: error.message });
   }
@@ -621,12 +662,14 @@ async function refreshAvailabilityAndBookings(message) {
   await refreshRooms(message);
   await refreshBookings(message);
   await refreshAdminBookings(message);
+  await refreshAdminToday(message);
   await refreshAdminAnalytics(message);
   await refreshAdminActivity(message);
   await refreshAdminUsers(message);
   await refreshAdminTestCases(message);
   await refreshAdminStaffProfiles(message);
   await refreshAdminPromoCodes(message);
+  await refreshAdminIntakes(message);
   await refreshPublicStaffProfiles(message);
   await loadSelectedBooking(message);
 }
@@ -642,6 +685,7 @@ async function loadPageData(message) {
   }
   if (requirements.admin) {
     await refreshAdminBookings(message || "Admin workspace ready.");
+    await refreshAdminToday(message || "Admin workspace ready.");
     await refreshAdminAnalytics(message || "Admin workspace ready.");
     await refreshAdminActivity(message || "Admin workspace ready.");
     await refreshAdminUsers(message || "Admin workspace ready.");
@@ -741,12 +785,13 @@ async function clearSession() {
 
 subscribe(renderApp);
 
-initAdminView({ refreshAll: refreshAvailabilityAndBookings, getState: () => state });
+initAdminView({ refreshAll: refreshAvailabilityAndBookings, refreshAdminToday, getState: () => state });
 initAuthView({ refreshSession, clearSession });
 initBookingsView({ refreshAvailabilityAndBookings });
 initBookingDetailView({ reloadBookingDetail: loadSelectedBooking });
 initHomeView();
 initInfoView();
+initIntakeView();
 initPaymentSuccessView({ reloadPaymentSuccess: loadSelectedBooking });
 initProfileView({ clearSession });
 initRoomBookingView();

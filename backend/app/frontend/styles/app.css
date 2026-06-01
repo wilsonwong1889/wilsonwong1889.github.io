@@ -420,8 +420,15 @@ body[data-auth-pending="true"] .site-header .header-actions > * {
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
   margin-top: 22px;
+}
+
+.hero-actions .primary-button,
+.hero-actions .ghost-button,
+.hero-actions .ghost-link {
+  min-height: 46px;
 }
 
 .hero-actions-center {
@@ -544,6 +551,39 @@ body[data-auth-pending="true"] .site-header .header-actions > * {
   min-height: 480px;
   border-radius: var(--radius-lg);
   overflow: hidden;
+}
+
+/* Disclaimer ribbon: makes it unmistakable the hero images are placeholders.
+   Sits above the slides container, full-width, brand red. */
+.home-carousel-placeholder-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--brand-red, #d71920),
+    var(--brand-red, #d71920) 14px,
+    #b30f15 14px,
+    #b30f15 28px
+  );
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .home-carousel-placeholder-ribbon {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    padding: 6px 10px;
+  }
 }
 
 .home-carousel-slide {
@@ -751,8 +791,19 @@ body[data-auth-pending="true"] .site-header .header-actions > * {
 .section-heading-row {
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-items: flex-start;
   gap: 18px;
+}
+
+.section-heading-row > div {
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .section-heading-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 .home-soft-badge,
@@ -2223,34 +2274,145 @@ body[data-page="home"] .site-acknowledgement {
 
 .rooms-admin-toolbar {
   margin: 0 0 14px;
-  padding: 10px 14px;
-  border: 1px dashed rgba(0, 38, 62, 0.16);
-  border-radius: 12px;
-  background: rgba(243, 247, 251, 0.6);
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 38, 62, 0.08);
+  border-radius: 10px;
+  background: rgba(248, 250, 253, 0.7);
   color: #4e6275;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
+}
+
+.rooms-when-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(0, 38, 62, 0.12);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #00263e;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.rooms-when-toggle:hover {
+  border-color: rgba(0, 38, 62, 0.28);
+  box-shadow: 0 4px 14px rgba(0, 38, 62, 0.05);
+}
+
+.rooms-when-toggle.is-open {
+  border-color: rgba(0, 38, 62, 0.4);
+  background: #f3f7fb;
+}
+
+.rooms-when-toggle.is-active {
+  border-color: var(--brand-red, #d71920);
+  color: var(--brand-red, #d71920);
+}
+
+.rooms-when-toggle-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  color: #6a7a8c;
+}
+
+.rooms-when-toggle.is-active .rooms-when-toggle-icon {
+  color: var(--brand-red, #d71920);
+}
+
+.rooms-when-toggle-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.rooms-when-toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(215, 25, 32, 0.1);
+  color: var(--brand-red, #d71920);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rooms-when-wrap {
+  position: relative;
 }
 
 .rooms-when-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
   align-items: end;
   margin-bottom: 16px;
-  padding: 12px 14px;
-  border: 1px solid rgba(0, 38, 62, 0.1);
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 38, 62, 0.08);
   border-radius: 14px;
   background: #ffffff;
   box-shadow: 0 6px 18px rgba(0, 38, 62, 0.04);
 }
 
-.rooms-when-label {
-  align-self: center;
-  padding: 0 6px 0 4px;
-  color: #00263e;
-  font-weight: 700;
-  font-size: 0.95rem;
-  letter-spacing: -0.01em;
+.rooms-when-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  margin-bottom: 0;
+  min-width: 420px;
+  border-color: rgba(0, 38, 62, 0.14);
+  box-shadow: 0 18px 36px rgba(0, 38, 62, 0.14);
+  animation: rooms-when-popover-enter 0.16s ease-out;
+}
+
+.rooms-when-popover::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  right: 22px;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 38, 62, 0.14);
+  border-left: 1px solid rgba(0, 38, 62, 0.14);
+  transform: rotate(45deg);
+}
+
+.rooms-when-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@keyframes rooms-when-popover-enter {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* On phones, the popover becomes a full-width slide-down below the toolbar
+   so it can't run off the screen. */
+@media (max-width: 720px) {
+  .rooms-when-popover {
+    position: static;
+    min-width: 0;
+    margin: 8px 0 12px;
+  }
+  .rooms-when-popover::before {
+    display: none;
+  }
+  .rooms-when-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+  .rooms-when-actions .primary-button,
+  .rooms-when-actions .ghost-button {
+    flex: 1;
+  }
 }
 
 .rooms-when-field {
@@ -2354,10 +2516,21 @@ body[data-page="rooms"] .rooms-catalog-shell > div:not(.rooms-catalog-header) {
 
 .rooms-catalog-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
   align-items: center;
   margin-bottom: 12px;
+}
+
+@media (max-width: 720px) {
+  .rooms-catalog-toolbar {
+    grid-template-columns: 1fr;
+  }
+  .rooms-when-toggle,
+  .rooms-sort-shell {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .rooms-search-input-shell,
@@ -2365,10 +2538,10 @@ body[data-page="rooms"] .rooms-catalog-shell > div:not(.rooms-catalog-header) {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  min-height: 56px;
-  padding: 0 16px;
+  min-height: 44px;
+  padding: 0 14px;
   border: 1px solid rgba(0, 38, 62, 0.12);
-  border-radius: 13px;
+  border-radius: 12px;
   background: #ffffff;
   box-shadow: 0 4px 14px rgba(0, 38, 62, 0.028);
 }
@@ -2415,11 +2588,12 @@ body[data-page="rooms"] .rooms-catalog-shell > div:not(.rooms-catalog-header) {
 }
 
 .rooms-sort-shell {
-  min-width: 240px;
+  min-width: 200px;
 }
 
 .rooms-sort-shell select {
   cursor: pointer;
+  font-weight: 500;
 }
 
 .rooms-filter-toggle {
@@ -5407,7 +5581,7 @@ textarea.booking-contact-value:focus {
 
 .admin-today-row {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: 132px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 140px) auto auto;
   gap: 12px;
   align-items: center;
   padding: 10px 14px;
@@ -5462,10 +5636,153 @@ textarea.booking-contact-value:focus {
 }
 
 .admin-today-guest {
+  display: grid;
   overflow: hidden;
   color: var(--muted);
-  white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.admin-today-arrived {
+  font-size: 0.74rem;
+  color: #126e3c;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* New today-live-ops elements introduced by the admin Today Live Ops upgrade */
+
+.admin-today-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-today-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.admin-today-counters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.admin-today-counter .metric-value {
+  font-size: 1.7rem;
+}
+
+.admin-today-counter[data-today-counter="arrived"] .metric-value { color: #126e3c; }
+.admin-today-counter[data-today-counter="pending_arrival"] .metric-value { color: #d4840a; }
+.admin-today-counter[data-today-counter="pending_payment"] .metric-value { color: #a06000; }
+.admin-today-counter[data-today-counter="cancelled"] .metric-value { color: #be1e1e; }
+
+.admin-today-phone {
+  font-weight: 600;
+  color: var(--brand-red, #d71920);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.admin-today-phone:hover { text-decoration: underline; }
+.admin-today-phone-empty {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.82rem;
+}
+
+.admin-today-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-today-checkin {
+  white-space: nowrap;
+}
+
+.admin-today-open {
+  color: var(--ink-muted, #4e6275);
+  text-decoration: none;
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  border: 1px solid rgba(0, 38, 62, 0.12);
+  border-radius: 8px;
+}
+
+.admin-today-open:hover {
+  border-color: var(--brand-blue, #0d2545);
+  color: var(--brand-blue, #0d2545);
+}
+
+.admin-today-note {
+  grid-column: 1 / -1;
+  padding: 6px 8px 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.admin-today-row.is-checked-in {
+  opacity: 0.7;
+}
+
+.admin-today-row.is-imminent {
+  box-shadow: 0 0 0 2px rgba(215, 25, 32, 0.45);
+  animation: admin-today-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes admin-today-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(215, 25, 32, 0.45); }
+  50%      { box-shadow: 0 0 0 4px rgba(215, 25, 32, 0.18); }
+}
+
+.admin-upcoming-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.admin-upcoming-list {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-upcoming-row {
+  grid-template-columns: 80px minmax(0, 1.4fr) minmax(0, 1.4fr);
+}
+
+/* Print-friendly today roster — hides chrome so the front desk gets a
+   clean single-page printout with just the counters + roster. */
+@media print {
+  body.admin-printing-today > * {
+    display: none !important;
+  }
+  body.admin-printing-today .admin-today-shell,
+  body.admin-printing-today .admin-today-shell *,
+  body.admin-printing-today .admin-today-counters,
+  body.admin-printing-today .admin-today-counters *,
+  body.admin-printing-today .admin-today-glance,
+  body.admin-printing-today .admin-today-glance * {
+    display: revert !important;
+  }
+  body.admin-printing-today .admin-today-checkin,
+  body.admin-printing-today .admin-today-open,
+  body.admin-printing-today #admin-today-print {
+    display: none !important;
+  }
+  body.admin-printing-today .admin-today-row {
+    page-break-inside: avoid;
+    border: 1px solid #000 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    animation: none !important;
+  }
 }
 
 .admin-booking-summary-card {
@@ -7468,12 +7785,48 @@ body:not([data-page="home"]) .home-top-utility {
 }
 
 .home-utility-actions .home-header-book-button {
-  min-height: 40px;
-  padding: 10px 20px;
-  border-radius: 6px;
+  min-height: 36px;
+  padding: 6px 18px;
+  border-radius: 999px;
   background: var(--brand-red);
   color: #ffffff;
   box-shadow: none;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-utility-actions .home-header-book-button:hover {
+  background: #b30f15;
+  color: #ffffff;
+}
+
+.home-utility-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.home-utility-actions .ghost-button {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 0.92rem;
+  border-radius: 999px;
+}
+
+/* BIPOC Foundation logo on the right side of the white header (replaces the
+   Log in / Book Now buttons that moved to the utility bar). */
+.header-bipoc-side-logo {
+  height: 38px;
+  width: auto;
+  object-fit: contain;
+  justify-self: end;
+  margin-left: auto;
+  margin-right: 4px;
 }
 
 body[data-page="home"] .home-layout-full {
@@ -8051,7 +8404,7 @@ body[data-page] .header-brand-block {
 }
 
 body[data-page] .header-am-logo {
-  height: 52px;
+  height: 64px;
   width: auto;
   object-fit: contain;
 }
@@ -8880,6 +9233,16 @@ body[data-page="pricing"] .pricing-hero-card h1 {
   gap: 12px;
 }
 
+.pricing-deposit-grid-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pricing-deposit-auth-value {
+  margin-top: 10px;
+  font-size: clamp(0.95rem, 2.2vw, 1.2rem);
+  line-height: 1.3;
+}
+
 .pricing-benefits-grid .story-card strong,
 .pricing-policy-grid .detail-card h3 {
   color: var(--brand-blue);
@@ -8976,7 +9339,8 @@ body[data-page="pricing"] .pricing-hero-card h1 {
 @media (max-width: 680px) {
   .pricing-hero-media-grid,
   .pricing-price-lockup,
-  .pricing-deposit-grid {
+  .pricing-deposit-grid,
+  .pricing-deposit-grid-three {
     grid-template-columns: 1fr;
   }
 
@@ -9017,6 +9381,19 @@ body[data-page="account"] .home-utility-divider {
 
 body[data-page="account"] .home-utility-actions {
   pointer-events: auto;
+}
+
+body[data-page="account"] .header-bipoc-action-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+}
+
+body[data-page="account"] .header-bipoc-action-block .header-bipoc-side-logo {
+  margin: 0;
+  justify-self: auto;
 }
 
 body[data-page="account"] .home-utility-actions .ghost-button,
@@ -9202,11 +9579,10 @@ body[data-page="account"] #account-profile-panel {
 .home-collab-badge {
   position: absolute;
   bottom: 28px;
-  left: 28px;
   z-index: 20;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -9214,12 +9590,28 @@ body[data-page="account"] #account-profile-panel {
   border-radius: 10px;
   padding: 10px 16px;
   color: #ffffff;
+  /* The badge container ignores clicks so it never blocks carousel swipes;
+     only the Learn more pill re-enables pointer events. */
   pointer-events: none;
   user-select: none;
 }
 
+/* Arts Marvels pinned bottom-left, BIPOC Foundation pinned bottom-right. */
+.home-collab-badge-left {
+  left: 28px;
+  right: auto;
+  align-items: flex-start;
+}
+
+.home-collab-badge-right {
+  left: auto;
+  right: 28px;
+  align-items: flex-end;
+  text-align: right;
+}
+
 .home-collab-logo {
-  height: 32px;
+  height: 44px;
   width: auto;
   display: block;
   object-fit: contain;
@@ -9253,21 +9645,196 @@ body[data-page="account"] #account-profile-panel {
   color: #c0392b;
 }
 
+/* Signature-red Learn more pill inside each carousel partner badge. */
+.home-collab-learn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--brand-red);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.home-collab-learn:hover,
+.home-collab-learn:focus-visible {
+  background: var(--brand-red-deep);
+  transform: translateY(-1px);
+}
+
 @media (max-width: 600px) {
   .home-collab-badge {
-    bottom: 16px;
-    left: 16px;
+    /* Lifted above the centered "Book now" button so the corner badges never
+       collide with it on narrow screens. */
+    bottom: 88px;
     padding: 8px 12px;
-    gap: 8px;
+    gap: 6px;
+  }
+  .home-collab-badge-left {
+    left: 16px;
+  }
+  .home-collab-badge-right {
+    right: 16px;
   }
   .home-collab-logo {
     height: 24px;
+  }
+  .home-collab-learn {
+    padding: 3px 10px;
+    font-size: 11px;
   }
 }
 
 /* ─── Home Collab Panel ─────────────────────────────────────────────────── */
 .home-collab-panel {
   /* standard panel spacing already handled by .panel.panel-wide */
+}
+
+/* BIPOC Foundation Media Collective lead-in, shown above the "In partnership" header. */
+.home-collective-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 28px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid rgba(24, 33, 39, 0.1);
+}
+.home-collective-title {
+  margin: 0;
+  max-width: 720px;
+}
+.home-initiative-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+}
+.home-initiative-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.home-initiative-logo {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+}
+
+/* Partner "Learn more" links: hidden on desktop (the carousel badges cover this),
+   surfaced beside "Read Help" on mobile where those badges shrink. */
+.home-partner-learn {
+  display: none;
+}
+@media (max-width: 768px) {
+  .home-partner-learn {
+    display: inline-flex;
+  }
+}
+
+/* ── Public intake forms (membership interest, engineer application) ───────── */
+.intake-form {
+  max-width: 760px;
+}
+.intake-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.intake-form textarea {
+  resize: vertical;
+  min-height: 84px;
+}
+.intake-optional {
+  color: var(--muted);
+  font-weight: 400;
+}
+.intake-feedback {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(24, 33, 39, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink);
+  line-height: 1.5;
+}
+.intake-feedback.is-error {
+  border-color: rgba(215, 25, 32, 0.34);
+  background: rgba(243, 247, 251, 0.9);
+  color: var(--danger);
+}
+.intake-feedback.is-success {
+  border-color: rgba(34, 120, 74, 0.28);
+  background: rgba(236, 250, 242, 0.9);
+  color: #1f6a43;
+}
+@media (max-width: 640px) {
+  .intake-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Admin intake (leads) review ───────────────────────────────────────────── */
+.admin-intakes-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 14px;
+  margin: 18px 0;
+}
+.admin-intakes-list {
+  display: grid;
+  gap: 16px;
+}
+.admin-intake-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  background: #ffffff;
+}
+.admin-intake-card.is-status-new {
+  border-left-color: var(--brand-red);
+}
+.admin-intake-card.is-status-reviewed {
+  border-left-color: var(--success, #2d9d62);
+}
+.admin-intake-card.is-status-archived {
+  border-left-color: var(--line);
+  opacity: 0.7;
+}
+.admin-intake-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.admin-intake-card-header h4 {
+  margin: 0 0 2px;
+}
+.admin-intake-contact {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.admin-intake-contact a {
+  color: inherit;
+}
+.admin-intake-status-pill {
+  text-transform: capitalize;
+}
+.admin-intake-meta {
+  margin: 12px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
 }
 .home-collab-grid {
   display: grid;
@@ -9285,7 +9852,7 @@ body[data-page="account"] #account-profile-panel {
   background: rgba(248,250,253,0.8);
 }
 .home-collab-org-logo {
-  height: 36px;
+  height: 64px;
   width: auto;
   object-fit: contain;
 }
@@ -9297,8 +9864,32 @@ body[data-page="account"] #account-profile-panel {
   margin-top: 16px;
   letter-spacing: 0.01em;
 }
+
+.contact-map-actions {
+  margin-bottom: 1.5rem;
+}
+
+.responsive-card-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.card-bottom-actions,
+.card-bottom-action {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+@media (max-width: 980px) {
+  .responsive-card-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 700px) {
-  .home-collab-grid { grid-template-columns: 1fr; }
+  .home-collab-grid,
+  .responsive-card-grid-3 {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Initiative horizontal rows */
@@ -9335,6 +9926,10 @@ body[data-page="account"] #account-profile-panel {
   margin-top: 0.5rem;
 }
 
+.programming-programs-actions {
+  margin-top: 2rem;
+}
+
 .studio-footer-collab-lockup {
   display: flex;
   align-items: center;
@@ -9342,7 +9937,7 @@ body[data-page="account"] #account-profile-panel {
   margin-bottom: 10px;
 }
 .studio-footer-collab-logo {
-  height: 28px;
+  height: 40px;
   width: auto;
   object-fit: contain;
   filter: brightness(0) invert(1);
@@ -10481,6 +11076,10 @@ button.avail-cal-day:focus-visible {
     display: none;
   }
 
+  body[data-page="account"] .header-bipoc-action-block {
+    display: none;
+  }
+
   /* Show hamburger */
   .mobile-nav-toggle {
     display: inline-flex;
@@ -10636,7 +11235,7 @@ button.avail-cal-day:focus-visible {
 
 @media (max-width: 480px) {
   body[data-page] .header-am-logo {
-    height: 38px;
+    height: 48px;
   }
 
   body[data-page] .header-bipoc-inline {

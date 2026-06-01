@@ -110,6 +110,7 @@ function setActiveAdminTab(tab) {
     elements.adminWorkspaceSelect.value = tab;
   }
   syncAdminModalState();
+  syncAdminTodayPollingForActiveTab();
 }
 
 function setActiveAdminSubpage(group, subpage) {
@@ -155,6 +156,7 @@ function setActiveAdminSubpage(group, subpage) {
     panel.setAttribute("aria-hidden", isActive ? "false" : "true");
   });
   syncAdminModalState();
+  syncAdminTodayPollingForActiveTab();
 }
 
 function syncAdminModalState() {
@@ -532,6 +534,192 @@ function renderAdminBookingQuickFilters(filterOptions) {
     .join("");
 }
 
+const ADMIN_TODAY_COUNTER_CARDS = [
+  { key: "total", label: "Total today" },
+  { key: "arrived", label: "Already arrived" },
+  { key: "pending_arrival", label: "Pending arrival" },
+  { key: "pending_payment", label: "Pending payment" },
+  { key: "cancelled", label: "Cancelled" },
+];
+
+function renderAdminTodayCounters(currentState) {
+  if (!elements.adminTodayCounters) {
+    return;
+  }
+  const counters = currentState.adminTodayRoster?.counters || null;
+  if (!counters) {
+    elements.adminTodayCounters.innerHTML = ADMIN_TODAY_COUNTER_CARDS
+      .map(
+        (card) => `
+          <article class="metric-card admin-today-counter" data-today-counter="${card.key}">
+            <span class="metric-label">${escapeHtml(card.label)}</span>
+            <strong class="metric-value">—</strong>
+          </article>
+        `,
+      )
+      .join("");
+    return;
+  }
+  elements.adminTodayCounters.innerHTML = ADMIN_TODAY_COUNTER_CARDS
+    .map(
+      (card) => `
+        <article class="metric-card admin-today-counter" data-today-counter="${card.key}">
+          <span class="metric-label">${escapeHtml(card.label)}</span>
+          <strong class="metric-value">${counters[card.key] ?? 0}</strong>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderAdminTodayRoster(currentState) {
+  if (!elements.adminTodayGlance) {
+    return;
+  }
+  const roster = currentState.adminTodayRoster?.today
+    || (currentState.adminBookings || [])
+      .filter((booking) => getDateKey(booking.start_time) === todayString())
+      .sort((left, right) => new Date(left.start_time).getTime() - new Date(right.start_time).getTime());
+
+  if (!roster.length) {
+    elements.adminTodayGlance.innerHTML = '<div class="empty-state">No bookings scheduled for today.</div>';
+    return;
+  }
+  const nowMs = Date.now();
+  elements.adminTodayGlance.innerHTML = roster
+    .map((booking) => {
+      const isStaff = booking.booking_kind === "staff";
+      const venue = isStaff
+        ? booking.staff_name || "Staff session"
+        : booking.room_name || "Room";
+      const guest = booking.user_full_name || booking.user_email || "Guest";
+      const statusClass = getStatusClass(booking.status);
+      const startMs = new Date(booking.start_time).getTime();
+      const checkedIn = Boolean(booking.checked_in_at);
+      const canCheckIn = booking.status === "Paid" && !checkedIn && !isStaff;
+      const minutesToStart = (startMs - nowMs) / 60000;
+      const isImminent = !checkedIn && minutesToStart > -5 && minutesToStart <= 15;
+      const rowClasses = ["admin-today-row", statusClass];
+      if (checkedIn) rowClasses.push("is-checked-in");
+      if (isImminent) rowClasses.push("is-imminent");
+      const phoneRaw = booking.user_phone || "";
+      const phoneHref = phoneRaw ? normalizePhoneHref(phoneRaw) : "";
+      const phoneLabel = phoneRaw ? formatPhone(phoneRaw) : "";
+      const phoneCell = phoneHref
+        ? `<a class="admin-today-phone" href="${escapeAttribute(phoneHref)}">${escapeHtml(phoneLabel)}</a>`
+        : '<span class="admin-today-phone admin-today-phone-empty">No phone</span>';
+      const noteRow = booking.note
+        ? `<span class="admin-today-note">📝 ${escapeHtml(booking.note)}</span>`
+        : "";
+      const checkInButton = canCheckIn
+        ? `<button class="ghost-button admin-today-checkin" type="button" data-admin-action="check-in" data-booking-id="${escapeAttribute(booking.id)}" data-booking-kind="${escapeAttribute(isStaff ? "staff" : "room")}">Check in</button>`
+        : "";
+      const arrivedSubtitle = checkedIn
+        ? `<span class="admin-today-arrived">Arrived ${formatTimeOnly(booking.checked_in_at)}</span>`
+        : "";
+      const bookingHref = `/booking?id=${encodeURIComponent(booking.id)}${isStaff ? "&kind=staff" : ""}`;
+      return `
+        <article class="${rowClasses.map((cls) => escapeAttribute(cls)).join(" ")}" data-admin-today-row="${escapeAttribute(booking.id)}">
+          <span class="admin-today-time">${formatTimeOnly(booking.start_time)} – ${formatTimeOnly(booking.end_time)}</span>
+          <span class="admin-today-venue">${escapeHtml(venue)}</span>
+          <span class="admin-today-guest">${escapeHtml(guest)}${arrivedSubtitle}</span>
+          ${phoneCell}
+          <span class="pill pill-xs ${escapeAttribute(statusClass)}">${escapeHtml(getStatusLabel(booking.status))}</span>
+          <span class="admin-today-actions">
+            ${checkInButton}
+            <a class="admin-today-open" href="${escapeAttribute(bookingHref)}">Open</a>
+          </span>
+          ${noteRow}
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderAdminUpcomingRoster(currentState) {
+  if (!elements.adminUpcomingGlance) {
+    return;
+  }
+  const roster = currentState.adminTodayRoster;
+  if (!roster) {
+    elements.adminUpcomingGlance.innerHTML = '<div class="empty-state">Loading the week ahead…</div>';
+    return;
+  }
+  const tomorrowCount = roster.tomorrow_count || 0;
+  const tomorrowFirstThree = roster.tomorrow_first_three || [];
+  const weekCount = roster.next_seven_days_count || 0;
+  const tomorrowRows = tomorrowFirstThree.length
+    ? tomorrowFirstThree
+        .map((booking) => {
+          const isStaff = booking.booking_kind === "staff";
+          const venue = isStaff
+            ? booking.staff_name || "Staff session"
+            : booking.room_name || "Room";
+          const guest = booking.user_full_name || booking.user_email || "Guest";
+          const bookingHref = `/booking?id=${encodeURIComponent(booking.id)}${isStaff ? "&kind=staff" : ""}`;
+          return `
+            <a class="admin-today-row admin-upcoming-row" href="${escapeAttribute(bookingHref)}">
+              <span class="admin-today-time">${formatTimeOnly(booking.start_time)}</span>
+              <span class="admin-today-venue">${escapeHtml(venue)}</span>
+              <span class="admin-today-guest">${escapeHtml(guest)}</span>
+            </a>
+          `;
+        })
+        .join("")
+    : '<div class="empty-state">No bookings for tomorrow yet.</div>';
+  elements.adminUpcomingGlance.innerHTML = `
+    <div class="admin-upcoming-summary">
+      <article class="metric-card"><span class="metric-label">Tomorrow</span><strong class="metric-value">${tomorrowCount}</strong></article>
+      <article class="metric-card"><span class="metric-label">Next 7 days</span><strong class="metric-value">${weekCount}</strong></article>
+    </div>
+    <div class="admin-upcoming-list">${tomorrowRows}</div>
+  `;
+}
+
+// 60s polling of /api/admin/today while Overview > Dashboard is the active
+// subpage. Paused while the browser tab is hidden so we're not burning
+// quota on a backgrounded tab.
+let adminTodayPollHandle = null;
+let adminTodayActionsRef = null;
+let adminTodayVisibilityBound = false;
+
+function isAdminOverviewDashboardActive() {
+  return activeAdminTab === "overview" && activeAdminSubpages.overview === "dashboard";
+}
+
+function startAdminTodayPolling(actions) {
+  if (actions) adminTodayActionsRef = actions;
+  if (adminTodayPollHandle) return;
+  if (!adminTodayActionsRef?.refreshAdminToday) return;
+  adminTodayPollHandle = window.setInterval(() => {
+    if (document.visibilityState !== "visible") return;
+    adminTodayActionsRef.refreshAdminToday("");
+  }, 60_000);
+  if (!adminTodayVisibilityBound) {
+    document.addEventListener("visibilitychange", () => {
+      if (!isAdminOverviewDashboardActive()) return;
+      if (document.visibilityState === "visible") {
+        adminTodayActionsRef?.refreshAdminToday?.("");
+      }
+    });
+    adminTodayVisibilityBound = true;
+  }
+}
+
+function stopAdminTodayPolling() {
+  if (!adminTodayPollHandle) return;
+  window.clearInterval(adminTodayPollHandle);
+  adminTodayPollHandle = null;
+}
+
+function syncAdminTodayPollingForActiveTab() {
+  if (isAdminOverviewDashboardActive()) {
+    startAdminTodayPolling(adminTodayActionsRef);
+  } else {
+    stopAdminTodayPolling();
+  }
+}
+
 function renderAdminDashboardMetrics(currentState) {
   if (!elements.adminDashboardMetrics) {
     return;
@@ -813,6 +1001,9 @@ function renderAdminPromoCodeCard(promoCode) {
         </div>
         <div class="room-meta">
           <span class="pill">${escapeHtml(formatPromoDiscountLabel(promoCode))}</span>
+          ${promoCode.member_unique ? '<span class="pill">Personal</span>' : ""}
+          ${promoCode.member_category ? `<span class="pill">${escapeHtml(humanizeIntakeKey(promoCode.member_category))}</span>` : ""}
+          ${promoCode.valid_month ? `<span class="pill muted">${escapeHtml(promoCode.valid_month)}</span>` : ""}
           <span class="pill ${promoCode.active ? "" : "muted"}">${promoCode.active ? "Active" : "Inactive"}</span>
         </div>
       </div>
@@ -850,6 +1041,89 @@ function renderAdminPromoCodes(currentState) {
   list.innerHTML = promoCodes.length
     ? promoCodes.map(renderAdminPromoCodeCard).join("")
     : '<div class="empty-state">No promo codes yet. Create one above to start offering discounts.</div>';
+}
+
+const INTAKE_TYPE_LABELS = {
+  membership_interest: "Membership interest",
+  engineer_application: "Engineer application",
+};
+
+function humanizeIntakeKey(key) {
+  return String(key)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function renderAdminIntakeCard(intake) {
+  const typeLabel = INTAKE_TYPE_LABELS[intake.intake_type] || intake.intake_type;
+  const created = intake.created_at ? new Date(intake.created_at).toLocaleString() : "";
+  const detailRows = Object.entries(intake.details || {})
+    .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+    .map(
+      ([key, value]) => `
+        <div class="admin-detail-field">
+          <span>${escapeHtml(humanizeIntakeKey(key))}</span>
+          <div class="admin-detail-value">${escapeHtml(String(value))}</div>
+        </div>`,
+    )
+    .join("");
+
+  const statusActions = [];
+  if (intake.status !== "reviewed") {
+    statusActions.push(
+      `<button class="ghost-button" type="button" data-admin-action="set-intake-status" data-intake-id="${escapeAttribute(intake.id)}" data-intake-status="reviewed">Mark reviewed</button>`,
+    );
+  }
+  if (intake.status !== "archived") {
+    statusActions.push(
+      `<button class="ghost-button" type="button" data-admin-action="set-intake-status" data-intake-id="${escapeAttribute(intake.id)}" data-intake-status="archived">Archive</button>`,
+    );
+  }
+  if (intake.status !== "new") {
+    statusActions.push(
+      `<button class="ghost-button" type="button" data-admin-action="set-intake-status" data-intake-id="${escapeAttribute(intake.id)}" data-intake-status="new">Reopen</button>`,
+    );
+  }
+
+  return `
+    <article class="admin-intake-card is-status-${escapeAttribute(intake.status)}">
+      <div class="admin-intake-card-header">
+        <div>
+          <h4>${escapeHtml(intake.name)}</h4>
+          <p class="admin-intake-contact">
+            <a href="mailto:${escapeAttribute(intake.email)}">${escapeHtml(intake.email)}</a>
+            &middot; <a href="tel:${escapeAttribute(intake.phone)}">${escapeHtml(intake.phone)}</a>
+          </p>
+        </div>
+        <div class="room-meta">
+          <span class="pill">${escapeHtml(typeLabel)}</span>
+          <span class="pill admin-intake-status-pill">${escapeHtml(intake.status)}</span>
+        </div>
+      </div>
+      <div class="admin-detail-grid">${detailRows || '<div class="empty-state">No extra details.</div>'}</div>
+      <p class="admin-intake-meta">Submitted ${escapeHtml(created)}</p>
+      <div class="room-actions">${statusActions.join("")}</div>
+    </article>
+  `;
+}
+
+function renderAdminIntakes(currentState) {
+  const list = document.getElementById("admin-intakes-list");
+  if (!list) {
+    return;
+  }
+
+  const typeFilter = document.getElementById("admin-intakes-type-filter")?.value || "";
+  const statusFilter = document.getElementById("admin-intakes-status-filter")?.value || "";
+  const intakes = (currentState.adminIntakes || []).filter((item) => {
+    if (typeFilter && item.intake_type !== typeFilter) return false;
+    if (statusFilter && item.status !== statusFilter) return false;
+    return true;
+  });
+
+  list.innerHTML = intakes.length
+    ? intakes.map(renderAdminIntakeCard).join("")
+    : '<div class="empty-state">No submissions match these filters yet.</div>';
 }
 
 function formatActivityAction(action) {
@@ -934,7 +1208,12 @@ function populateStaffProfileForm(profile) {
   elements.adminStaffProfileForm.elements.description.value = profile.description || "";
   elements.adminStaffProfileForm.elements.skills.value = (profile.skills || []).join(", ");
   elements.adminStaffProfileForm.elements.talents.value = (profile.talents || []).join(", ");
+  elements.adminStaffProfileForm.elements.services.value = (profile.services || []).join(", ");
+  elements.adminStaffProfileForm.elements.bio.value = profile.bio || "";
+  elements.adminStaffProfileForm.elements.portfolio_url.value = profile.portfolio_url || "";
+  elements.adminStaffProfileForm.elements.headshot_urls.value = (profile.headshot_urls || []).join("\n");
   elements.adminStaffProfileForm.elements.add_on_price_cents.value = profile.add_on_price_cents || 0;
+  elements.adminStaffProfileForm.elements.equipment_rental_cost_cents.value = profile.equipment_rental_cost_cents || 0;
   elements.adminStaffProfileForm.elements.active.checked = Boolean(profile.active);
   if (elements.adminStaffProfileId) {
     elements.adminStaffProfileId.value = profile.id;
@@ -1848,6 +2127,32 @@ export function initAdminView(actions) {
     return;
   }
 
+  // Capture actions for the polling lifecycle (Today live ops dashboard).
+  adminTodayActionsRef = actions;
+
+  elements.adminTodayPrintButton?.addEventListener("click", () => {
+    document.body.classList.add("admin-printing-today");
+    window.print();
+    window.setTimeout(() => document.body.classList.remove("admin-printing-today"), 200);
+  });
+
+  // Inline Check-in button inside the Today's live roster. Reuses the existing
+  // admin check-in endpoint but DOESN'T pull the admin off the Overview tab.
+  elements.adminTodayGlance?.addEventListener("click", async (event) => {
+    const button = event.target.closest('[data-admin-action="check-in"]');
+    if (!button) return;
+    event.preventDefault();
+    try {
+      setState({ message: "Marking guest as arrived..." });
+      await api.adminCheckInBooking(button.dataset.bookingId);
+      await actions.refreshAdminToday?.("Guest checked in.");
+      // Also refresh the bookings list so the queue tab stays in sync.
+      await actions.refreshAll?.("");
+    } catch (error) {
+      setState({ message: error.message });
+    }
+  });
+
   elements.adminBookingLookupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = new FormData(elements.adminBookingLookupForm);
@@ -2140,10 +2445,15 @@ export function initAdminView(actions) {
       const payload = {
         name: form.elements.name.value.trim(),
         description: form.elements.description.value.trim() || null,
+        bio: form.elements.bio.value.trim() || null,
         skills: parseListInput(form.elements.skills.value),
         talents: parseListInput(form.elements.talents.value),
+        services: parseListInput(form.elements.services.value),
         photo_url: photoUrl,
+        headshot_urls: parseListInput(form.elements.headshot_urls.value),
+        portfolio_url: form.elements.portfolio_url.value.trim() || null,
         add_on_price_cents: Number(form.elements.add_on_price_cents.value || 0),
+        equipment_rental_cost_cents: Number(form.elements.equipment_rental_cost_cents.value || 0),
         active: form.elements.active.checked,
       };
 
@@ -2363,6 +2673,71 @@ export function initAdminView(actions) {
     }
   });
 
+  // Intakes (membership interest + engineer applications): client-side filters,
+  // refresh through the umbrella reload, and inline status changes.
+  ["admin-intakes-type-filter", "admin-intakes-status-filter"].forEach((selectId) => {
+    document.getElementById(selectId)?.addEventListener("change", () => {
+      renderAdminIntakes(actions.getState());
+    });
+  });
+
+  document.getElementById("admin-intakes-refresh")?.addEventListener("click", () => {
+    actions.refreshAll("Refreshing leads…");
+  });
+
+  document.getElementById("admin-intakes-list")?.addEventListener("click", async (event) => {
+    const button = event.target.closest('[data-admin-action="set-intake-status"]');
+    if (!button) {
+      return;
+    }
+    try {
+      button.disabled = true;
+      setState({ message: "Updating submission…" });
+      await api.adminUpdateIntakeStatus(button.dataset.intakeId, button.dataset.intakeStatus);
+      await actions.refreshAll(`Submission marked ${button.dataset.intakeStatus}.`);
+    } catch (error) {
+      setState({ message: error.message });
+    }
+  });
+
+  document.getElementById("admin-monthly-codes-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const feedback = document.getElementById("admin-monthly-codes-feedback");
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalLabel = submitButton ? submitButton.textContent : "";
+    const payload = {
+      month: form.elements.month.value,
+      member_category: form.elements.member_category.value,
+      percent_off: Number(form.elements.percent_off.value || 50),
+    };
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "Generating…";
+    }
+    if (feedback) feedback.classList.add("hidden");
+    try {
+      const result = await api.adminGenerateMonthlyMemberCodes(payload);
+      if (feedback) {
+        feedback.textContent = `Created ${result.created} new code${result.created === 1 ? "" : "s"}, skipped ${result.skipped} existing.`;
+        feedback.classList.remove("hidden", "is-error");
+        feedback.classList.add("is-success");
+      }
+      await actions.refreshAll("Monthly member codes generated.");
+    } catch (error) {
+      if (feedback) {
+        feedback.textContent = error?.message ? String(error.message) : "Could not generate codes.";
+        feedback.classList.remove("hidden", "is-success");
+        feedback.classList.add("is-error");
+      }
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = originalLabel;
+      }
+    }
+  });
+
   elements.adminRoomStaffList?.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-admin-action='save-room-staff']");
     if (!button) {
@@ -2533,6 +2908,7 @@ export function renderAdminView(currentState) {
   renderAdminRoomCalendarSummary(currentState);
   renderAdminRoomCalendar(currentState);
   renderAdminPromoCodes(currentState);
+  renderAdminIntakes(currentState);
   syncAdminPromoDiscountFields();
 
   if (elements.adminAnalyticsGrid) {
@@ -2567,36 +2943,10 @@ export function renderAdminView(currentState) {
       : '<div class="empty-state">Analytics will appear once booking data is available.</div>';
   }
 
-  const todayGlanceEl = document.getElementById("admin-today-glance");
-  if (todayGlanceEl) {
-    const todayBookings = (currentState.adminBookings || [])
-      .filter((booking) => getDateKey(booking.start_time) === todayString())
-      .sort((left, right) => new Date(left.start_time).getTime() - new Date(right.start_time).getTime());
-
-    if (!todayBookings.length) {
-      todayGlanceEl.innerHTML = '<div class="empty-state">No bookings scheduled for today.</div>';
-    } else {
-      todayGlanceEl.innerHTML = todayBookings
-        .map((booking) => {
-          const isStaff = booking.booking_kind === "staff";
-          const venue = isStaff
-            ? booking.staff_name || "Staff session"
-            : booking.room_name || "Room";
-          const guest = booking.user_full_name || booking.user_email || "Guest";
-          const statusClass = getStatusClass(booking.status);
-          const bookingHref = `/booking?id=${encodeURIComponent(booking.id)}${isStaff ? "&kind=staff" : ""}`;
-          return `
-            <a class="admin-today-row ${escapeAttribute(statusClass)}" href="${escapeAttribute(bookingHref)}">
-              <span class="admin-today-time">${formatTimeOnly(booking.start_time)} – ${formatTimeOnly(booking.end_time)}</span>
-              <span class="admin-today-venue">${escapeHtml(venue)}</span>
-              <span class="admin-today-guest">${escapeHtml(guest)}</span>
-              <span class="pill pill-xs ${escapeAttribute(statusClass)}">${escapeHtml(getStatusLabel(booking.status))}</span>
-            </a>
-          `;
-        })
-        .join("");
-    }
-  }
+  renderAdminTodayCounters(currentState);
+  renderAdminTodayRoster(currentState);
+  renderAdminUpcomingRoster(currentState);
+  syncAdminTodayPollingForActiveTab();
 
   if (elements.adminRoomBreakdown) {
     const roomSummaries = currentState.adminAnalytics?.room_summaries || [];
