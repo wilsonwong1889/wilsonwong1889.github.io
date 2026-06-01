@@ -243,6 +243,46 @@
     </div>
   </section>
 
+  <section class="panel panel-wide intake-panel" id="engineer-application">
+    <div class="panel-header">
+      <p class="panel-kicker">Join the team</p>
+      <h2>Apply to be a studio engineer</h2>
+      <p class="panel-copy">Are you an audio, video, or production engineer who wants to work out of the Hub? Tell us about your skills and gear and we'll be in touch.</p>
+    </div>
+    <form id="engineer-application-form" class="stack-form intake-form" novalidate>
+      <p id="engineer-application-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
+      <div class="intake-form-grid">
+        <label>
+          <span>Name</span>
+          <input type="text" name="name" autocomplete="name" maxlength="120" placeholder="Jane Doe" required />
+        </label>
+        <label>
+          <span>Email</span>
+          <input type="email" name="email" autocomplete="email" maxlength="120" placeholder="jane@example.com" required />
+        </label>
+        <label>
+          <span>Phone</span>
+          <input type="tel" name="phone" autocomplete="tel" maxlength="40" placeholder="403-555-0100" required />
+        </label>
+      </div>
+      <label>
+        <span>Skillset</span>
+        <textarea name="skillset" rows="3" maxlength="2000" placeholder="e.g. recording, mixing, mastering, live sound, video editing…" required></textarea>
+      </label>
+      <label>
+        <span>Equipment <span class="intake-optional">(optional)</span></span>
+        <textarea name="equipment" rows="3" maxlength="2000" placeholder="Any gear you'd bring or work with."></textarea>
+      </label>
+      <label>
+        <span>Why should you be considered?</span>
+        <textarea name="why_considered" rows="4" maxlength="2000" placeholder="Tell us about your experience and what you'd bring to the studio." required></textarea>
+      </label>
+      <div class="hero-actions">
+        <button type="submit" class="primary-button" id="engineer-application-submit">Submit application</button>
+      </div>
+    </form>
+  </section>
+
 </main>
 
       <footer class="studio-footer">

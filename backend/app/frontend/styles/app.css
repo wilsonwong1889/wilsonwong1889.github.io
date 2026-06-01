@@ -9738,6 +9738,104 @@ body[data-page="account"] #account-profile-panel {
     display: inline-flex;
   }
 }
+
+/* ── Public intake forms (membership interest, engineer application) ───────── */
+.intake-form {
+  max-width: 760px;
+}
+.intake-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.intake-form textarea {
+  resize: vertical;
+  min-height: 84px;
+}
+.intake-optional {
+  color: var(--muted);
+  font-weight: 400;
+}
+.intake-feedback {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(24, 33, 39, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink);
+  line-height: 1.5;
+}
+.intake-feedback.is-error {
+  border-color: rgba(215, 25, 32, 0.34);
+  background: rgba(243, 247, 251, 0.9);
+  color: var(--danger);
+}
+.intake-feedback.is-success {
+  border-color: rgba(34, 120, 74, 0.28);
+  background: rgba(236, 250, 242, 0.9);
+  color: #1f6a43;
+}
+@media (max-width: 640px) {
+  .intake-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Admin intake (leads) review ───────────────────────────────────────────── */
+.admin-intakes-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 14px;
+  margin: 18px 0;
+}
+.admin-intakes-list {
+  display: grid;
+  gap: 16px;
+}
+.admin-intake-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  background: #ffffff;
+}
+.admin-intake-card.is-status-new {
+  border-left-color: var(--brand-red);
+}
+.admin-intake-card.is-status-reviewed {
+  border-left-color: var(--success, #2d9d62);
+}
+.admin-intake-card.is-status-archived {
+  border-left-color: var(--line);
+  opacity: 0.7;
+}
+.admin-intake-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.admin-intake-card-header h4 {
+  margin: 0 0 2px;
+}
+.admin-intake-contact {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.admin-intake-contact a {
+  color: inherit;
+}
+.admin-intake-status-pill {
+  text-transform: capitalize;
+}
+.admin-intake-meta {
+  margin: 12px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
 .home-collab-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

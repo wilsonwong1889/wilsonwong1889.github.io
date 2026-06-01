@@ -1040,6 +1040,89 @@ function renderAdminPromoCodes(currentState) {
     : '<div class="empty-state">No promo codes yet. Create one above to start offering discounts.</div>';
 }
 
+const INTAKE_TYPE_LABELS = {
+  membership_interest: "Membership interest",
+  engineer_application: "Engineer application",
+};
+
+function humanizeIntakeKey(key) {
+  return String(key)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function renderAdminIntakeCard(intake) {
+  const typeLabel = INTAKE_TYPE_LABELS[intake.intake_type] || intake.intake_type;
+  const created = intake.created_at ? new Date(intake.created_at).toLocaleString() : "";
+  const detailRows = Object.entries(intake.details || {})
+    .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+    .map(
+      ([key, value]) => `
+        <div class="admin-detail-field">
+          <span>${escapeHtml(humanizeIntakeKey(key))}</span>
+          <div class="admin-detail-value">${escapeHtml(String(value))}</div>
+        </div>`,
+    )
+    .join("");
+
+  const statusActions = [];
+  if (intake.status !== "reviewed") {
+    statusActions.push(
+      `<button class="ghost-button" type="button" data-admin-action="set-intake-status" data-intake-id="${escapeAttribute(intake.id)}" data-intake-status="reviewed">Mark reviewed</button>`,
+    );
+  }
+  if (intake.status !== "archived") {
+    statusActions.push(
+      `<button class="ghost-button" type="button" data-admin-action="set-intake-status" data-intake-id="${escapeAttribute(intake.id)}" data-intake-status="archived">Archive</button>`,
+    );
+  }
+  if (intake.status !== "new") {
+    statusActions.push(
+      `<button class="ghost-button" type="button" data-admin-action="set-intake-status" data-intake-id="${escapeAttribute(intake.id)}" data-intake-status="new">Reopen</button>`,
+    );
+  }
+
+  return `
+    <article class="admin-intake-card is-status-${escapeAttribute(intake.status)}">
+      <div class="admin-intake-card-header">
+        <div>
+          <h4>${escapeHtml(intake.name)}</h4>
+          <p class="admin-intake-contact">
+            <a href="mailto:${escapeAttribute(intake.email)}">${escapeHtml(intake.email)}</a>
+            &middot; <a href="tel:${escapeAttribute(intake.phone)}">${escapeHtml(intake.phone)}</a>
+          </p>
+        </div>
+        <div class="room-meta">
+          <span class="pill">${escapeHtml(typeLabel)}</span>
+          <span class="pill admin-intake-status-pill">${escapeHtml(intake.status)}</span>
+        </div>
+      </div>
+      <div class="admin-detail-grid">${detailRows || '<div class="empty-state">No extra details.</div>'}</div>
+      <p class="admin-intake-meta">Submitted ${escapeHtml(created)}</p>
+      <div class="room-actions">${statusActions.join("")}</div>
+    </article>
+  `;
+}
+
+function renderAdminIntakes(currentState) {
+  const list = document.getElementById("admin-intakes-list");
+  if (!list) {
+    return;
+  }
+
+  const typeFilter = document.getElementById("admin-intakes-type-filter")?.value || "";
+  const statusFilter = document.getElementById("admin-intakes-status-filter")?.value || "";
+  const intakes = (currentState.adminIntakes || []).filter((item) => {
+    if (typeFilter && item.intake_type !== typeFilter) return false;
+    if (statusFilter && item.status !== statusFilter) return false;
+    return true;
+  });
+
+  list.innerHTML = intakes.length
+    ? intakes.map(renderAdminIntakeCard).join("")
+    : '<div class="empty-state">No submissions match these filters yet.</div>';
+}
+
 function formatActivityAction(action) {
   return action.replaceAll("_", " ");
 }
@@ -2577,6 +2660,33 @@ export function initAdminView(actions) {
     }
   });
 
+  // Intakes (membership interest + engineer applications): client-side filters,
+  // refresh through the umbrella reload, and inline status changes.
+  ["admin-intakes-type-filter", "admin-intakes-status-filter"].forEach((selectId) => {
+    document.getElementById(selectId)?.addEventListener("change", () => {
+      renderAdminIntakes(actions.getState());
+    });
+  });
+
+  document.getElementById("admin-intakes-refresh")?.addEventListener("click", () => {
+    actions.refreshAll("Refreshing leads…");
+  });
+
+  document.getElementById("admin-intakes-list")?.addEventListener("click", async (event) => {
+    const button = event.target.closest('[data-admin-action="set-intake-status"]');
+    if (!button) {
+      return;
+    }
+    try {
+      button.disabled = true;
+      setState({ message: "Updating submission…" });
+      await api.adminUpdateIntakeStatus(button.dataset.intakeId, button.dataset.intakeStatus);
+      await actions.refreshAll(`Submission marked ${button.dataset.intakeStatus}.`);
+    } catch (error) {
+      setState({ message: error.message });
+    }
+  });
+
   elements.adminRoomStaffList?.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-admin-action='save-room-staff']");
     if (!button) {
@@ -2747,6 +2857,7 @@ export function renderAdminView(currentState) {
   renderAdminRoomCalendarSummary(currentState);
   renderAdminRoomCalendar(currentState);
   renderAdminPromoCodes(currentState);
+  renderAdminIntakes(currentState);
   syncAdminPromoDiscountFields();
 
   if (elements.adminAnalyticsGrid) {

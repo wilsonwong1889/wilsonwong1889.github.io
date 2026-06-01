@@ -249,7 +249,7 @@
             <h2>Simple booking deposits.</h2>
             <p class="panel-copy">Deposits help protect the calendar while keeping the booking flow accessible.</p>
           </div>
-          <div class="pricing-deposit-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+          <div class="pricing-deposit-grid pricing-deposit-grid-three">
             <article>
               <span>Space-only booking</span>
               <strong>$10</strong>
@@ -260,7 +260,7 @@
             </article>
             <article>
               <span>Equipment rental</span>
-              <strong style="font-size: clamp(0.95rem, 2.2vw, 1.2rem); line-height: 1.3; margin-top: 10px;">Credit card authorization for full replacement value</strong>
+              <strong class="pricing-deposit-auth-value">Credit card authorization for full replacement value</strong>
             </article>
           </div>
           <p class="pricing-note">
@@ -317,6 +317,53 @@
               </div>
             </article>
           </div>
+        </section>
+
+        <section class="panel panel-wide intake-panel" id="membership-interest">
+          <div class="panel-header">
+            <p class="panel-kicker">Become a member</p>
+            <h2>Ask about membership</h2>
+            <p class="panel-copy">Tell us a little about you and which membership fits. The team follows up by email or phone — no payment now.</p>
+          </div>
+          <form id="membership-interest-form" class="stack-form intake-form" novalidate>
+            <p id="membership-interest-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
+            <div class="intake-form-grid">
+              <label>
+                <span>Name</span>
+                <input type="text" name="name" autocomplete="name" maxlength="120" placeholder="Jane Doe" required />
+              </label>
+              <label>
+                <span>Email</span>
+                <input type="email" name="email" autocomplete="email" maxlength="120" placeholder="jane@example.com" required />
+              </label>
+              <label>
+                <span>Phone</span>
+                <input type="tel" name="phone" autocomplete="tel" maxlength="40" placeholder="403-555-0100" required />
+              </label>
+              <label>
+                <span>Membership interest</span>
+                <select name="membership_interest" required>
+                  <option value="" disabled selected>Select a membership…</option>
+                  <option>Artist Member — monthly</option>
+                  <option>Artist Member — annual</option>
+                  <option>Fellowship Artist</option>
+                  <option>Artist in Residence</option>
+                  <option>Service Engineer</option>
+                  <option>BIPOC Community Member</option>
+                  <option>Venture Member</option>
+                  <option>Organizational Member</option>
+                  <option>Not sure yet</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              <span>Message <span class="intake-optional">(optional)</span></span>
+              <textarea name="message" rows="3" maxlength="2000" placeholder="Anything you'd like us to know?"></textarea>
+            </label>
+            <div class="hero-actions">
+              <button type="submit" class="primary-button" id="membership-interest-submit">Request membership info</button>
+            </div>
+          </form>
         </section>
 
         <section class="panel panel-wide pricing-cta-panel">

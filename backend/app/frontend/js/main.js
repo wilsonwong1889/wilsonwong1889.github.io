@@ -16,6 +16,7 @@ import { initBookingDetailView, renderBookingDetailView } from "./views/booking-
 import { initBookingsView, renderBookingsView } from "./views/bookings.js";
 import { initHomeView, renderHomeView } from "./views/home.js";
 import { initInfoView, renderInfoView } from "./views/info.js";
+import { initIntakeView, renderIntakeView } from "./views/intake.js";
 import { initPaymentSuccessView, renderPaymentSuccessView } from "./views/payment-success.js";
 import { initProfileView, renderProfileView } from "./views/profile.js";
 import { initRoomBookingView, renderRoomBookingView } from "./views/room-booking.js";
@@ -176,6 +177,7 @@ function renderApp(currentState) {
   renderBookingsView(currentState);
   renderBookingDetailView(currentState);
   renderInfoView(currentState);
+  renderIntakeView(currentState);
   renderPaymentSuccessView(currentState);
   renderProfileView(currentState);
   renderRoomBookingView(currentState);
@@ -251,6 +253,7 @@ function resetScopedData() {
     patch.adminTestCases = [];
     patch.adminStaffProfiles = [];
     patch.adminPromoCodes = [];
+    patch.adminIntakes = [];
   }
   if (!requirements.publicStaff) {
     patch.publicStaffProfiles = [];
@@ -463,6 +466,24 @@ async function refreshAdminPromoCodes(message) {
   }
 }
 
+async function refreshAdminIntakes(message) {
+  if (!currentRequirements().admin) {
+    return;
+  }
+
+  if (!state.currentUser?.is_admin) {
+    setState({ adminIntakes: [], message: message || state.message });
+    return;
+  }
+
+  try {
+    const adminIntakes = await api.getAdminIntakes();
+    setState({ adminIntakes, message: message || "Leads loaded." });
+  } catch (error) {
+    setState({ message: error.message });
+  }
+}
+
 async function refreshPublicStaffProfiles(message) {
   if (!currentRequirements().publicStaff) {
     return;
@@ -648,6 +669,7 @@ async function refreshAvailabilityAndBookings(message) {
   await refreshAdminTestCases(message);
   await refreshAdminStaffProfiles(message);
   await refreshAdminPromoCodes(message);
+  await refreshAdminIntakes(message);
   await refreshPublicStaffProfiles(message);
   await loadSelectedBooking(message);
 }
@@ -769,6 +791,7 @@ initBookingsView({ refreshAvailabilityAndBookings });
 initBookingDetailView({ reloadBookingDetail: loadSelectedBooking });
 initHomeView();
 initInfoView();
+initIntakeView();
 initPaymentSuccessView({ reloadPaymentSuccess: loadSelectedBooking });
 initProfileView({ clearSession });
 initRoomBookingView();

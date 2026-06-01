@@ -24,6 +24,7 @@ export const state = {
   adminTestCases: [],
   adminStaffProfiles: [],
   adminPromoCodes: [],
+  adminIntakes: [],
   publicStaffProfiles: [],
   selectedRoom: null,
   selectedRoomReviews: [],

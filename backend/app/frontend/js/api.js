@@ -186,6 +186,18 @@ export const api = {
       }),
     });
   },
+  submitMembershipInterest(payload) {
+    return request("/api/intake/membership-interest", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  submitEngineerApplication(payload) {
+    return request("/api/intake/engineer-application", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
   cancelBooking(bookingId, payload) {
     return request(`/api/bookings/${bookingId}/cancel`, {
       method: "POST",
@@ -403,6 +415,22 @@ export const api = {
     return request(`/api/admin/rooms/${roomId}`, {
       method: "PUT",
       body: JSON.stringify(payload),
+    });
+  },
+  getAdminIntakes(query = {}) {
+    const params = new URLSearchParams();
+    Object.entries(query).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      }
+    });
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return request(`/api/admin/intakes${suffix}`);
+  },
+  adminUpdateIntakeStatus(intakeId, status) {
+    return request(`/api/admin/intakes/${intakeId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
     });
   },
 };
