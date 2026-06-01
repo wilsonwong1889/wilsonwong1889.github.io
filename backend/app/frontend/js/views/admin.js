@@ -1205,7 +1205,12 @@ function populateStaffProfileForm(profile) {
   elements.adminStaffProfileForm.elements.description.value = profile.description || "";
   elements.adminStaffProfileForm.elements.skills.value = (profile.skills || []).join(", ");
   elements.adminStaffProfileForm.elements.talents.value = (profile.talents || []).join(", ");
+  elements.adminStaffProfileForm.elements.services.value = (profile.services || []).join(", ");
+  elements.adminStaffProfileForm.elements.bio.value = profile.bio || "";
+  elements.adminStaffProfileForm.elements.portfolio_url.value = profile.portfolio_url || "";
+  elements.adminStaffProfileForm.elements.headshot_urls.value = (profile.headshot_urls || []).join("\n");
   elements.adminStaffProfileForm.elements.add_on_price_cents.value = profile.add_on_price_cents || 0;
+  elements.adminStaffProfileForm.elements.equipment_rental_cost_cents.value = profile.equipment_rental_cost_cents || 0;
   elements.adminStaffProfileForm.elements.active.checked = Boolean(profile.active);
   if (elements.adminStaffProfileId) {
     elements.adminStaffProfileId.value = profile.id;
@@ -2437,10 +2442,15 @@ export function initAdminView(actions) {
       const payload = {
         name: form.elements.name.value.trim(),
         description: form.elements.description.value.trim() || null,
+        bio: form.elements.bio.value.trim() || null,
         skills: parseListInput(form.elements.skills.value),
         talents: parseListInput(form.elements.talents.value),
+        services: parseListInput(form.elements.services.value),
         photo_url: photoUrl,
+        headshot_urls: parseListInput(form.elements.headshot_urls.value),
+        portfolio_url: form.elements.portfolio_url.value.trim() || null,
         add_on_price_cents: Number(form.elements.add_on_price_cents.value || 0),
+        equipment_rental_cost_cents: Number(form.elements.equipment_rental_cost_cents.value || 0),
         active: form.elements.active.checked,
       };
 
