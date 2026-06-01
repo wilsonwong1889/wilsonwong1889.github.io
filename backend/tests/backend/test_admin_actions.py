@@ -41,11 +41,12 @@ class AdminActionsTest(BaseAppTest):
         self.assertTrue(all("health" in item for item in payload))
         self.assertTrue(all(item["health"] in {"working", "needs_fix", "not_working"} for item in payload))
         self.assertTrue(any(item["health"] == "working" for item in payload))
-        # `not_working` covers the live SendGrid/Twilio verification gap that
-        # can't be automated without external sandboxes — the other two former
-        # `needs_fix` entries (webhook storm, worker recovery) are now backed
-        # by test_31 / test_42.
-        self.assertTrue(any(item["health"] == "not_working" for item in payload))
+        # The catalog's three health states are still all renderable by the
+        # admin UI; we no longer demand a `not_working` example here because
+        # we don't want to preserve an antipattern just to keep this
+        # assertion happy. Live provider verification used to be the
+        # placeholder `not_working` entry — it now ships green via
+        # tests/backend/test_notification_providers.py.
         self.assertTrue(any(item["title"] == "Payment confirmation end-to-end" for item in payload))
         self.assertTrue(
             any(item["title"] == "Runtime config rejects placeholder production secrets" for item in payload)
