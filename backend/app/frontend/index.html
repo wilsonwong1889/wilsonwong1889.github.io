@@ -112,13 +112,17 @@
                 </div>
               </div>
               <div class="home-hero-overlay home-hero-overlay-primary"></div>
-              <div class="home-collab-badge" aria-label="Arts Marvels x BIPOC Foundation partnership">
+              <div class="home-collab-badge home-collab-badge-left" aria-label="Arts Marvels">
                 <img class="home-collab-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" />
-                <span class="home-collab-x" aria-hidden="true">×</span>
+                <!-- NOTE: swap href="#" for the Arts Marvels Instapage URL once provided (also the [data-am-learn-more] link in hero-actions). -->
+                <a class="home-collab-learn" data-am-learn-more href="#">Learn more</a>
+              </div>
+              <div class="home-collab-badge home-collab-badge-right" aria-label="BIPOC Foundation">
                 <span class="home-collab-partner">
                   <strong class="home-collab-bipoc">bipoc</strong>
                   <span class="home-collab-foundation">foundation</span>
                 </span>
+                <a class="home-collab-learn" href="https://bipocfoundation.org" target="_blank" rel="noreferrer">Learn more</a>
               </div>
               <div class="home-hero-stage">
                 <div class="home-carousel-controls">
@@ -150,19 +154,33 @@
                   A community-first creative production space in Lethbridge — powered by Arts Marvels and supported by BIPOC Foundation — for artists, entrepreneurs, creators, organizations, and community members.
                 </p>
               </div>
-              <a class="ghost-button ghost-link" href="/info">Learn more</a>
             </div>
           </div>
           <p class="panel-copy">
             Professional tools. Community access. One space. Browse studios, check rates, or read the Help guide to get started.
           </p>
           <div class="hero-actions">
+            <a class="ghost-button ghost-link" href="/info">Learn more</a>
             <a class="ghost-button ghost-link" href="/pricing">View pricing</a>
             <a class="ghost-button ghost-link" href="/faq">Read Help</a>
+            <!-- Surfaced on mobile so the partner "Learn more" links stay reachable when the carousel badges shrink. -->
+            <a class="ghost-button ghost-link home-partner-learn" data-am-learn-more href="#">About Arts Marvels</a>
+            <a class="ghost-button ghost-link home-partner-learn" href="https://bipocfoundation.org" target="_blank" rel="noreferrer">About BIPOC Foundation</a>
           </div>
         </section>
 
         <section class="panel panel-wide home-collab-panel">
+          <div class="home-collective-intro">
+            <p class="panel-kicker">BIPOC Foundation Media Collective</p>
+            <h2 class="home-collective-title">A creative home built by and for the community.</h2>
+            <p class="panel-copy">
+              The BIPOC Foundation Media Collective brings artists, engineers, and storytellers together under one roof — a shared production studio where community members create professional media, build their brands, and grow their craft.
+            </p>
+            <div class="home-initiative-lockup">
+              <span class="home-initiative-label">This initiative is in partnership with</span>
+              <img class="home-initiative-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" />
+            </div>
+          </div>
           <div class="panel-header">
             <p class="panel-kicker">In partnership</p>
             <h2>Arts Marvels × BIPOC Foundation</h2>

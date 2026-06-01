@@ -420,8 +420,15 @@ body[data-auth-pending="true"] .site-header .header-actions > * {
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
   margin-top: 22px;
+}
+
+.hero-actions .primary-button,
+.hero-actions .ghost-button,
+.hero-actions .ghost-link {
+  min-height: 46px;
 }
 
 .hero-actions-center {
@@ -784,8 +791,19 @@ body[data-auth-pending="true"] .site-header .header-actions > * {
 .section-heading-row {
   display: flex;
   justify-content: space-between;
-  align-items: end;
+  align-items: flex-start;
   gap: 18px;
+}
+
+.section-heading-row > div {
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .section-heading-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 .home-soft-badge,
@@ -9215,6 +9233,16 @@ body[data-page="pricing"] .pricing-hero-card h1 {
   gap: 12px;
 }
 
+.pricing-deposit-grid-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pricing-deposit-auth-value {
+  margin-top: 10px;
+  font-size: clamp(0.95rem, 2.2vw, 1.2rem);
+  line-height: 1.3;
+}
+
 .pricing-benefits-grid .story-card strong,
 .pricing-policy-grid .detail-card h3 {
   color: var(--brand-blue);
@@ -9311,7 +9339,8 @@ body[data-page="pricing"] .pricing-hero-card h1 {
 @media (max-width: 680px) {
   .pricing-hero-media-grid,
   .pricing-price-lockup,
-  .pricing-deposit-grid {
+  .pricing-deposit-grid,
+  .pricing-deposit-grid-three {
     grid-template-columns: 1fr;
   }
 
@@ -9352,6 +9381,19 @@ body[data-page="account"] .home-utility-divider {
 
 body[data-page="account"] .home-utility-actions {
   pointer-events: auto;
+}
+
+body[data-page="account"] .header-bipoc-action-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+}
+
+body[data-page="account"] .header-bipoc-action-block .header-bipoc-side-logo {
+  margin: 0;
+  justify-self: auto;
 }
 
 body[data-page="account"] .home-utility-actions .ghost-button,
@@ -9537,11 +9579,10 @@ body[data-page="account"] #account-profile-panel {
 .home-collab-badge {
   position: absolute;
   bottom: 28px;
-  left: 28px;
   z-index: 20;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -9549,8 +9590,24 @@ body[data-page="account"] #account-profile-panel {
   border-radius: 10px;
   padding: 10px 16px;
   color: #ffffff;
+  /* The badge container ignores clicks so it never blocks carousel swipes;
+     only the Learn more pill re-enables pointer events. */
   pointer-events: none;
   user-select: none;
+}
+
+/* Arts Marvels pinned bottom-left, BIPOC Foundation pinned bottom-right. */
+.home-collab-badge-left {
+  left: 28px;
+  right: auto;
+  align-items: flex-start;
+}
+
+.home-collab-badge-right {
+  left: auto;
+  right: 28px;
+  align-items: flex-end;
+  text-align: right;
 }
 
 .home-collab-logo {
@@ -9588,21 +9645,98 @@ body[data-page="account"] #account-profile-panel {
   color: #c0392b;
 }
 
+/* Signature-red Learn more pill inside each carousel partner badge. */
+.home-collab-learn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--brand-red);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.home-collab-learn:hover,
+.home-collab-learn:focus-visible {
+  background: var(--brand-red-deep);
+  transform: translateY(-1px);
+}
+
 @media (max-width: 600px) {
   .home-collab-badge {
-    bottom: 16px;
-    left: 16px;
+    /* Lifted above the centered "Book now" button so the corner badges never
+       collide with it on narrow screens. */
+    bottom: 88px;
     padding: 8px 12px;
-    gap: 8px;
+    gap: 6px;
+  }
+  .home-collab-badge-left {
+    left: 16px;
+  }
+  .home-collab-badge-right {
+    right: 16px;
   }
   .home-collab-logo {
     height: 24px;
+  }
+  .home-collab-learn {
+    padding: 3px 10px;
+    font-size: 11px;
   }
 }
 
 /* ─── Home Collab Panel ─────────────────────────────────────────────────── */
 .home-collab-panel {
   /* standard panel spacing already handled by .panel.panel-wide */
+}
+
+/* BIPOC Foundation Media Collective lead-in, shown above the "In partnership" header. */
+.home-collective-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 28px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid rgba(24, 33, 39, 0.1);
+}
+.home-collective-title {
+  margin: 0;
+  max-width: 720px;
+}
+.home-initiative-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+}
+.home-initiative-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.home-initiative-logo {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+}
+
+/* Partner "Learn more" links: hidden on desktop (the carousel badges cover this),
+   surfaced beside "Read Help" on mobile where those badges shrink. */
+.home-partner-learn {
+  display: none;
+}
+@media (max-width: 768px) {
+  .home-partner-learn {
+    display: inline-flex;
+  }
 }
 .home-collab-grid {
   display: grid;
@@ -9632,8 +9766,32 @@ body[data-page="account"] #account-profile-panel {
   margin-top: 16px;
   letter-spacing: 0.01em;
 }
+
+.contact-map-actions {
+  margin-bottom: 1.5rem;
+}
+
+.responsive-card-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.card-bottom-actions,
+.card-bottom-action {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+@media (max-width: 980px) {
+  .responsive-card-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 700px) {
-  .home-collab-grid { grid-template-columns: 1fr; }
+  .home-collab-grid,
+  .responsive-card-grid-3 {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Initiative horizontal rows */
@@ -9668,6 +9826,10 @@ body[data-page="account"] #account-profile-panel {
 }
 .initiative-row-copy .hero-actions {
   margin-top: 0.5rem;
+}
+
+.programming-programs-actions {
+  margin-top: 2rem;
 }
 
 .studio-footer-collab-lockup {
@@ -10813,6 +10975,10 @@ button.avail-cal-day:focus-visible {
 
   /* Hide desktop CTA buttons on mobile */
   body[data-page] .header-cta-block {
+    display: none;
+  }
+
+  body[data-page="account"] .header-bipoc-action-block {
     display: none;
   }
 
