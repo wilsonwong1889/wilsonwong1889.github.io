@@ -495,6 +495,33 @@
                         <button id="admin-promo-cancel-edit" class="ghost-button" type="button">Clear form</button>
                       </div>
                     </form>
+
+                    <form id="admin-monthly-codes-form" class="stack-form admin-monthly-codes-form">
+                      <h4>Generate monthly member codes</h4>
+                      <p class="field-help">Creates one unique, single-use code per member in the selected category for the chosen month. Re-running skips members who already have a code that month — codes do not stack.</p>
+                      <p id="admin-monthly-codes-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
+                      <div class="intake-form-grid">
+                        <label>
+                          <span>Member category</span>
+                          <select name="member_category" required>
+                            <option value="artist_member">Artist Member</option>
+                            <option value="venture_member">Venture Member</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span>Month</span>
+                          <input type="month" name="month" required />
+                        </label>
+                        <label>
+                          <span>Percent off</span>
+                          <input type="number" name="percent_off" min="1" max="100" value="50" required />
+                        </label>
+                      </div>
+                      <div class="room-actions">
+                        <button class="primary-button" type="submit">Generate codes</button>
+                      </div>
+                    </form>
+
                     <div id="admin-promo-codes-list" class="admin-promo-codes-list"></div>
                 </section>
 

@@ -565,7 +565,7 @@ def _create_booking_record(
         duration_minutes,
         staff_assignments,
     )
-    promo_result = apply_promo_code_to_amount(db, promo_code, original_price_cents)
+    promo_result = apply_promo_code_to_amount(db, promo_code, original_price_cents, user)
     subtotal_after_discount = promo_result["final_amount_cents"]
     tax_cents = calculate_tax_cents(subtotal_after_discount)
     total_cents = subtotal_after_discount + tax_cents

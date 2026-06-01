@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -21,6 +21,9 @@ class PromoCodeBase(BaseModel):
     max_redemptions: Optional[int] = Field(default=None, ge=1)
     starts_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
+    member_category: Optional[str] = Field(default=None, max_length=60)
+    member_unique: bool = False
+    valid_month: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}$")
 
     @field_validator("code")
     @classmethod
@@ -54,6 +57,9 @@ class PromoCodeUpdate(BaseModel):
     max_redemptions: Optional[int] = Field(default=None, ge=1)
     starts_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
+    member_category: Optional[str] = Field(default=None, max_length=60)
+    member_unique: Optional[bool] = None
+    valid_month: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}$")
 
     @field_validator("code")
     @classmethod
@@ -78,6 +84,10 @@ class PromoCodeOut(BaseModel):
     max_redemptions: Optional[int] = None
     starts_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
+    member_category: Optional[str] = None
+    member_unique: bool = False
+    assigned_user_id: Optional[UUID] = None
+    valid_month: Optional[str] = None
     active_redemptions: int = 0
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -103,3 +113,18 @@ class PromoCodePreviewOut(BaseModel):
     final_amount_cents: int
     percent_off: Optional[int] = None
     amount_off_cents: Optional[int] = None
+
+
+class MonthlyMemberCodeRequest(BaseModel):
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    member_category: str = Field(min_length=1, max_length=60)
+    percent_off: int = Field(default=50, ge=1, le=100)
+
+
+class MonthlyMemberCodeResult(BaseModel):
+    month: str
+    member_category: str
+    percent_off: int
+    created: int
+    skipped: int
+    codes: List[PromoCodeOut] = Field(default_factory=list)

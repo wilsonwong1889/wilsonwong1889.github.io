@@ -420,7 +420,7 @@ def _create_staff_booking_record(
         ensure_single_booking_per_day(db, user, normalized_start)
     ensure_staff_is_available(db, profile.id, normalized_start, end_time)
     original_price_cents = calculate_price_cents(get_staff_booking_rate_cents(profile), duration_minutes)
-    promo_result = apply_promo_code_to_amount(db, promo_code, original_price_cents)
+    promo_result = apply_promo_code_to_amount(db, promo_code, original_price_cents, user)
 
     booking = StaffBooking(
         user_id=user.id,

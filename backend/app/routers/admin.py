@@ -27,7 +27,13 @@ from app.schemas.booking import (
 )
 from app.schemas.admin import AdminTestCaseOut
 from app.schemas.admin import AdminSuiteDashMetaOut, AdminSuiteDashStatusOut
-from app.schemas.promo_code import PromoCodeCreate, PromoCodeOut, PromoCodeUpdate
+from app.schemas.promo_code import (
+    MonthlyMemberCodeRequest,
+    MonthlyMemberCodeResult,
+    PromoCodeCreate,
+    PromoCodeOut,
+    PromoCodeUpdate,
+)
 from app.schemas.staff import StaffPhotoUploadOut, StaffProfileCreate, StaffProfileOut, StaffProfileUpdate
 from app.schemas.staff_booking import StaffBookingOut
 from app.schemas.user import AdminUserAccountOut, AdminUserDeleteConfirm, AdminUserRoleUpdate
@@ -59,7 +65,13 @@ from app.services.booking_service import (
     clear_past_bookings_for_admin,
 )
 from app.services.payment_service import PaymentBackendError
-from app.services.promo_code_service import PromoCodeError, create_promo_code, list_promo_codes, update_promo_code
+from app.services.promo_code_service import (
+    PromoCodeError,
+    create_promo_code,
+    generate_monthly_member_codes,
+    list_promo_codes,
+    update_promo_code,
+)
 from app.services.staff_service import (
     create_staff_profile,
     delete_staff_profile,
@@ -430,6 +442,38 @@ def admin_update_promo_code(
     except PromoCodeError as exc:
         status_code = 404 if "not found" in str(exc).lower() else 400
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@router.post("/promo-codes/generate-monthly", response_model=MonthlyMemberCodeResult, status_code=201)
+def admin_generate_monthly_member_codes(
+    payload: MonthlyMemberCodeRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(admin_rate_limit),
+):
+    try:
+        result = generate_monthly_member_codes(
+            db,
+            month=payload.month,
+            member_category=payload.member_category,
+            percent_off=payload.percent_off,
+        )
+        create_audit_log(
+            db,
+            actor_id=admin.id,
+            booking_id=None,
+            action="promo_codes_generated_monthly",
+            details={
+                "month": result["month"],
+                "member_category": result["member_category"],
+                "created": result["created"],
+                "skipped": result["skipped"],
+            },
+        )
+        db.commit()
+        return result
+    except PromoCodeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/bookings/clear-day", response_model=AdminBookingBulkClearResultOut)

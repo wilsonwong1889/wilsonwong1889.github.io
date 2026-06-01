@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_admin_user, get_current_user
+from app.core.dependencies import get_admin_user, get_current_user, get_optional_current_user
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
 from app.models.booking import Booking
@@ -205,9 +205,10 @@ def get_my_booking(
 def preview_promo_code(
     payload: PromoCodePreviewIn,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_optional_current_user),
 ):
     try:
-        result = calculate_discount_for_amount(db, payload.code, payload.amount_cents)
+        result = calculate_discount_for_amount(db, payload.code, payload.amount_cents, current_user)
     except PromoCodeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

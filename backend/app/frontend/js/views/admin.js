@@ -1001,6 +1001,9 @@ function renderAdminPromoCodeCard(promoCode) {
         </div>
         <div class="room-meta">
           <span class="pill">${escapeHtml(formatPromoDiscountLabel(promoCode))}</span>
+          ${promoCode.member_unique ? '<span class="pill">Personal</span>' : ""}
+          ${promoCode.member_category ? `<span class="pill">${escapeHtml(humanizeIntakeKey(promoCode.member_category))}</span>` : ""}
+          ${promoCode.valid_month ? `<span class="pill muted">${escapeHtml(promoCode.valid_month)}</span>` : ""}
           <span class="pill ${promoCode.active ? "" : "muted"}">${promoCode.active ? "Active" : "Inactive"}</span>
         </div>
       </div>
@@ -2694,6 +2697,44 @@ export function initAdminView(actions) {
       await actions.refreshAll(`Submission marked ${button.dataset.intakeStatus}.`);
     } catch (error) {
       setState({ message: error.message });
+    }
+  });
+
+  document.getElementById("admin-monthly-codes-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const feedback = document.getElementById("admin-monthly-codes-feedback");
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalLabel = submitButton ? submitButton.textContent : "";
+    const payload = {
+      month: form.elements.month.value,
+      member_category: form.elements.member_category.value,
+      percent_off: Number(form.elements.percent_off.value || 50),
+    };
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "Generating…";
+    }
+    if (feedback) feedback.classList.add("hidden");
+    try {
+      const result = await api.adminGenerateMonthlyMemberCodes(payload);
+      if (feedback) {
+        feedback.textContent = `Created ${result.created} new code${result.created === 1 ? "" : "s"}, skipped ${result.skipped} existing.`;
+        feedback.classList.remove("hidden", "is-error");
+        feedback.classList.add("is-success");
+      }
+      await actions.refreshAll("Monthly member codes generated.");
+    } catch (error) {
+      if (feedback) {
+        feedback.textContent = error?.message ? String(error.message) : "Could not generate codes.";
+        feedback.classList.remove("hidden", "is-success");
+        feedback.classList.add("is-error");
+      }
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = originalLabel;
+      }
     }
   });
 
