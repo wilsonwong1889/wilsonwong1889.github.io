@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import html
 import json
 import smtplib
 from datetime import datetime, timedelta, timezone
@@ -282,6 +283,48 @@ def account_created_email(*, to_email: str, full_name: Optional[str]) -> dict:
             f"Your account at the {STUDIO_NAME} is ready.\n"
             f"Browse studios and book at: {settings.APP_BASE_URL.rstrip('/')}/rooms\n"
         ),
+        html_content=body,
+    )
+
+
+def intake_received_email(
+    *,
+    to_email: str,
+    intake_type_label: str,
+    name: str,
+    email: str,
+    phone: str,
+    fields: list,
+) -> dict:
+    """Notify staff of a new public intake (membership interest / engineer application).
+
+    ``fields`` is a list of ``(label, value)`` tuples for the type-specific
+    answers. All values are HTML-escaped because they come from public input.
+    """
+    label_lower = intake_type_label.lower()
+    rows = (
+        _detail_row("Name", html.escape(name))
+        + _detail_row("Email", html.escape(email))
+        + _detail_row("Phone", html.escape(phone))
+    )
+    plain_lines = [f"New {intake_type_label}", "", f"Name: {name}", f"Email: {email}", f"Phone: {phone}"]
+    for field_label, value in fields:
+        if not value:
+            continue
+        rows += _detail_row(html.escape(field_label), html.escape(str(value)))
+        plain_lines.append(f"{field_label}: {value}")
+
+    body = _html_wrap(
+        f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">New {label_lower}</h2>'
+        f'<p style="margin:0 0 4px;color:#444;font-size:15px;line-height:1.6;">'
+        f'A new {label_lower} came in through the website.</p>'
+        + _details_table(rows)
+        + _button("Review in admin", f"{settings.APP_BASE_URL.rstrip('/')}/admin")
+    )
+    return send_email(
+        to_email=to_email,
+        subject=f"New {intake_type_label}: {name}",
+        plain_text_content="\n".join(plain_lines) + "\n",
         html_content=body,
     )
 
