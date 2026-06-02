@@ -1165,7 +1165,7 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         payload = response.json()
         self.assertTrue(payload["access_token"])
-        self.assertEqual(payload["booking"]["status"], "PendingPayment")
+        self.assertEqual(payload["booking"]["status"], "Requested")
         self.assertEqual(payload["booking"]["service_type"], "Podcast support")
         staff_rate, promo_pct = 6500, 60
         expected_original = self._staff_price(staff_rate, 60)
@@ -1175,6 +1175,13 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(payload["booking"]["price_cents"], expected_original - expected_discount)
         self.assertEqual(payload["booking"]["promo_code"], "SUMMER60")
         self.assertEqual(payload["booking"]["staff_profile"]["name"], "Podcast Engineer")
+
+        # Request-first flow: the staff member accepts before the customer can pay.
+        from app.services.staff_booking_service import accept_staff_booking
+        with self.SessionLocal() as db:
+            requested = db.query(StaffBooking).filter(StaffBooking.id == payload["booking"]["id"]).first()
+            accepted = accept_staff_booking(db, requested)
+            self.assertEqual(accepted.status, "AcceptedPendingPayment")
 
         guest_headers = {"Authorization": f"Bearer {payload['access_token']}"}
         response = self.client.get(
@@ -1287,7 +1294,15 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(len(lookup_rows), 1)
         self.assertEqual(lookup_rows[0]["booking_kind"], "staff")
         self.assertEqual(lookup_rows[0]["staff_name"], "Independent Producer")
-        self.assertEqual(lookup_rows[0]["status"], "PendingPayment")
+        self.assertEqual(lookup_rows[0]["status"], "Requested")
+
+        # Accept the request first (request-first flow), then mark paid.
+        response = self.client.post(
+            f"/api/admin/staff-bookings/{staff_booking['id']}/accept",
+            headers=admin_headers,
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["status"], "AcceptedPendingPayment")
 
         response = self.client.post(
             f"/api/admin/staff-bookings/{staff_booking['id']}/mark-paid",
@@ -1667,7 +1682,13 @@ class AppSmokeTest(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 201, resp.text)
         staff_booking = resp.json()
-        self.assertEqual(staff_booking["status"], "PendingPayment")
+        self.assertEqual(staff_booking["status"], "Requested")
+
+        resp = self.client.post(
+            f"/api/admin/staff-bookings/{staff_booking['id']}/accept",
+            headers=admin_headers,
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
 
         resp = self.client.post(
             f"/api/admin/staff-bookings/{staff_booking['id']}/waive-payment",
@@ -1689,7 +1710,13 @@ class AppSmokeTest(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 201, resp.text)
         staff_booking2 = resp.json()
-        self.assertEqual(staff_booking2["status"], "PendingPayment")
+        self.assertEqual(staff_booking2["status"], "Requested")
+
+        resp = self.client.post(
+            f"/api/admin/staff-bookings/{staff_booking2['id']}/accept",
+            headers=admin_headers,
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
 
         resp = self.client.post(
             f"/api/admin/staff-bookings/{staff_booking2['id']}/mark-paid",

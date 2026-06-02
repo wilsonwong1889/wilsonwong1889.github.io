@@ -61,6 +61,8 @@ class StaffBookingOut(BaseModel):
     confirmed_at: Optional[datetime] = None
     cancelled_at: Optional[datetime] = None
     cancellation_reason: Optional[str] = None
+    responded_at: Optional[datetime] = None
+    request_expires_at: Optional[datetime] = None
     note: Optional[str] = None
     user_email: Optional[str] = None
     user_full_name: Optional[str] = None

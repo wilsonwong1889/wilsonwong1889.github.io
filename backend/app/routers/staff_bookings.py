@@ -24,9 +24,12 @@ from app.services.booking_service import DailyBookingLimitError, PaymentSessionE
 from app.services.payment_service import PaymentBackendError
 from app.services.staff_booking_service import (
     StaffBookingConflictError,
+    StaffBookingStateError,
+    accept_staff_booking,
     cancel_staff_booking,
     create_guest_staff_booking,
     create_staff_booking,
+    decline_staff_booking,
     get_staff_availability,
     get_staff_booking_for_user,
     get_staff_booking_payment_session,
@@ -156,6 +159,43 @@ def cancel_my_staff_booking(
         return cancel_staff_booking(db, booking, current_user, payload.reason)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/admin/staff-bookings/{staff_booking_id}/accept", response_model=StaffBookingOut)
+def admin_accept_staff_booking(
+    staff_booking_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(booking_rate_limit),
+):
+    booking = db.query(StaffBooking).filter(StaffBooking.id == staff_booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Staff booking not found")
+    try:
+        return accept_staff_booking(db, booking, actor_id=admin.id)
+    except StaffBookingStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except StaffBookingConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except PaymentBackendError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/admin/staff-bookings/{staff_booking_id}/decline", response_model=StaffBookingOut)
+def admin_decline_staff_booking(
+    staff_booking_id: str,
+    payload: StaffBookingCancel,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(booking_rate_limit),
+):
+    booking = db.query(StaffBooking).filter(StaffBooking.id == staff_booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Staff booking not found")
+    try:
+        return decline_staff_booking(db, booking, reason=payload.reason, actor_id=admin.id)
+    except StaffBookingStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/staff-bookings/{staff_booking_id}/reschedule", response_model=StaffBookingOut)

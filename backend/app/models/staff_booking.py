@@ -42,18 +42,25 @@ class StaffBooking(Base):
     confirmed_at = Column(DateTime(timezone=True))
     cancelled_at = Column(DateTime(timezone=True))
     cancellation_reason = Column(String)
+    # When the staff member accepted/declined the request.
+    responded_at = Column(DateTime(timezone=True))
     note = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     __table_args__ = (
         CheckConstraint(
-            "status IN ('PendingPayment','Paid','Completed','Cancelled','Refunded')",
+            "status IN ('Requested','AcceptedPendingPayment','PendingPayment','Paid',"
+            "'Completed','Declined','Expired','Cancelled','Refunded')",
             name="staff_booking_status_check",
         ),
+        # A staff member can't be double-held: a Requested or accepted booking
+        # blocks the slot just like a paid one.
         ExcludeConstraint(
             ("staff_profile_id", "="),
             (func.tstzrange(start_time, end_time, "[)"), "&&"),
-            where=text("status IN ('PendingPayment','Paid','Completed')"),
+            where=text(
+                "status IN ('Requested','AcceptedPendingPayment','PendingPayment','Paid','Completed')"
+            ),
             using="gist",
             name="staff_booking_time_excl",
         ),
@@ -61,12 +68,25 @@ class StaffBooking(Base):
 
     @property
     def payment_expires_at(self):
-        if self.status != "PendingPayment" or not self.created_at:
+        # The payment window opens once a request is accepted (or for legacy
+        # PendingPayment bookings), anchored at the acceptance time.
+        if self.status not in ("AcceptedPendingPayment", "PendingPayment"):
+            return None
+        anchor = self.responded_at if (self.status == "AcceptedPendingPayment" and self.responded_at) else self.created_at
+        if not anchor:
+            return None
+        if anchor.tzinfo is None or anchor.utcoffset() is None:
+            anchor = anchor.replace(tzinfo=timezone.utc)
+        return anchor + timedelta(minutes=settings.PENDING_BOOKING_EXPIRY_MINUTES)
+
+    @property
+    def request_expires_at(self):
+        if self.status != "Requested" or not self.created_at:
             return None
         created_at = self.created_at
         if created_at.tzinfo is None or created_at.utcoffset() is None:
             created_at = created_at.replace(tzinfo=timezone.utc)
-        return created_at + timedelta(minutes=settings.PENDING_BOOKING_EXPIRY_MINUTES)
+        return created_at + timedelta(hours=settings.STAFF_REQUEST_EXPIRY_HOURS)
 
     @property
     def payment_seconds_remaining(self):

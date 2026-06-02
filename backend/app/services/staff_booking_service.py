@@ -41,7 +41,10 @@ from app.services.payment_service import (
 from app.services.promo_code_service import apply_promo_code_to_amount
 
 
-ACTIVE_BOOKING_STATUSES = ("PendingPayment", "Paid", "Completed")
+# A Requested or accepted booking holds the slot just like a paid one.
+ACTIVE_BOOKING_STATUSES = ("Requested", "AcceptedPendingPayment", "PendingPayment", "Paid", "Completed")
+# Bookings awaiting customer payment (new accepted flow + legacy PendingPayment).
+PAYABLE_STATUSES = ("AcceptedPendingPayment", "PendingPayment")
 AMBIGUOUS_CHARACTERS = {"0", "1", "I", "O"}
 BOOKING_CODE_ALPHABET = "".join(
     character for character in f"{ascii_uppercase}{digits}" if character not in AMBIGUOUS_CHARACTERS
@@ -50,6 +53,10 @@ BOOKING_CODE_ALPHABET = "".join(
 
 class StaffBookingConflictError(Exception):
     pass
+
+
+class StaffBookingStateError(ValueError):
+    """Raised when a booking isn't in the expected state for a transition."""
 
 
 def get_business_timezone() -> ZoneInfo:
@@ -139,21 +146,39 @@ def expire_pending_staff_booking(
     *,
     now: Optional[datetime] = None,
 ) -> bool:
-    if booking.status != "PendingPayment" or not booking.payment_expires_at:
-        return False
+    """Expire a stale booking. A Requested booking past its 48h window becomes
+    Expired; an accepted/legacy-pending booking past its payment window becomes
+    Cancelled. Returns True if the status changed."""
     current_time = now or datetime.now(timezone.utc)
-    if booking.payment_expires_at > current_time:
-        return False
-    booking.status = "Cancelled"
-    booking.cancelled_at = current_time
-    booking.cancellation_reason = f"Payment window expired after {settings.PENDING_BOOKING_EXPIRY_MINUTES} minutes"
-    return True
+    if booking.status == "Requested":
+        if not booking.request_expires_at or booking.request_expires_at > current_time:
+            return False
+        booking.status = "Expired"
+        booking.responded_at = current_time
+        booking.cancellation_reason = (
+            f"Request expired after {settings.STAFF_REQUEST_EXPIRY_HOURS} hours with no response"
+        )
+        return True
+    if booking.status in PAYABLE_STATUSES:
+        if not booking.payment_expires_at or booking.payment_expires_at > current_time:
+            return False
+        booking.status = "Cancelled"
+        booking.cancelled_at = current_time
+        booking.cancellation_reason = (
+            f"Payment window expired after {settings.PENDING_BOOKING_EXPIRY_MINUTES} minutes"
+        )
+        return True
+    return False
 
 
 def expire_stale_pending_staff_bookings(db: Session) -> int:
-    pending_bookings = db.query(StaffBooking).filter(StaffBooking.status == "PendingPayment").all()
+    stale_bookings = (
+        db.query(StaffBooking)
+        .filter(StaffBooking.status.in_(("Requested",) + PAYABLE_STATUSES))
+        .all()
+    )
     cleaned = 0
-    for booking in pending_bookings:
+    for booking in stale_bookings:
         if expire_pending_staff_booking(db, booking):
             cleaned += 1
     if cleaned:
@@ -456,7 +481,9 @@ def _create_staff_booking_record(
         promo_code=promo_result["promo_code"].code if promo_result["promo_code"] else None,
         price_cents=promo_result["final_amount_cents"],
         currency=settings.DEFAULT_CURRENCY,
-        status="PendingPayment",
+        # Request-first: the booking starts as a request and is only charged
+        # once the staff member accepts (see accept_staff_booking).
+        status="Requested",
         booking_code=generate_booking_code(),
         user_email_snapshot=user.email,
         user_full_name_snapshot=user.full_name,
@@ -466,26 +493,10 @@ def _create_staff_booking_record(
 
     try:
         db.add(booking)
-        db.flush()
-        payment_intent = create_payment_intent(
-            amount_cents=booking.price_cents,
-            currency=booking.currency,
-            booking_id=str(booking.id),
-            user_email=user.email,
-            metadata={
-                "booking_type": "staff",
-                "staff_booking_id": str(booking.id),
-            },
-        )
-        booking.payment_intent_id = payment_intent.intent_id
-        booking.payment_client_secret = payment_intent.client_secret
         db.commit()
     except IntegrityError as exc:
         db.rollback()
         raise StaffBookingConflictError("Selected time is no longer available") from exc
-    except PaymentBackendError:
-        db.rollback()
-        raise
 
     db.refresh(booking)
     attach_staff_profile_snapshot(db, booking, profile=profile)
@@ -493,7 +504,7 @@ def _create_staff_booking_record(
         db,
         user_id=user.id,
         booking_id=None,
-        notification_type="staff_booking_created",
+        notification_type="staff_booking_requested",
         status="Queued",
         details={
             "staff_booking_id": str(booking.id),
@@ -562,10 +573,86 @@ def create_guest_staff_booking(db: Session, payload: GuestStaffBookingCreate) ->
     return GuestStaffBookingCreateOut(access_token=token, booking=booking)
 
 
+def accept_staff_booking(db: Session, booking: StaffBooking, *, actor_id: UUID | str | None = None) -> StaffBooking:
+    """Staff accepts a request: generate the payment intent and move it to
+    AcceptedPendingPayment so the customer can pay."""
+    expire_stale_pending_staff_bookings(db)
+    db.refresh(booking)
+    if booking.status != "Requested":
+        raise StaffBookingStateError("This booking request is no longer pending a response")
+
+    try:
+        payment_intent = create_payment_intent(
+            amount_cents=booking.price_cents,
+            currency=booking.currency,
+            booking_id=str(booking.id),
+            user_email=booking.user_email_snapshot or "",
+            metadata={"booking_type": "staff", "staff_booking_id": str(booking.id)},
+        )
+    except PaymentBackendError:
+        db.rollback()
+        raise
+
+    booking.payment_intent_id = payment_intent.intent_id
+    booking.payment_client_secret = payment_intent.client_secret
+    booking.status = "AcceptedPendingPayment"
+    booking.responded_at = datetime.now(timezone.utc)
+    create_notification_log(
+        db,
+        user_id=booking.user_id,
+        booking_id=None,
+        notification_type="staff_booking_accepted",
+        status="Queued",
+        details={"staff_booking_id": str(booking.id), "booking_code": booking.booking_code},
+    )
+    create_audit_log(
+        db,
+        actor_id=actor_id,
+        booking_id=None,
+        action="staff_booking_accepted",
+        details={"staff_booking_id": str(booking.id)},
+    )
+    db.commit()
+    db.refresh(booking)
+    return attach_staff_profile_snapshot(db, booking)
+
+
+def decline_staff_booking(
+    db: Session, booking: StaffBooking, *, reason: Optional[str] = None, actor_id: UUID | str | None = None
+) -> StaffBooking:
+    """Staff declines a request: release the slot and notify the customer."""
+    expire_stale_pending_staff_bookings(db)
+    db.refresh(booking)
+    if booking.status != "Requested":
+        raise StaffBookingStateError("This booking request is no longer pending a response")
+
+    booking.status = "Declined"
+    booking.responded_at = datetime.now(timezone.utc)
+    booking.cancellation_reason = (reason or "").strip() or "Declined by staff"
+    create_notification_log(
+        db,
+        user_id=booking.user_id,
+        booking_id=None,
+        notification_type="staff_booking_declined",
+        status="Queued",
+        details={"staff_booking_id": str(booking.id), "reason": booking.cancellation_reason},
+    )
+    create_audit_log(
+        db,
+        actor_id=actor_id,
+        booking_id=None,
+        action="staff_booking_declined",
+        details={"staff_booking_id": str(booking.id), "reason": booking.cancellation_reason},
+    )
+    db.commit()
+    db.refresh(booking)
+    return attach_staff_profile_snapshot(db, booking)
+
+
 def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: User) -> dict:
     expire_stale_pending_staff_bookings(db)
-    if booking.status != "PendingPayment":
-        raise PaymentSessionError("Payment session is only available for pending bookings")
+    if booking.status not in PAYABLE_STATUSES:
+        raise PaymentSessionError("Payment session is only available once a request is accepted")
     if expire_pending_staff_booking(db, booking):
         db.commit()
         raise PaymentSessionError("Payment window expired for this booking")
@@ -598,8 +685,8 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
 
 
 def waive_staff_booking_payment(db: Session, booking: StaffBooking, admin: User) -> StaffBooking:
-    if booking.status != "PendingPayment":
-        raise ValueError("Only pending staff bookings can skip Stripe payment")
+    if booking.status not in PAYABLE_STATUSES:
+        raise ValueError("Only accepted staff bookings awaiting payment can skip Stripe payment")
     original_price_cents = booking.price_cents
     booking.price_cents = 0
     waived_payment_reference = f"admin_staff_waived_{uuid4().hex[:20]}"
@@ -622,8 +709,8 @@ def waive_staff_booking_payment(db: Session, booking: StaffBooking, admin: User)
 
 
 def cancel_staff_booking(db: Session, booking: StaffBooking, user: User, reason: Optional[str] = None) -> StaffBooking:
-    if booking.status not in ("PendingPayment", "Paid"):
-        raise ValueError("Only pending or paid staff bookings can be cancelled")
+    if booking.status not in ("Requested", "AcceptedPendingPayment", "PendingPayment", "Paid"):
+        raise ValueError("Only active staff bookings can be cancelled")
     booking.status = "Cancelled"
     booking.cancelled_at = datetime.now(timezone.utc)
     booking.cancellation_reason = reason or "Cancelled by user"
@@ -648,8 +735,8 @@ def reschedule_staff_booking(
     user: User,
     payload: StaffBookingRescheduleIn,
 ) -> StaffBooking:
-    if booking.status not in ("PendingPayment", "Paid"):
-        raise ValueError("Only pending or paid staff bookings can be rescheduled")
+    if booking.status not in ("Requested", "AcceptedPendingPayment", "PendingPayment", "Paid"):
+        raise ValueError("Only active staff bookings can be rescheduled")
     normalized_start = normalize_booking_start(payload.start_time)
     ensure_booking_start_not_in_past(normalized_start)
     end_time = normalized_start + timedelta(minutes=booking.duration_minutes)
@@ -679,8 +766,8 @@ def reschedule_staff_booking(
 
 
 def mark_staff_booking_paid(db: Session, booking: StaffBooking, payment_intent_id: str) -> StaffBooking:
-    if booking.status != "PendingPayment":
-        raise ValueError("Only pending staff bookings can be marked paid")
+    if booking.status not in PAYABLE_STATUSES:
+        raise ValueError("Only accepted staff bookings awaiting payment can be marked paid")
     booking.status = "Paid"
     booking.payment_intent_id = payment_intent_id
     booking.confirmed_at = datetime.now(timezone.utc)
@@ -705,8 +792,8 @@ def mark_staff_booking_paid(db: Session, booking: StaffBooking, payment_intent_i
 
 
 def mark_staff_booking_paid_manually(db: Session, booking: StaffBooking, admin: User) -> StaffBooking:
-    if booking.status != "PendingPayment":
-        raise ValueError("Only pending staff bookings can be marked paid manually")
+    if booking.status not in PAYABLE_STATUSES:
+        raise ValueError("Only accepted staff bookings awaiting payment can be marked paid manually")
     manual_payment_reference = f"admin_staff_manual_paid_{uuid4().hex[:20]}"
     booking = mark_staff_booking_paid(db, booking, manual_payment_reference)
     create_audit_log(
@@ -744,7 +831,7 @@ def handle_staff_booking_payment_webhook_event(db: Session, event: dict) -> dict
     if event_type == "payment_intent.succeeded":
         if booking.status == "Paid":
             return {"received": True, "staff_booking_id": str(booking.id), "status": booking.status}
-        if booking.status != "PendingPayment":
+        if booking.status not in PAYABLE_STATUSES:
             return {"received": True, "ignored": True, "staff_booking_id": str(booking.id), "status": booking.status}
         if expire_pending_staff_booking(db, booking):
             db.commit()
@@ -821,7 +908,9 @@ def build_staff_booking_feed_item(booking: StaffBooking, *, profile: Optional[St
         "created_at": booking.created_at,
         "updated_at": booking.updated_at,
         "location_label": "Studio support session",
-        "can_cancel": booking.status in ("PendingPayment", "Paid"),
-        "can_pay": booking.status == "PendingPayment",
+        "request_expires_at": booking.request_expires_at,
+        "awaiting_approval": booking.status == "Requested",
+        "can_cancel": booking.status in ("Requested", "AcceptedPendingPayment", "PendingPayment", "Paid"),
+        "can_pay": booking.status in PAYABLE_STATUSES,
         "staff_profile": staff_profile_data,
     }

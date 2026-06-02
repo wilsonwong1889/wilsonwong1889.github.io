@@ -312,7 +312,13 @@ class AdminActionsTest(BaseAppTest):
         )
         self.assertEqual(resp.status_code, 201)
         staff_booking = resp.json()
-        self.assertEqual(staff_booking["status"], "PendingPayment")
+        self.assertEqual(staff_booking["status"], "Requested")
+
+        resp = self.client.post(
+            f"/api/admin/staff-bookings/{staff_booking['id']}/accept",
+            headers=admin_headers,
+        )
+        self.assertEqual(resp.status_code, 200)
 
         resp = self.client.post(
             f"/api/admin/staff-bookings/{staff_booking['id']}/waive-payment",
@@ -334,7 +340,13 @@ class AdminActionsTest(BaseAppTest):
         )
         self.assertEqual(resp.status_code, 201)
         staff_booking2 = resp.json()
-        self.assertEqual(staff_booking2["status"], "PendingPayment")
+        self.assertEqual(staff_booking2["status"], "Requested")
+
+        resp = self.client.post(
+            f"/api/admin/staff-bookings/{staff_booking2['id']}/accept",
+            headers=admin_headers,
+        )
+        self.assertEqual(resp.status_code, 200)
 
         resp = self.client.post(
             f"/api/admin/staff-bookings/{staff_booking2['id']}/mark-paid",
