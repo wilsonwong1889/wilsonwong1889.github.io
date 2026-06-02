@@ -478,7 +478,7 @@ function calculateEstimatedTotal(room) {
 }
 
 function getDepositCents(room) {
-  return 2000;
+  return Number(room?.deposit_cents ?? 2000);
 }
 
 function renderSelectedStaffBreakdown(room) {

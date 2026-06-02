@@ -584,6 +584,8 @@ def _create_booking_record(
         promo_code=promo_result["promo_code"].code if promo_result["promo_code"] else None,
         tax_cents=tax_cents,
         price_cents=total_cents,
+        deposit_amount_cents=room.deposit_cents,
+        deposit_with_engineer=bool(staff_assignments),
         currency=settings.DEFAULT_CURRENCY,
         status=status,
         booking_code=generate_booking_code(),
