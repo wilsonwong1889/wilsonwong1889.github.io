@@ -2,6 +2,7 @@
 import os
 import sys
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -39,6 +40,11 @@ class StaffAvailabilityEndpointTest(BaseAppTest):
     def _next_friday(self):
         base = datetime.now(timezone.utc).date() + timedelta(days=14)
         return base + timedelta(days=(FRIDAY - base.weekday()) % 7)
+
+    def _next_sunday(self):
+        business_timezone = ZoneInfo("America/Edmonton")
+        base = datetime.now(business_timezone).date() + timedelta(days=14)
+        return base + timedelta(days=(6 - base.weekday()) % 7)
 
     def _start_hours(self, staff_id, day):
         resp = self.client.get(f"/api/staff/{staff_id}/availability?date={day.isoformat()}")
@@ -100,3 +106,24 @@ class StaffAvailabilityEndpointTest(BaseAppTest):
         self.assertNotIn(15, hours)
         self.assertIn(14, hours)
         self.assertIn(16, hours)
+
+    def test_04_unscheduled_closed_day_has_no_default_availability(self) -> None:
+        headers = self._admin_headers()
+        staff_id = self._staff_id(headers)
+        self.assertEqual(self._start_hours(staff_id, self._next_sunday()), [])
+
+    def test_05_extra_available_exception_opens_closed_day_window(self) -> None:
+        headers = self._admin_headers()
+        staff_id = self._staff_id(headers)
+        sunday = self._next_sunday()
+        self.client.post(
+            f"/api/admin/staff/{staff_id}/availability/exceptions",
+            json={
+                "exception_date": sunday.isoformat(),
+                "start_minute": 720,
+                "end_minute": 840,
+                "is_available": True,
+            },
+            headers=headers,
+        )
+        self.assertEqual(self._start_hours(staff_id, sunday), [12, 13])

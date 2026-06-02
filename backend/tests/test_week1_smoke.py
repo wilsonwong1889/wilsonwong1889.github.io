@@ -1610,7 +1610,8 @@ class AppSmokeTest(unittest.TestCase):
 
         from zoneinfo import ZoneInfo
         biz_tz = ZoneInfo("America/Edmonton")
-        base = datetime.now(biz_tz).date() + timedelta(days=10)
+        base_candidate = datetime.now(biz_tz).date() + timedelta(days=10)
+        base = base_candidate + timedelta(days=(2 - base_candidate.weekday()) % 7)
 
         def make_start(day_offset, hour):
             d = base + timedelta(days=day_offset)

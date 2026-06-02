@@ -26,6 +26,7 @@ from app.schemas.staff_booking import (
     StaffBookingRescheduleIn,
 )
 from app.services.booking_service import (
+    BOOKING_OPEN_WEEKDAYS,
     DailyBookingLimitError,
     PaymentSessionError,
     create_audit_log,
@@ -37,6 +38,7 @@ from app.services.booking_service import (
 from app.services.payment_service import (
     PaymentBackendError,
     create_payment_intent,
+    create_refund,
     get_payment_intent_session,
 )
 from app.services.promo_code_service import apply_promo_code_to_amount
@@ -250,28 +252,55 @@ def ensure_staff_is_available(
                 raise StaffBookingConflictError("Selected staff member is already assigned to a room booking at this time")
 
 
-def get_staff_availability(db: Session, staff_profile_id: UUID | str, target_date: date) -> dict:
+def _availability_windows_for_staff_date(
+    db: Session,
+    staff_profile_id: UUID | str,
+    target_date: date,
+) -> list[tuple[int, int]]:
     from app.services.staff_availability_service import (
         available_windows_for_date,
         has_availability_rules,
     )
 
+    open_hour, close_hour = get_booking_window_hours()
+    if has_availability_rules(db, staff_profile_id):
+        return available_windows_for_date(db, staff_profile_id, target_date)
+
+    base_windows = (
+        [(open_hour * 60, close_hour * 60)]
+        if target_date.weekday() in BOOKING_OPEN_WEEKDAYS
+        else []
+    )
+    return available_windows_for_date(db, staff_profile_id, target_date, base_windows=base_windows)
+
+
+def ensure_staff_window_is_available(
+    db: Session,
+    staff_profile_id: UUID | str,
+    start_time: datetime,
+    end_time: datetime,
+) -> None:
+    business_timezone = get_business_timezone()
+    local_start = start_time.astimezone(business_timezone)
+    local_end = end_time.astimezone(business_timezone)
+    if local_start.date() != local_end.date():
+        raise ValueError("Bookings must start and end on the same business day")
+
+    start_minute = local_start.hour * 60 + local_start.minute
+    end_minute = local_end.hour * 60 + local_end.minute
+    windows = _availability_windows_for_staff_date(db, staff_profile_id, local_start.date())
+    if not any(window_start <= start_minute and end_minute <= window_end for window_start, window_end in windows):
+        raise ValueError("Selected staff member is not available for this time")
+
+
+def get_staff_availability(db: Session, staff_profile_id: UUID | str, target_date: date) -> dict:
     expire_stale_pending_staff_bookings(db)
     get_staff_profile_or_404(db, staff_profile_id)
     business_timezone = get_business_timezone()
     open_hour, close_hour = get_booking_window_hours()
     utc_start, utc_end = get_day_bounds(target_date)
 
-    # Restrict to the staff member's availability. With a weekly schedule, only
-    # times inside their rules (minus blocked exceptions, plus extra ones) are
-    # bookable; with no schedule configured we default to business hours but
-    # still honour one-off exceptions for the date.
-    if has_availability_rules(db, staff_profile_id):
-        availability_windows = available_windows_for_date(db, staff_profile_id, target_date)
-    else:
-        availability_windows = available_windows_for_date(
-            db, staff_profile_id, target_date, base_windows=[(open_hour * 60, close_hour * 60)]
-        )
+    availability_windows = _availability_windows_for_staff_date(db, staff_profile_id, target_date)
     available_start_times: list[str] = []
     max_duration_minutes_by_start: dict[str, int] = {}
     current_time = datetime.now(timezone.utc)
@@ -493,6 +522,7 @@ def _create_staff_booking_record(
     ensure_booking_start_not_in_past(normalized_start)
     end_time = normalized_start + timedelta(minutes=duration_minutes)
     validate_booking_window(normalized_start, end_time)
+    ensure_staff_window_is_available(db, profile.id, normalized_start, end_time)
     if enforce_daily_limit:
         ensure_single_booking_per_day(db, user, normalized_start)
     ensure_staff_is_available(db, profile.id, normalized_start, end_time)
@@ -774,6 +804,7 @@ def reschedule_staff_booking(
     ensure_booking_start_not_in_past(normalized_start)
     end_time = normalized_start + timedelta(minutes=booking.duration_minutes)
     validate_booking_window(normalized_start, end_time)
+    ensure_staff_window_is_available(db, booking.staff_profile_id, normalized_start, end_time)
     ensure_staff_is_available(
         db,
         booking.staff_profile_id,
@@ -846,6 +877,39 @@ def mark_staff_booking_paid_manually(db: Session, booking: StaffBooking, admin: 
     return attach_staff_profile_snapshot(db, booking)
 
 
+def _auto_refund_stale_staff_payment(
+    db: Session,
+    booking: StaffBooking,
+    payment_intent_id: Optional[str],
+) -> None:
+    refund_amount = booking.price_cents or 0
+    refund_id: Optional[str] = None
+    failure_message: Optional[str] = None
+    if payment_intent_id and refund_amount > 0:
+        try:
+            refund_id = create_refund(
+                payment_intent_id=payment_intent_id,
+                amount_cents=refund_amount,
+            )
+        except Exception as exc:  # noqa: BLE001
+            failure_message = str(exc)
+    create_audit_log(
+        db,
+        actor_id=None,
+        booking_id=None,
+        action="staff_payment_received_after_expiry",
+        details={
+            "staff_booking_id": str(booking.id),
+            "payment_intent_id": payment_intent_id,
+            "booking_status": booking.status,
+            "amount_cents": refund_amount,
+            "stripe_refund_id": refund_id,
+            "refund_error": failure_message,
+        },
+    )
+    db.commit()
+
+
 def handle_staff_booking_payment_webhook_event(db: Session, event: dict) -> dict:
     event_type = event.get("type")
     data_object = event.get("data", {}).get("object", {})
@@ -865,10 +929,24 @@ def handle_staff_booking_payment_webhook_event(db: Session, event: dict) -> dict
         if booking.status == "Paid":
             return {"received": True, "staff_booking_id": str(booking.id), "status": booking.status}
         if booking.status not in PAYABLE_STATUSES:
-            return {"received": True, "ignored": True, "staff_booking_id": str(booking.id), "status": booking.status}
+            _auto_refund_stale_staff_payment(db, booking, payment_intent_id)
+            return {
+                "received": True,
+                "ignored": True,
+                "auto_refunded": True,
+                "staff_booking_id": str(booking.id),
+                "status": booking.status,
+            }
         if expire_pending_staff_booking(db, booking):
             db.commit()
-            return {"received": True, "ignored": True, "staff_booking_id": str(booking.id), "status": booking.status}
+            _auto_refund_stale_staff_payment(db, booking, payment_intent_id)
+            return {
+                "received": True,
+                "ignored": True,
+                "auto_refunded": True,
+                "staff_booking_id": str(booking.id),
+                "status": booking.status,
+            }
         updated = mark_staff_booking_paid(db, booking, payment_intent_id)
         return {"received": True, "staff_booking_id": str(updated.id), "status": updated.status}
 
