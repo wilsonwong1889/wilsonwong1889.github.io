@@ -141,14 +141,29 @@ def calculate_price_cents(hourly_rate_cents: int, duration_minutes: int) -> int:
     return floor(hourly_rate_cents * (duration_minutes / 60))
 
 
+# "5th hour free" incentive: one free hour of room time for every full 5 hours
+# booked (so a 5-hour booking is charged as 4 hours of room time). Applies to
+# room time only — staff add-ons are unaffected.
+FREE_HOUR_BLOCK_MINUTES = 300
+FREE_HOUR_CREDIT_MINUTES = 60
+
+
+def free_room_minutes(duration_minutes: int) -> int:
+    return (duration_minutes // FREE_HOUR_BLOCK_MINUTES) * FREE_HOUR_CREDIT_MINUTES
+
+
+def billable_room_minutes(duration_minutes: int) -> int:
+    return duration_minutes - free_room_minutes(duration_minutes)
+
+
 def calculate_booking_total_cents(
     hourly_rate_cents: int,
     duration_minutes: int,
     staff_assignments: list[dict],
 ) -> int:
-    return calculate_price_cents(hourly_rate_cents, duration_minutes) + staff_add_on_total_cents(
-        staff_assignments
-    )
+    return calculate_price_cents(
+        hourly_rate_cents, billable_room_minutes(duration_minutes)
+    ) + staff_add_on_total_cents(staff_assignments)
 
 
 def calculate_tax_cents(subtotal_cents: int) -> int:
