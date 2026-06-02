@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.database import Base
@@ -12,6 +12,23 @@ class StaffProfile(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     description = Column(String)
+    # Optional linked login account for this staff member (so engineers can log
+    # in to a staff portal). Set via the admin "linked account email" field.
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    role_title = Column(String)
+    # Where booking-request notifications go (falls back to the linked account).
+    notification_email = Column(String)
+    notification_phone = Column(String)
+    notify_by_email = Column(Boolean, nullable=False, default=True)
+    notify_by_sms = Column(Boolean, nullable=False, default=False)
+    # When true, staff bookings start as Requested and need this staff member's
+    # approval before payment; when false they go straight to PendingPayment.
+    booking_requires_approval = Column(Boolean, nullable=False, default=True)
     # Longer free-form biography (description stays a short service summary).
     bio = Column(String)
     skills = Column(JSONB, default=list)
