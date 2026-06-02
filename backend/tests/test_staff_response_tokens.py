@@ -51,15 +51,17 @@ class StaffResponseTokenTest(BaseAppTest):
 
     def _mint_token(self, booking_id, *, expired=False) -> str:
         from app.models.staff_booking import StaffBooking
-        from app.services.staff_token_service import create_response_token
+        from app.services.staff_token_service import _hash_token, create_response_token
 
         with self.SessionLocal() as db:
             booking = db.query(StaffBooking).filter(StaffBooking.id == booking_id).first()
             raw = create_response_token(db, booking)
             if expired:
                 from app.models.staff_booking_token import StaffBookingResponseToken
+                # Target exactly the token we just minted (creation also mints one
+                # via the eager notification dispatch).
                 token = db.query(StaffBookingResponseToken).filter(
-                    StaffBookingResponseToken.staff_booking_id == booking_id
+                    StaffBookingResponseToken.token_hash == _hash_token(raw)
                 ).first()
                 token.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
             db.commit()

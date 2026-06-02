@@ -9,6 +9,8 @@ from app.database import SessionLocal
 from app.monitoring import record_task_items, record_task_run
 from app.models.booking import Booking, NotificationLog
 from app.models.room import Room
+from app.models.staff_booking import StaffBooking
+from app.models.staff_profile import StaffProfile
 from app.models.user import User
 from app.services.booking_service import (
     create_notification_log,
@@ -33,6 +35,10 @@ from app.services.notification_service import (
     password_reset_email,
     refund_processed_email,
     refund_processed_sms,
+    staff_booking_accepted_customer_email,
+    staff_booking_declined_customer_email,
+    staff_booking_request_email,
+    staff_booking_request_sms,
 )
 from app.services.suitedash_service import (
     SuiteDashConfigurationError,
@@ -720,6 +726,186 @@ def send_booking_staff_notification_email_task(booking_id: str, event_type: str)
         db.commit()
         record_task_run("send_booking_staff_notification_email")
         record_task_items("send_booking_staff_notification_email", "sent", 1)
+        return {"sent": True}
+    finally:
+        db.close()
+
+
+# ── Staff booking request flow notifications ───────────────────────────────────
+
+def _staff_recipient_email(db, profile) -> Optional[str]:
+    if profile.notification_email:
+        return profile.notification_email
+    if profile.user_id:
+        user = db.query(User).filter(User.id == profile.user_id).first()
+        if user and user.email:
+            return user.email
+    return settings.STUDIO_ADMIN_EMAIL
+
+
+def _staff_recipient_phone(db, profile) -> Optional[str]:
+    if profile.notification_phone:
+        return profile.notification_phone
+    if profile.user_id:
+        user = db.query(User).filter(User.id == profile.user_id).first()
+        if user and user.phone:
+            return user.phone
+    return None
+
+
+def _staff_response_urls(staff_booking_id, raw_token: str):
+    base = settings.APP_BASE_URL.rstrip("/")
+    common = f"{base}/staff-respond?booking={staff_booking_id}&token={raw_token}"
+    return f"{common}&action=accept", f"{common}&action=decline"
+
+
+@task(name="app.tasks.send_staff_booking_request_email")
+def send_staff_booking_request_email_task(staff_booking_id: str):
+    db = SessionLocal()
+    try:
+        booking = db.query(StaffBooking).filter(StaffBooking.id == staff_booking_id).first()
+        profile = (
+            db.query(StaffProfile).filter(StaffProfile.id == booking.staff_profile_id).first()
+            if booking
+            else None
+        )
+        if not booking or booking.status != "Requested" or not profile or not profile.notify_by_email:
+            record_task_run("send_staff_booking_request_email")
+            record_task_items("send_staff_booking_request_email", "skipped", 1)
+            return {"sent": False}
+        from app.services.staff_token_service import create_response_token
+
+        raw_token = create_response_token(db, booking)
+        accept_url, decline_url = _staff_response_urls(booking.id, raw_token)
+        delivery = staff_booking_request_email(
+            to_email=_staff_recipient_email(db, profile),
+            staff_name=profile.name,
+            customer_name=booking.user_full_name_snapshot,
+            customer_phone=booking.user_phone_snapshot,
+            service=booking.service_type,
+            start_time=booking.start_time,
+            accept_url=accept_url,
+            decline_url=decline_url,
+        )
+        create_notification_log(
+            db,
+            user_id=booking.user_id,
+            booking_id=None,
+            notification_type="staff_booking_request_email_worker",
+            status="Sent",
+            details={"delivery": delivery, "staff_booking_id": str(booking.id)},
+        )
+        db.commit()
+        record_task_run("send_staff_booking_request_email")
+        record_task_items("send_staff_booking_request_email", "sent", 1)
+        return {"sent": True}
+    finally:
+        db.close()
+
+
+@task(name="app.tasks.send_staff_booking_request_sms")
+def send_staff_booking_request_sms_task(staff_booking_id: str):
+    db = SessionLocal()
+    try:
+        booking = db.query(StaffBooking).filter(StaffBooking.id == staff_booking_id).first()
+        profile = (
+            db.query(StaffProfile).filter(StaffProfile.id == booking.staff_profile_id).first()
+            if booking
+            else None
+        )
+        recipient = _staff_recipient_phone(db, profile) if profile else None
+        if not booking or booking.status != "Requested" or not profile or not profile.notify_by_sms or not recipient:
+            record_task_run("send_staff_booking_request_sms")
+            record_task_items("send_staff_booking_request_sms", "skipped", 1)
+            return {"sent": False}
+        from app.services.staff_token_service import create_response_token
+
+        raw_token = create_response_token(db, booking)
+        accept_url, decline_url = _staff_response_urls(booking.id, raw_token)
+        delivery = staff_booking_request_sms(
+            to_number=recipient,
+            customer_name=booking.user_full_name_snapshot,
+            start_time=booking.start_time,
+            accept_url=accept_url,
+            decline_url=decline_url,
+        )
+        create_notification_log(
+            db,
+            user_id=booking.user_id,
+            booking_id=None,
+            notification_type="staff_booking_request_sms_worker",
+            status="Sent",
+            details={"delivery": delivery, "staff_booking_id": str(booking.id)},
+        )
+        db.commit()
+        record_task_run("send_staff_booking_request_sms")
+        record_task_items("send_staff_booking_request_sms", "sent", 1)
+        return {"sent": True}
+    finally:
+        db.close()
+
+
+@task(name="app.tasks.send_staff_booking_accepted_customer_email")
+def send_staff_booking_accepted_customer_email_task(staff_booking_id: str):
+    db = SessionLocal()
+    try:
+        booking = db.query(StaffBooking).filter(StaffBooking.id == staff_booking_id).first()
+        if not booking or not booking.user_email:
+            record_task_run("send_staff_booking_accepted_customer_email")
+            record_task_items("send_staff_booking_accepted_customer_email", "skipped", 1)
+            return {"sent": False}
+        profile = db.query(StaffProfile).filter(StaffProfile.id == booking.staff_profile_id).first()
+        delivery = staff_booking_accepted_customer_email(
+            to_email=booking.user_email,
+            customer_name=booking.user_full_name_snapshot,
+            staff_name=profile.name if profile else None,
+            start_time=booking.start_time,
+            payment_url=f"{settings.APP_BASE_URL.rstrip('/')}/bookings",
+        )
+        create_notification_log(
+            db,
+            user_id=booking.user_id,
+            booking_id=None,
+            notification_type="staff_booking_accepted_customer_email_worker",
+            status="Sent",
+            details={"delivery": delivery, "staff_booking_id": str(booking.id)},
+        )
+        db.commit()
+        record_task_run("send_staff_booking_accepted_customer_email")
+        record_task_items("send_staff_booking_accepted_customer_email", "sent", 1)
+        return {"sent": True}
+    finally:
+        db.close()
+
+
+@task(name="app.tasks.send_staff_booking_declined_customer_email")
+def send_staff_booking_declined_customer_email_task(staff_booking_id: str):
+    db = SessionLocal()
+    try:
+        booking = db.query(StaffBooking).filter(StaffBooking.id == staff_booking_id).first()
+        if not booking or not booking.user_email:
+            record_task_run("send_staff_booking_declined_customer_email")
+            record_task_items("send_staff_booking_declined_customer_email", "skipped", 1)
+            return {"sent": False}
+        profile = db.query(StaffProfile).filter(StaffProfile.id == booking.staff_profile_id).first()
+        delivery = staff_booking_declined_customer_email(
+            to_email=booking.user_email,
+            customer_name=booking.user_full_name_snapshot,
+            staff_name=profile.name if profile else None,
+            start_time=booking.start_time,
+            reason=booking.cancellation_reason,
+        )
+        create_notification_log(
+            db,
+            user_id=booking.user_id,
+            booking_id=None,
+            notification_type="staff_booking_declined_customer_email_worker",
+            status="Sent",
+            details={"delivery": delivery, "staff_booking_id": str(booking.id)},
+        )
+        db.commit()
+        record_task_run("send_staff_booking_declined_customer_email")
+        record_task_items("send_staff_booking_declined_customer_email", "sent", 1)
         return {"sent": True}
     finally:
         db.close()

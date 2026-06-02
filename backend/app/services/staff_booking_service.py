@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, time, timedelta, timezone
 from math import floor
 from secrets import choice
@@ -57,6 +58,35 @@ class StaffBookingConflictError(Exception):
 
 class StaffBookingStateError(ValueError):
     """Raised when a booking isn't in the expected state for a transition."""
+
+
+logger = logging.getLogger(__name__)
+
+
+def _dispatch_staff_request_notifications(staff_booking_id) -> None:
+    """Best-effort: enqueue the staff request email/SMS. Enqueue failures never
+    break booking creation."""
+    try:
+        from app.tasks import (
+            send_staff_booking_request_email_task,
+            send_staff_booking_request_sms_task,
+        )
+
+        send_staff_booking_request_email_task.delay(str(staff_booking_id))
+        send_staff_booking_request_sms_task.delay(str(staff_booking_id))
+    except Exception:  # pragma: no cover - notification enqueue is best-effort
+        logger.exception("Failed to enqueue staff request notifications for %s", staff_booking_id)
+
+
+def _dispatch_staff_decision_notification(staff_booking_id, *, accepted: bool) -> None:
+    try:
+        if accepted:
+            from app.tasks import send_staff_booking_accepted_customer_email_task as task_fn
+        else:
+            from app.tasks import send_staff_booking_declined_customer_email_task as task_fn
+        task_fn.delay(str(staff_booking_id))
+    except Exception:  # pragma: no cover - notification enqueue is best-effort
+        logger.exception("Failed to enqueue staff decision notification for %s", staff_booking_id)
 
 
 def get_business_timezone() -> ZoneInfo:
@@ -524,6 +554,7 @@ def _create_staff_booking_record(
         },
     )
     db.commit()
+    _dispatch_staff_request_notifications(booking.id)
     return booking
 
 
@@ -614,6 +645,7 @@ def accept_staff_booking(db: Session, booking: StaffBooking, *, actor_id: UUID |
     )
     db.commit()
     db.refresh(booking)
+    _dispatch_staff_decision_notification(booking.id, accepted=True)
     return attach_staff_profile_snapshot(db, booking)
 
 
@@ -646,6 +678,7 @@ def decline_staff_booking(
     )
     db.commit()
     db.refresh(booking)
+    _dispatch_staff_decision_notification(booking.id, accepted=False)
     return attach_staff_profile_snapshot(db, booking)
 
 

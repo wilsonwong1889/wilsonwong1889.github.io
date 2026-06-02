@@ -763,6 +763,128 @@ def login_verification_sms(*, to_number: str, code: str) -> dict:
     )
 
 
+# ── Staff booking request flow ─────────────────────────────────────────────────
+
+def staff_booking_request_email(
+    *,
+    to_email: str,
+    staff_name: Optional[str],
+    customer_name: Optional[str],
+    customer_phone: Optional[str],
+    service: Optional[str],
+    start_time: datetime,
+    accept_url: str,
+    decline_url: str,
+) -> dict:
+    when = _fmt_local(start_time)
+    rows = (
+        _detail_row("Client", html.escape(customer_name or "Guest"))
+        + _detail_row("Phone", html.escape(customer_phone or "—"))
+        + _detail_row("When", html.escape(when))
+    )
+    if service:
+        rows += _detail_row("Service", html.escape(service))
+    body = _html_wrap(
+        f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">New session request</h2>'
+        f'<p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">'
+        f'Hi {html.escape(staff_name or "there")}, you have a new booking request. '
+        f'Please accept or decline within {settings.STAFF_REQUEST_EXPIRY_HOURS} hours.</p>'
+        + _details_table(rows)
+        + _button("Accept", accept_url)
+        + ' &nbsp; '
+        + _button("Decline", decline_url)
+    )
+    return send_email(
+        to_email=to_email,
+        subject=f"New booking request — {when}",
+        plain_text_content=(
+            f"New session request from {customer_name or 'a client'} for {when}.\n"
+            f"Accept: {accept_url}\nDecline: {decline_url}\n"
+        ),
+        html_content=body,
+    )
+
+
+def staff_booking_request_sms(
+    *,
+    to_number: str,
+    customer_name: Optional[str],
+    start_time: datetime,
+    accept_url: str,
+    decline_url: str,
+) -> dict:
+    when = _fmt_local(start_time)
+    return send_sms(
+        to_number=to_number,
+        body=(
+            f"New booking request from {customer_name or 'a client'} for {when}. "
+            f"Accept: {accept_url} | Decline: {decline_url}"
+        ),
+    )
+
+
+def staff_booking_accepted_customer_email(
+    *,
+    to_email: str,
+    customer_name: Optional[str],
+    staff_name: Optional[str],
+    start_time: datetime,
+    payment_url: str,
+) -> dict:
+    when = _fmt_local(start_time)
+    body = _html_wrap(
+        f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">Your request was accepted</h2>'
+        f'<p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">'
+        f'Hi {html.escape(customer_name or "there")}, {html.escape(staff_name or "the staff member")} '
+        f'accepted your session on {html.escape(when)}. Complete payment to confirm your booking.</p>'
+        + _button("Complete payment", payment_url)
+    )
+    return send_email(
+        to_email=to_email,
+        subject=f"{staff_name or 'Your booking'} accepted — complete payment",
+        plain_text_content=(
+            f"Good news! Your session on {when} was accepted.\n"
+            f"Complete payment to confirm: {payment_url}\n"
+        ),
+        html_content=body,
+    )
+
+
+def staff_booking_declined_customer_email(
+    *,
+    to_email: str,
+    customer_name: Optional[str],
+    staff_name: Optional[str],
+    start_time: datetime,
+    reason: Optional[str],
+) -> dict:
+    when = _fmt_local(start_time)
+    reason_html = (
+        f'<p style="margin:0 0 16px;color:#444;font-size:14px;">Reason: {html.escape(reason)}</p>'
+        if reason
+        else ""
+    )
+    body = _html_wrap(
+        f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">Booking request not available</h2>'
+        f'<p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">'
+        f'Hi {html.escape(customer_name or "there")}, unfortunately '
+        f'{html.escape(staff_name or "the staff member")} isn\'t available for your session on '
+        f'{html.escape(when)}. Your time has been released and you have not been charged.</p>'
+        + reason_html
+        + _button("Browse the team", f"{settings.APP_BASE_URL.rstrip('/')}/staff")
+    )
+    return send_email(
+        to_email=to_email,
+        subject="Your booking request couldn't be confirmed",
+        plain_text_content=(
+            f"Your session request for {when} wasn't available."
+            + (f" Reason: {reason}." if reason else "")
+            + f"\nBrowse the team: {settings.APP_BASE_URL.rstrip('/')}/staff\n"
+        ),
+        html_content=body,
+    )
+
+
 def booking_created_sms(*, to_number: str, booking_code: str, start_time: str, status: str) -> dict:
     return send_sms(
         to_number=to_number,
