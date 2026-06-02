@@ -714,6 +714,10 @@ export function renderAuthView(state) {
     elements.headerAdminLink.classList.toggle("hidden", !state.currentUser?.is_admin);
   }
 
+  if (elements.headerStaffLink) {
+    elements.headerStaffLink.classList.toggle("hidden", state.currentUser?.role !== "Staff");
+  }
+
   if (!state.currentUser) {
     setHeaderMenuOpen(false);
   }

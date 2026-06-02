@@ -9836,6 +9836,31 @@ body[data-page="account"] #account-profile-panel {
   font-size: 0.82rem;
   color: var(--muted);
 }
+
+/* ── Staff dashboard ────────────────────────────────────────────────────────── */
+.staff-requests-list {
+  display: grid;
+  gap: 14px;
+}
+.staff-rules-list,
+.staff-exceptions-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.staff-schedule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.staff-schedule-row .ghost-button {
+  min-height: 32px;
+  padding: 4px 12px;
+}
+.staff-dashboard .panel {
+  margin-bottom: 20px;
+}
 .home-collab-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

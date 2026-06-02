@@ -23,6 +23,7 @@ import { initRoomBookingView, renderRoomBookingView } from "./views/room-booking
 import { initRoomDetailView, renderRoomDetailView } from "./views/room-detail.js";
 import { initRoomsView, renderRoomsView } from "./views/rooms.js";
 import { initStaffDirectoryView, renderStaffDirectoryView } from "./views/staff-directory.js";
+import { initStaffDashboardView, renderStaffDashboardView } from "./views/staff-dashboard.js";
 import { renderStatus } from "./views/status.js";
 
 const PAGE_DATA_REQUIREMENTS = {
@@ -37,6 +38,7 @@ const PAGE_DATA_REQUIREMENTS = {
   room: { rooms: false, bookings: false, admin: false, selectedRoom: true, selectedBooking: false },
   reserve: { rooms: false, bookings: false, admin: false, selectedRoom: true, selectedBooking: false },
   staff: { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: false, publicStaff: true },
+  "staff-dashboard": { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: false },
   bookings: { rooms: true, bookings: true, admin: false, selectedRoom: false, selectedBooking: false },
   booking: { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: true },
   "payment-success": { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: true },
@@ -184,6 +186,7 @@ function renderApp(currentState) {
   renderRoomDetailView(currentState);
   renderRoomsView(currentState);
   renderStaffDirectoryView(currentState);
+  renderStaffDashboardView(currentState);
 }
 
 function initRevealAnimations() {
@@ -798,6 +801,7 @@ initRoomBookingView();
 initRoomDetailView();
 initRoomsView({ refreshRooms });
 initStaffDirectoryView();
+initStaffDashboardView();
 
 renderApp(state);
 resetScopedData();

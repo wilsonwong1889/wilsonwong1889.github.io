@@ -9,6 +9,7 @@ export const elements = {
   headerProfileLink: document.getElementById("header-profile-link"),
   headerBookingsLink: document.getElementById("header-bookings-link"),
   headerAdminLink: document.getElementById("header-admin-link"),
+  headerStaffLink: document.getElementById("header-staff-link"),
   headerLogoutButton: document.getElementById("header-logout-button"),
   appMessage: document.getElementById("app-message"),
   loginForm: document.getElementById("login-form"),

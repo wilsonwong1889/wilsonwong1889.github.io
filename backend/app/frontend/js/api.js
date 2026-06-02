@@ -439,4 +439,43 @@ export const api = {
       body: JSON.stringify({ status }),
     });
   },
+  getMyStaffProfile() {
+    return request("/api/staff/me");
+  },
+  getMyAvailabilityRules() {
+    return request("/api/staff/me/availability/rules");
+  },
+  createMyAvailabilityRule(payload) {
+    return request("/api/staff/me/availability/rules", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  deleteMyAvailabilityRule(ruleId) {
+    return request(`/api/staff/me/availability/rules/${ruleId}`, { method: "DELETE" });
+  },
+  getMyAvailabilityExceptions() {
+    return request("/api/staff/me/availability/exceptions");
+  },
+  createMyAvailabilityException(payload) {
+    return request("/api/staff/me/availability/exceptions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  deleteMyAvailabilityException(exceptionId) {
+    return request(`/api/staff/me/availability/exceptions/${exceptionId}`, { method: "DELETE" });
+  },
+  getMyBookingRequests() {
+    return request("/api/staff/me/booking-requests");
+  },
+  acceptMyBookingRequest(bookingId) {
+    return request(`/api/staff/me/booking-requests/${bookingId}/accept`, { method: "POST" });
+  },
+  declineMyBookingRequest(bookingId, reason) {
+    return request(`/api/staff/me/booking-requests/${bookingId}/decline`, {
+      method: "POST",
+      body: JSON.stringify({ reason: reason || null }),
+    });
+  },
 };
