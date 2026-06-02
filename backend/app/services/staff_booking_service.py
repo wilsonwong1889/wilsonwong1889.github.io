@@ -371,6 +371,17 @@ def list_staff_bookings_for_user(db: Session, user: User) -> list[StaffBooking]:
     return [attach_staff_profile_snapshot(db, booking, profile=profiles.get(booking.staff_profile_id)) for booking in bookings]
 
 
+def list_staff_bookings_for_profile(db: Session, staff_profile_id, statuses=None) -> list[StaffBooking]:
+    """Bookings for a staff member's own profile (for the staff portal)."""
+    expire_stale_pending_staff_bookings(db)
+    query = db.query(StaffBooking).filter(StaffBooking.staff_profile_id == staff_profile_id)
+    if statuses:
+        query = query.filter(StaffBooking.status.in_(tuple(statuses)))
+    bookings = query.order_by(StaffBooking.start_time.asc()).all()
+    profile = db.query(StaffProfile).filter(StaffProfile.id == staff_profile_id).first()
+    return [attach_staff_profile_snapshot(db, booking, profile=profile) for booking in bookings]
+
+
 def serialize_admin_staff_booking(
     booking: StaffBooking,
     *,

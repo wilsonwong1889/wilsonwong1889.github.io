@@ -93,6 +93,13 @@ def list_staff_profiles(db: Session) -> list[StaffProfile]:
     return db.query(StaffProfile).order_by(StaffProfile.active.desc(), StaffProfile.name.asc()).all()
 
 
+def get_staff_profile_for_user(db: Session, user: User) -> StaffProfile | None:
+    """The staff profile linked to a login account (for the staff portal)."""
+    if user is None:
+        return None
+    return db.query(StaffProfile).filter(StaffProfile.user_id == user.id).first()
+
+
 def create_staff_profile(db: Session, payload: StaffProfileCreate) -> StaffProfile:
     name = _normalize_profile_name(payload.name)
     _ensure_unique_name(db, name)

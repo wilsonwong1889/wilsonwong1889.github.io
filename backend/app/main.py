@@ -21,6 +21,7 @@ from app.routers import (
     staff,
     staff_availability,
     staff_bookings,
+    staff_portal,
     users,
     webhooks,
 )
@@ -91,6 +92,7 @@ app.include_router(bookings.router)
 app.include_router(staff_bookings.router)
 app.include_router(intake.router)
 app.include_router(staff_availability.router)
+app.include_router(staff_portal.router)
 app.include_router(admin.router)
 app.include_router(webhooks.router)
 

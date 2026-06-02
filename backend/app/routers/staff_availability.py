@@ -1,7 +1,8 @@
+from datetime import date
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_admin_user
@@ -13,10 +14,38 @@ from app.schemas.staff_availability import (
     StaffAvailabilityExceptionOut,
     StaffAvailabilityRuleCreate,
     StaffAvailabilityRuleOut,
+    StaffDayScheduleOut,
 )
 from app.services import staff_availability_service as availability
 
 router = APIRouter(prefix="/api/admin/staff", tags=["Staff Availability"])
+
+
+@router.get("/schedule", response_model=List[StaffDayScheduleOut])
+def admin_staff_schedule(
+    date_value: date = Query(alias="date"),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_admin_user),
+):
+    """All active staff and their configured availability windows for a date —
+    the combined calendar admins review before publishing."""
+    profiles = (
+        db.query(StaffProfile)
+        .filter(StaffProfile.active.is_(True))
+        .order_by(StaffProfile.name.asc())
+        .all()
+    )
+    schedule = []
+    for profile in profiles:
+        windows = availability.available_windows_for_date(db, profile.id, date_value)
+        schedule.append(
+            {
+                "staff_profile_id": profile.id,
+                "name": profile.name,
+                "windows": [{"start_minute": start, "end_minute": end} for start, end in windows],
+            }
+        )
+    return schedule
 
 
 def _ensure_staff_exists(db: Session, staff_profile_id: UUID) -> None:

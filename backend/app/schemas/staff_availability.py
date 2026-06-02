@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -55,3 +55,14 @@ class StaffAvailabilityExceptionOut(BaseModel):
     reason: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class ScheduleWindowOut(BaseModel):
+    start_minute: int
+    end_minute: int
+
+
+class StaffDayScheduleOut(BaseModel):
+    staff_profile_id: UUID
+    name: str
+    windows: List[ScheduleWindowOut] = []
