@@ -9861,6 +9861,28 @@ body[data-page="account"] #account-profile-panel {
 .staff-dashboard .panel {
   margin-bottom: 20px;
 }
+
+/* ── Admin staff schedule calendar ──────────────────────────────────────────── */
+.admin-schedule-list {
+  display: grid;
+  gap: 10px;
+}
+.admin-schedule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+}
+.admin-schedule-windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
 .home-collab-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

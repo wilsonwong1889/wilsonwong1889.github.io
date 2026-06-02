@@ -439,6 +439,9 @@ export const api = {
       body: JSON.stringify({ status }),
     });
   },
+  getAdminStaffSchedule(date) {
+    return request(`/api/admin/staff/schedule?date=${encodeURIComponent(date)}`);
+  },
   getMyStaffProfile() {
     return request("/api/staff/me");
   },

@@ -94,6 +94,7 @@
                 <button id="admin-tab-staff" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-staff" tabindex="-1" data-admin-tab="staff">Staff catalog</button>
                 <button id="admin-tab-roles" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-roles" tabindex="-1" data-admin-tab="roles">Roles</button>
                 <button id="admin-tab-intakes" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-intakes" tabindex="-1" data-admin-tab="intakes">Leads</button>
+                <button id="admin-tab-schedule" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-schedule" tabindex="-1" data-admin-tab="schedule">Schedule</button>
                 <button id="admin-tab-qa" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-qa" tabindex="-1" data-admin-tab="qa">Tests</button>
               </div>
               <label class="inline-field admin-workspace-picker">
@@ -106,6 +107,7 @@
                   <option value="staff">Staff catalog</option>
                   <option value="roles">Roles</option>
                   <option value="intakes">Leads</option>
+                  <option value="schedule">Schedule</option>
                   <option value="qa">Tests</option>
                 </select>
               </label>
@@ -260,6 +262,22 @@
                 <button id="admin-intakes-refresh" class="ghost-button" type="button">Refresh</button>
               </div>
               <div id="admin-intakes-list" class="admin-intakes-list"></div>
+            </section>
+
+            <section id="admin-panel-schedule" class="admin-tab-panel hidden" role="tabpanel" aria-labelledby="admin-tab-schedule" aria-hidden="true" data-admin-panel="schedule">
+              <div class="panel-header">
+                <p class="panel-kicker">Team calendar</p>
+                <h3>Staff schedule</h3>
+                <p class="panel-copy">Every active staff member's published availability for a day, in one place. Staff set their own windows from the staff dashboard.</p>
+              </div>
+              <div class="admin-intakes-filters">
+                <label class="inline-field">
+                  <span>Date</span>
+                  <input id="admin-schedule-date" type="date" />
+                </label>
+                <button id="admin-schedule-refresh" class="ghost-button" type="button">Refresh</button>
+              </div>
+              <div id="admin-schedule-list" class="admin-schedule-list"></div>
             </section>
 
             <section id="admin-panel-qa" class="admin-tab-panel hidden" role="tabpanel" aria-labelledby="admin-tab-qa" aria-hidden="true" data-admin-panel="qa">

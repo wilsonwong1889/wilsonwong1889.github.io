@@ -1126,6 +1126,46 @@ function renderAdminIntakes(currentState) {
     : '<div class="empty-state">No submissions match these filters yet.</div>';
 }
 
+function formatScheduleMinutes(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+function renderAdminStaffSchedule(rows) {
+  const list = document.getElementById("admin-schedule-list");
+  if (!list) return;
+  if (!rows || !rows.length) {
+    list.innerHTML = '<div class="empty-state">No active staff for this date.</div>';
+    return;
+  }
+  list.innerHTML = rows
+    .map((row) => {
+      const windows = (row.windows || [])
+        .map((w) => `<span class="pill">${formatScheduleMinutes(w.start_minute)}–${formatScheduleMinutes(w.end_minute)}</span>`)
+        .join(" ");
+      return `
+        <div class="admin-schedule-row">
+          <strong>${escapeHtml(row.name)}</strong>
+          <div class="admin-schedule-windows">${windows || '<span class="empty-state">Not available</span>'}</div>
+        </div>`;
+    })
+    .join("");
+}
+
+async function loadAdminStaffSchedule() {
+  const dateInput = document.getElementById("admin-schedule-date");
+  if (!dateInput) return;
+  if (!dateInput.value) {
+    dateInput.value = new Date().toISOString().slice(0, 10);
+  }
+  try {
+    renderAdminStaffSchedule(await api.getAdminStaffSchedule(dateInput.value));
+  } catch (error) {
+    setState({ message: error.message });
+  }
+}
+
 function formatActivityAction(action) {
   return action.replaceAll("_", " ");
 }
@@ -2713,6 +2753,10 @@ export function initAdminView(actions) {
       setState({ message: error.message });
     }
   });
+
+  document.getElementById("admin-schedule-date")?.addEventListener("change", () => loadAdminStaffSchedule());
+  document.getElementById("admin-schedule-refresh")?.addEventListener("click", () => loadAdminStaffSchedule());
+  document.getElementById("admin-tab-schedule")?.addEventListener("click", () => loadAdminStaffSchedule());
 
   document.getElementById("admin-monthly-codes-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
