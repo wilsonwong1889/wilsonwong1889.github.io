@@ -53,6 +53,7 @@ class BaseAppTest(unittest.TestCase):
         from app.models.room import Room
         from app.models.staff_availability import StaffAvailabilityException, StaffAvailabilityRule
         from app.models.staff_booking import StaffBooking
+        from app.models.staff_booking_token import StaffBookingResponseToken
         from app.models.staff_profile import StaffProfile
         from app.models.user import User
         from app.services.seed_service import ensure_admin_user, ensure_promo_codes, ensure_rooms
@@ -70,6 +71,7 @@ class BaseAppTest(unittest.TestCase):
         cls.UserMembership = UserMembership
         cls.StaffAvailabilityRule = StaffAvailabilityRule
         cls.StaffAvailabilityException = StaffAvailabilityException
+        cls.StaffBookingResponseToken = StaffBookingResponseToken
         cls.PromoCode = PromoCode
         cls.Room = Room
         cls.StaffBooking = StaffBooking
@@ -103,6 +105,7 @@ class BaseAppTest(unittest.TestCase):
                 self.UserMembership,
                 self.StaffAvailabilityRule,
                 self.StaffAvailabilityException,
+                self.StaffBookingResponseToken,
                 self.BookingSlot,
                 self.Booking,
                 self.StaffBooking,

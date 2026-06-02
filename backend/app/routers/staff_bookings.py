@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -22,6 +22,11 @@ from app.schemas.staff_booking import (
 )
 from app.services.booking_service import DailyBookingLimitError, PaymentSessionError
 from app.services.payment_service import PaymentBackendError
+from app.services.staff_token_service import (
+    StaffTokenError,
+    mark_token_used,
+    resolve_response_token,
+)
 from app.services.staff_booking_service import (
     StaffBookingConflictError,
     StaffBookingStateError,
@@ -159,6 +164,53 @@ def cancel_my_staff_booking(
         return cancel_staff_booking(db, booking, current_user, payload.reason)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _respond_to_request_via_token(db, staff_booking_id, token, *, action, reason=None):
+    booking = db.query(StaffBooking).filter(StaffBooking.id == staff_booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Staff booking not found")
+    try:
+        token_row = resolve_response_token(db, booking.id, token)
+    except StaffTokenError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    try:
+        if action == "accept":
+            result = accept_staff_booking(db, booking, actor_id=None)
+        else:
+            result = decline_staff_booking(db, booking, reason=reason, actor_id=None)
+    except StaffBookingStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except StaffBookingConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except PaymentBackendError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    mark_token_used(token_row)
+    db.commit()
+    return result
+
+
+@router.post("/staff-bookings/{staff_booking_id}/accept", response_model=StaffBookingOut)
+def respond_accept_staff_booking(
+    staff_booking_id: str,
+    token: str = Query(...),
+    db: Session = Depends(get_db),
+    _: None = Depends(booking_rate_limit),
+):
+    """Public, token-authenticated accept link for the staff member (no login)."""
+    return _respond_to_request_via_token(db, staff_booking_id, token, action="accept")
+
+
+@router.post("/staff-bookings/{staff_booking_id}/decline", response_model=StaffBookingOut)
+def respond_decline_staff_booking(
+    staff_booking_id: str,
+    token: str = Query(...),
+    reason: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+    _: None = Depends(booking_rate_limit),
+):
+    """Public, token-authenticated decline link for the staff member (no login)."""
+    return _respond_to_request_via_token(db, staff_booking_id, token, action="decline", reason=reason)
 
 
 @router.post("/admin/staff-bookings/{staff_booking_id}/accept", response_model=StaffBookingOut)
