@@ -34,6 +34,15 @@ class StaffProfileCreate(BaseModel):
     booking_rate_cents: int = Field(default=0, ge=0)
     equipment_rental_cost_cents: int = Field(default=0, ge=0)
     service_types: List[str] = Field(default_factory=list)
+    role_title: Optional[str] = Field(default=None, max_length=120)
+    notification_email: Optional[str] = Field(default=None, max_length=120)
+    notification_phone: Optional[str] = Field(default=None, max_length=40)
+    notify_by_email: bool = True
+    notify_by_sms: bool = False
+    booking_requires_approval: bool = True
+    # Write-only: links/creates the staff login account by email and grants the
+    # Staff role. Not echoed back in StaffProfileOut.
+    linked_user_email: Optional[str] = Field(default=None, max_length=120)
     booking_enabled: bool = True
     active: bool = True
 
@@ -57,6 +66,13 @@ class StaffProfileUpdate(BaseModel):
     booking_rate_cents: Optional[int] = Field(default=None, ge=0)
     equipment_rental_cost_cents: Optional[int] = Field(default=None, ge=0)
     service_types: Optional[List[str]] = None
+    role_title: Optional[str] = Field(default=None, max_length=120)
+    notification_email: Optional[str] = Field(default=None, max_length=120)
+    notification_phone: Optional[str] = Field(default=None, max_length=40)
+    notify_by_email: Optional[bool] = None
+    notify_by_sms: Optional[bool] = None
+    booking_requires_approval: Optional[bool] = None
+    linked_user_email: Optional[str] = Field(default=None, max_length=120)
     booking_enabled: Optional[bool] = None
     active: Optional[bool] = None
 
@@ -83,6 +99,13 @@ class StaffProfileOut(BaseModel):
     booking_rate_cents: int
     equipment_rental_cost_cents: int = 0
     service_types: List[str] = Field(default_factory=list)
+    user_id: Optional[UUID] = None
+    role_title: Optional[str] = None
+    notification_email: Optional[str] = None
+    notification_phone: Optional[str] = None
+    notify_by_email: bool = True
+    notify_by_sms: bool = False
+    booking_requires_approval: bool = True
     booking_enabled: bool
     active: bool
     created_at: datetime

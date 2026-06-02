@@ -13,6 +13,9 @@ class Room(Base):
     photos = Column(JSONB, default=list)
     staff_roles = Column(JSONB, default=list)
     hourly_rate_cents = Column(Integer, nullable=False, default=5000)
+    # Booking deposit for this room, separate from the hourly rate. Defaults to
+    # $20 (2000 cents); admins can set it per room.
+    deposit_cents = Column(Integer, nullable=False, default=2000)
     max_booking_duration_minutes = Column(Integer, nullable=False, default=300)
     active = Column(Boolean, default=True)
     coming_soon = Column(Boolean, default=False)

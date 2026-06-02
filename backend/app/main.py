@@ -12,7 +12,19 @@ from app.config import (
     validate_runtime_configuration,
 )
 from app.database import engine
-from app.routers import admin, auth, bookings, intake, rooms, staff, staff_bookings, users, webhooks
+from app.routers import (
+    admin,
+    auth,
+    bookings,
+    intake,
+    rooms,
+    staff,
+    staff_availability,
+    staff_bookings,
+    staff_portal,
+    users,
+    webhooks,
+)
 from app.monitoring import record_request, render_metrics, time_request
 from sqlalchemy import text
 
@@ -79,6 +91,8 @@ app.include_router(staff.router)
 app.include_router(bookings.router)
 app.include_router(staff_bookings.router)
 app.include_router(intake.router)
+app.include_router(staff_availability.router)
+app.include_router(staff_portal.router)
 app.include_router(admin.router)
 app.include_router(webhooks.router)
 

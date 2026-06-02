@@ -7,10 +7,31 @@ from sqlalchemy.orm import Session
 
 from app.models.room import Room
 from app.models.staff_profile import StaffProfile
+from app.models.user import User
+from app.roles import USER_ROLE_STAFF, user_has_admin_access
 from app.schemas.staff import StaffProfileCreate, StaffProfileUpdate
 from app.staffing import build_staff_snapshot, normalize_staff_roles, normalize_string_list
 
 STAFF_MEDIA_DIR = Path(__file__).resolve().parents[1] / "frontend" / "media" / "staff"
+
+
+def _clean(value: str | None) -> str | None:
+    cleaned = (value or "").strip()
+    return cleaned or None
+
+
+def _link_staff_account(db: Session, profile: StaffProfile, email: str | None) -> None:
+    """Link a login account to the staff profile by email and grant the Staff
+    role (without demoting an existing admin). Empty email is a no-op."""
+    cleaned = (email or "").strip()
+    if not cleaned:
+        return
+    user = db.query(User).filter(func.lower(User.email) == cleaned.lower()).first()
+    if not user:
+        raise ValueError(f"No account found for {cleaned}")
+    profile.user_id = user.id
+    if not user_has_admin_access(user):
+        user.role = USER_ROLE_STAFF
 
 
 def _normalize_profile_name(value: str | None) -> str:
@@ -72,6 +93,13 @@ def list_staff_profiles(db: Session) -> list[StaffProfile]:
     return db.query(StaffProfile).order_by(StaffProfile.active.desc(), StaffProfile.name.asc()).all()
 
 
+def get_staff_profile_for_user(db: Session, user: User) -> StaffProfile | None:
+    """The staff profile linked to a login account (for the staff portal)."""
+    if user is None:
+        return None
+    return db.query(StaffProfile).filter(StaffProfile.user_id == user.id).first()
+
+
 def create_staff_profile(db: Session, payload: StaffProfileCreate) -> StaffProfile:
     name = _normalize_profile_name(payload.name)
     _ensure_unique_name(db, name)
@@ -89,9 +117,16 @@ def create_staff_profile(db: Session, payload: StaffProfileCreate) -> StaffProfi
         booking_rate_cents=payload.booking_rate_cents,
         equipment_rental_cost_cents=payload.equipment_rental_cost_cents,
         service_types=normalize_string_list(payload.service_types),
+        role_title=_clean(payload.role_title),
+        notification_email=_clean(payload.notification_email),
+        notification_phone=_clean(payload.notification_phone),
+        notify_by_email=payload.notify_by_email,
+        notify_by_sms=payload.notify_by_sms,
+        booking_requires_approval=payload.booking_requires_approval,
         booking_enabled=payload.booking_enabled,
         active=payload.active,
     )
+    _link_staff_account(db, profile, payload.linked_user_email)
     db.add(profile)
     db.commit()
     db.refresh(profile)
@@ -132,6 +167,20 @@ def update_staff_profile(db: Session, profile_id: str, payload: StaffProfileUpda
         profile.equipment_rental_cost_cents = update_data["equipment_rental_cost_cents"]
     if "service_types" in update_data and update_data["service_types"] is not None:
         profile.service_types = normalize_string_list(update_data["service_types"])
+    if "role_title" in update_data:
+        profile.role_title = _clean(update_data["role_title"])
+    if "notification_email" in update_data:
+        profile.notification_email = _clean(update_data["notification_email"])
+    if "notification_phone" in update_data:
+        profile.notification_phone = _clean(update_data["notification_phone"])
+    if "notify_by_email" in update_data and update_data["notify_by_email"] is not None:
+        profile.notify_by_email = update_data["notify_by_email"]
+    if "notify_by_sms" in update_data and update_data["notify_by_sms"] is not None:
+        profile.notify_by_sms = update_data["notify_by_sms"]
+    if "booking_requires_approval" in update_data and update_data["booking_requires_approval"] is not None:
+        profile.booking_requires_approval = update_data["booking_requires_approval"]
+    if "linked_user_email" in update_data:
+        _link_staff_account(db, profile, update_data["linked_user_email"])
     if "booking_enabled" in update_data and update_data["booking_enabled"] is not None:
         profile.booking_enabled = update_data["booking_enabled"]
     if "active" in update_data and update_data["active"] is not None:

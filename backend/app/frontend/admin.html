@@ -605,6 +605,36 @@
                     <span>Equipment rental cost (cents)</span>
                     <input type="number" name="equipment_rental_cost_cents" min="0" value="0" />
                   </label>
+                  <h4>Account &amp; notifications</h4>
+                  <label>
+                    <span>Role title</span>
+                    <input type="text" name="role_title" placeholder="Sound Engineer" />
+                  </label>
+                  <label>
+                    <span>Linked account email</span>
+                    <input type="email" name="linked_user_email" placeholder="engineer@example.com" />
+                    <span class="field-help">Links an existing account and grants the Staff role so they can log in.</span>
+                  </label>
+                  <label>
+                    <span>Notification email</span>
+                    <input type="email" name="notification_email" placeholder="Where booking requests are emailed" />
+                  </label>
+                  <label>
+                    <span>Notification phone</span>
+                    <input type="tel" name="notification_phone" placeholder="For SMS booking requests" />
+                  </label>
+                  <label class="checkbox-row">
+                    <input type="checkbox" name="notify_by_email" checked />
+                    <span>Notify by email</span>
+                  </label>
+                  <label class="checkbox-row">
+                    <input type="checkbox" name="notify_by_sms" />
+                    <span>Notify by SMS</span>
+                  </label>
+                  <label class="checkbox-row">
+                    <input type="checkbox" name="booking_requires_approval" checked />
+                    <span>Bookings require this staff member's approval</span>
+                  </label>
                   <label>
                     <span>Profile picture</span>
                     <input id="admin-staff-photo-file" type="file" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp" />
@@ -697,6 +727,10 @@
                   <label>
                     <span>Hourly rate (cents)</span>
                     <input type="number" name="hourly_rate_cents" min="0" value="5000" />
+                  </label>
+                  <label>
+                    <span>Deposit (cents)</span>
+                    <input type="number" name="deposit_cents" min="0" value="2000" />
                   </label>
                   <label>
                     <span>Max booking duration</span>

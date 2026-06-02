@@ -30,6 +30,7 @@ class RoomCreate(BaseModel):
     photos: List[str] = Field(default_factory=list)
     staff_roles: List[StaffOption] = Field(default_factory=list)
     hourly_rate_cents: int = Field(default=5000, ge=0)
+    deposit_cents: int = Field(default=2000, ge=0)
     max_booking_duration_minutes: int = Field(default=300)
     status: str = "available"
 
@@ -59,6 +60,7 @@ class RoomOut(BaseModel):
     photos: List[str] = Field(default_factory=list)
     staff_roles: List[StaffOption] = Field(default_factory=list)
     hourly_rate_cents: int
+    deposit_cents: int = 2000
     max_booking_duration_minutes: int
     active: bool
     coming_soon: bool = False
@@ -85,6 +87,7 @@ class RoomUpdate(BaseModel):
     photos: Optional[List[str]] = None
     staff_roles: Optional[List[StaffOption]] = None
     hourly_rate_cents: Optional[int] = Field(default=None, ge=0)
+    deposit_cents: Optional[int] = Field(default=None, ge=0)
     max_booking_duration_minutes: Optional[int] = None
     active: Optional[bool] = None
     coming_soon: Optional[bool] = None

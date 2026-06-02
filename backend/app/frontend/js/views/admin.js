@@ -1214,6 +1214,13 @@ function populateStaffProfileForm(profile) {
   elements.adminStaffProfileForm.elements.headshot_urls.value = (profile.headshot_urls || []).join("\n");
   elements.adminStaffProfileForm.elements.add_on_price_cents.value = profile.add_on_price_cents || 0;
   elements.adminStaffProfileForm.elements.equipment_rental_cost_cents.value = profile.equipment_rental_cost_cents || 0;
+  elements.adminStaffProfileForm.elements.role_title.value = profile.role_title || "";
+  elements.adminStaffProfileForm.elements.notification_email.value = profile.notification_email || "";
+  elements.adminStaffProfileForm.elements.notification_phone.value = profile.notification_phone || "";
+  elements.adminStaffProfileForm.elements.notify_by_email.checked = profile.notify_by_email !== false;
+  elements.adminStaffProfileForm.elements.notify_by_sms.checked = Boolean(profile.notify_by_sms);
+  elements.adminStaffProfileForm.elements.booking_requires_approval.checked = profile.booking_requires_approval !== false;
+  elements.adminStaffProfileForm.elements.linked_user_email.value = "";
   elements.adminStaffProfileForm.elements.active.checked = Boolean(profile.active);
   if (elements.adminStaffProfileId) {
     elements.adminStaffProfileId.value = profile.id;
@@ -2454,6 +2461,13 @@ export function initAdminView(actions) {
         portfolio_url: form.elements.portfolio_url.value.trim() || null,
         add_on_price_cents: Number(form.elements.add_on_price_cents.value || 0),
         equipment_rental_cost_cents: Number(form.elements.equipment_rental_cost_cents.value || 0),
+        role_title: form.elements.role_title.value.trim() || null,
+        notification_email: form.elements.notification_email.value.trim() || null,
+        notification_phone: form.elements.notification_phone.value.trim() || null,
+        notify_by_email: form.elements.notify_by_email.checked,
+        notify_by_sms: form.elements.notify_by_sms.checked,
+        booking_requires_approval: form.elements.booking_requires_approval.checked,
+        linked_user_email: form.elements.linked_user_email.value.trim() || null,
         active: form.elements.active.checked,
       };
 

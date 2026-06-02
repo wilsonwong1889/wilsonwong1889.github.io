@@ -286,6 +286,9 @@ function resetRoomForm() {
   if (elements.roomForm?.elements?.hourly_rate_cents) {
     elements.roomForm.elements.hourly_rate_cents.value = "5000";
   }
+  if (elements.roomForm?.elements?.deposit_cents) {
+    elements.roomForm.elements.deposit_cents.value = "2000";
+  }
   if (elements.roomForm?.elements?.max_booking_duration_minutes) {
     elements.roomForm.elements.max_booking_duration_minutes.value = "300";
   }
@@ -316,6 +319,9 @@ function populateRoomForm(room) {
   const primaryPhoto = roomPhotos[0] || "";
   elements.roomForm.elements.photos.value = roomPhotos.slice(1).join("\n");
   elements.roomForm.elements.hourly_rate_cents.value = room.hourly_rate_cents || 5000;
+  if (elements.roomForm.elements.deposit_cents) {
+    elements.roomForm.elements.deposit_cents.value = room.deposit_cents ?? 2000;
+  }
   elements.roomForm.elements.max_booking_duration_minutes.value = room.max_booking_duration_minutes || 300;
   if (elements.roomForm.elements.status) {
     elements.roomForm.elements.status.value = room.status || "available";
@@ -1110,6 +1116,7 @@ export function initRoomsView(actions) {
           photos,
           staff_roles: collectCreateRoomStaffPayload(),
           hourly_rate_cents: Number(form.get("hourly_rate_cents") || 0),
+          deposit_cents: Number(form.get("deposit_cents") || 2000),
           max_booking_duration_minutes: Number(form.get("max_booking_duration_minutes") || 300),
           status: form.get("status") || "available",
         };

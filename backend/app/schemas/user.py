@@ -107,6 +107,9 @@ class AdminUserRoleUpdate(BaseModel):
         normalized_input = str(value or "").strip().replace(" ", "").replace("_", "").lower()
         allowed_inputs = {
             "customer",
+            "staff",
+            "engineer",
+            "serviceengineer",
             "admin",
             "adminmanager",
             "manager",

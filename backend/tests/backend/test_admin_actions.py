@@ -234,7 +234,8 @@ class AdminActionsTest(BaseAppTest):
         guest_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
         biz_tz = ZoneInfo("America/Edmonton")
-        base = datetime.now(biz_tz).date() + timedelta(days=10)
+        base_candidate = datetime.now(biz_tz).date() + timedelta(days=10)
+        base = base_candidate + timedelta(days=(2 - base_candidate.weekday()) % 7)
 
         def make_start(day_offset, hour):
             d = base + timedelta(days=day_offset)
@@ -312,7 +313,13 @@ class AdminActionsTest(BaseAppTest):
         )
         self.assertEqual(resp.status_code, 201)
         staff_booking = resp.json()
-        self.assertEqual(staff_booking["status"], "PendingPayment")
+        self.assertEqual(staff_booking["status"], "Requested")
+
+        resp = self.client.post(
+            f"/api/admin/staff-bookings/{staff_booking['id']}/accept",
+            headers=admin_headers,
+        )
+        self.assertEqual(resp.status_code, 200)
 
         resp = self.client.post(
             f"/api/admin/staff-bookings/{staff_booking['id']}/waive-payment",
@@ -334,7 +341,13 @@ class AdminActionsTest(BaseAppTest):
         )
         self.assertEqual(resp.status_code, 201)
         staff_booking2 = resp.json()
-        self.assertEqual(staff_booking2["status"], "PendingPayment")
+        self.assertEqual(staff_booking2["status"], "Requested")
+
+        resp = self.client.post(
+            f"/api/admin/staff-bookings/{staff_booking2['id']}/accept",
+            headers=admin_headers,
+        )
+        self.assertEqual(resp.status_code, 200)
 
         resp = self.client.post(
             f"/api/admin/staff-bookings/{staff_booking2['id']}/mark-paid",

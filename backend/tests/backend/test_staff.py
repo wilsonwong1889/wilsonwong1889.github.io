@@ -90,7 +90,7 @@ class StaffTest(BaseAppTest):
         self.assertEqual(resp.status_code, 201)
         payload = resp.json()
         self.assertTrue(payload["access_token"])
-        self.assertEqual(payload["booking"]["status"], "PendingPayment")
+        self.assertEqual(payload["booking"]["status"], "Requested")
         self.assertEqual(payload["booking"]["service_type"], "Podcast support")
         staff_rate, promo_pct = 6500, 60
         expected_original = self._staff_price(staff_rate, 60)
@@ -100,6 +100,13 @@ class StaffTest(BaseAppTest):
         self.assertEqual(payload["booking"]["price_cents"], expected_original - expected_discount)
         self.assertEqual(payload["booking"]["promo_code"], "SUMMER60")
         self.assertEqual(payload["booking"]["staff_profile"]["name"], "Podcast Engineer")
+
+        # Request-first flow: staff accepts before the customer can pay.
+        from app.models.staff_booking import StaffBooking
+        from app.services.staff_booking_service import accept_staff_booking
+        with self.SessionLocal() as db:
+            requested = db.query(StaffBooking).filter(StaffBooking.id == payload["booking"]["id"]).first()
+            accept_staff_booking(db, requested)
 
         guest_headers = {"Authorization": f"Bearer {payload['access_token']}"}
         resp = self.client.get(f"/api/staff-bookings/{payload['booking']['id']}", headers=guest_headers)
@@ -208,7 +215,13 @@ class StaffTest(BaseAppTest):
         self.assertEqual(len(lookup_rows), 1)
         self.assertEqual(lookup_rows[0]["booking_kind"], "staff")
         self.assertEqual(lookup_rows[0]["staff_name"], "Independent Producer")
-        self.assertEqual(lookup_rows[0]["status"], "PendingPayment")
+        self.assertEqual(lookup_rows[0]["status"], "Requested")
+
+        resp = self.client.post(
+            f"/api/admin/staff-bookings/{staff_booking['id']}/accept",
+            headers=admin_headers,
+        )
+        self.assertEqual(resp.status_code, 200)
 
         resp = self.client.post(
             f"/api/admin/staff-bookings/{staff_booking['id']}/mark-paid",

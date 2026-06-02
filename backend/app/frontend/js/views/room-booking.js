@@ -467,9 +467,15 @@ function getSelectedStaffOptions(room) {
   return roles.filter((role) => selectedStaffIds.has(role.id));
 }
 
+// "5th hour free": one free hour of room time per full 5 hours booked.
+function billableRoomMinutes(minutes) {
+  const freeHours = Math.floor(Number(minutes || 0) / 300);
+  return Number(minutes || 0) - freeHours * 60;
+}
+
 function calculateEstimatedTotal(room) {
   const hourlyRate = getRoomHourlyRate(room);
-  const baseRate = hourlyRate * (getSelectedDurationMinutes() / 60);
+  const baseRate = hourlyRate * (billableRoomMinutes(getSelectedDurationMinutes()) / 60);
   const staffTotal = getSelectedStaffOptions(room).reduce(
     (total, role) => total + (role.add_on_price_cents || 0),
     0,
@@ -478,10 +484,7 @@ function calculateEstimatedTotal(room) {
 }
 
 function getDepositCents(room) {
-  const hasEngineer = getSelectedStaffOptions(room).some((role) =>
-    /engineer/i.test(role.name || ""),
-  );
-  return hasEngineer ? 2000 : 1000;
+  return Number(room?.deposit_cents ?? 2000);
 }
 
 function renderSelectedStaffBreakdown(room) {
@@ -848,6 +851,7 @@ function renderSummary(currentState) {
     <div class="reserve-price-line"><span>Date</span><strong>${escapeHtml(formatDateLabel(selectedDate))}</strong></div>
     <div class="reserve-price-line"><span>Start time</span><strong>${escapeHtml(formatTime(selectedStart))}</strong></div>
     <div class="reserve-price-line"><span>Duration</span><strong>${formatDuration(getSelectedDurationMinutes())}</strong></div>
+    ${getSelectedDurationMinutes() >= 300 ? '<div class="reserve-price-line"><span>5th hour</span><strong class="reserve-price-free">Free</strong></div>' : ""}
     <div class="reserve-price-line"><span>${rateLabel}</span><strong>${formatCurrency(estimatedTotal)}</strong></div>
     <div class="reserve-price-line"><span>Service fee</span><strong class="reserve-price-free">Free</strong></div>
     ${

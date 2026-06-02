@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     REMINDER_DISPATCH_INTERVAL_MINUTES: int = 30
     PENDING_BOOKING_CLEANUP_INTERVAL_MINUTES: int = 1
     PENDING_BOOKING_EXPIRY_MINUTES: int = 5
+    # How long a staff member has to accept a booking request before it expires.
+    STAFF_REQUEST_EXPIRY_HOURS: int = 48
     RATE_LIMIT_WINDOW_SECONDS: int = 60
     AUTH_RATE_LIMIT_MAX_REQUESTS: int = 20
     BOOKING_RATE_LIMIT_MAX_REQUESTS: int = 30
