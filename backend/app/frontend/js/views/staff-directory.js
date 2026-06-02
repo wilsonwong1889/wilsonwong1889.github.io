@@ -523,11 +523,6 @@ function renderStaffCategoryBar(profiles) {
     { value: "sound-engineer", label: "Sound Engineer" },
     { value: "music-producer", label: "Music Producer" },
     { value: "podcast-producer", label: "Podcast Producer" },
-    { value: "lighting-technician", label: "Lighting Tech" },
-    { value: "graphic-designer", label: "Graphic Designer" },
-    { value: "content-creator", label: "Content Creator" },
-    { value: "creative-director", label: "Creative Director" },
-    { value: "studio-consultant", label: "Studio Consultant" },
   ];
 
   bar.innerHTML = ROLES.map((role) => {
