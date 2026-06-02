@@ -137,20 +137,34 @@ def _merge(windows: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
     return merged
 
 
-def available_windows_for_date(db: Session, staff_profile_id, target_date: date) -> List[Tuple[int, int]]:
+def _within_windows(windows: List[Tuple[int, int]], start_minute: int, end_minute: int) -> bool:
+    """True if [start_minute, end_minute) fits entirely inside one window."""
+    return any(win_start <= start_minute and end_minute <= win_end for win_start, win_end in windows)
+
+
+def available_windows_for_date(
+    db: Session,
+    staff_profile_id,
+    target_date: date,
+    base_windows: List[Tuple[int, int]] | None = None,
+) -> List[Tuple[int, int]]:
     """Merged available windows (minutes-from-midnight, business-local) for a
-    staff member on a given date: weekly rules for that weekday, plus
-    extra-available exceptions, minus blocked exceptions."""
-    rules = (
-        db.query(StaffAvailabilityRule)
-        .filter(
-            StaffAvailabilityRule.staff_profile_id == staff_profile_id,
-            StaffAvailabilityRule.active.is_(True),
-            StaffAvailabilityRule.weekday == target_date.weekday(),
+    staff member on a given date: a base (weekly rules for that weekday, or an
+    explicit ``base_windows`` fallback), plus extra-available exceptions, minus
+    blocked exceptions."""
+    if base_windows is None:
+        rules = (
+            db.query(StaffAvailabilityRule)
+            .filter(
+                StaffAvailabilityRule.staff_profile_id == staff_profile_id,
+                StaffAvailabilityRule.active.is_(True),
+                StaffAvailabilityRule.weekday == target_date.weekday(),
+            )
+            .all()
         )
-        .all()
-    )
-    windows: List[Tuple[int, int]] = [(rule.start_minute, rule.end_minute) for rule in rules]
+        windows: List[Tuple[int, int]] = [(rule.start_minute, rule.end_minute) for rule in rules]
+    else:
+        windows = list(base_windows)
 
     exceptions = (
         db.query(StaffAvailabilityException)

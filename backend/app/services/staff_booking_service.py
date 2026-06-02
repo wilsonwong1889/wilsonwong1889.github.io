@@ -196,11 +196,27 @@ def ensure_staff_is_available(
 
 
 def get_staff_availability(db: Session, staff_profile_id: UUID | str, target_date: date) -> dict:
+    from app.services.staff_availability_service import (
+        available_windows_for_date,
+        has_availability_rules,
+    )
+
     expire_stale_pending_staff_bookings(db)
     get_staff_profile_or_404(db, staff_profile_id)
     business_timezone = get_business_timezone()
     open_hour, close_hour = get_booking_window_hours()
     utc_start, utc_end = get_day_bounds(target_date)
+
+    # Restrict to the staff member's availability. With a weekly schedule, only
+    # times inside their rules (minus blocked exceptions, plus extra ones) are
+    # bookable; with no schedule configured we default to business hours but
+    # still honour one-off exceptions for the date.
+    if has_availability_rules(db, staff_profile_id):
+        availability_windows = available_windows_for_date(db, staff_profile_id, target_date)
+    else:
+        availability_windows = available_windows_for_date(
+            db, staff_profile_id, target_date, base_windows=[(open_hour * 60, close_hour * 60)]
+        )
     available_start_times: list[str] = []
     max_duration_minutes_by_start: dict[str, int] = {}
     current_time = datetime.now(timezone.utc)
@@ -222,9 +238,15 @@ def get_staff_availability(db: Session, staff_profile_id: UUID | str, target_dat
         if start_time <= current_time:
             continue
 
+        slot_start_minute = local_hour * 60
         max_duration_minutes = 0
         for duration_minutes in range(60, 301, 60):
             end_time = start_time + timedelta(minutes=duration_minutes)
+            if not any(
+                window_start <= slot_start_minute and slot_start_minute + duration_minutes <= window_end
+                for window_start, window_end in availability_windows
+            ):
+                break
             if end_time.astimezone(business_timezone).date() != target_date:
                 break
             if end_time.astimezone(business_timezone).hour > close_hour:
