@@ -1277,7 +1277,7 @@ function populateStaffProfileForm(profile) {
   elements.adminStaffProfileForm.elements.notify_by_email.checked = profile.notify_by_email !== false;
   elements.adminStaffProfileForm.elements.notify_by_sms.checked = Boolean(profile.notify_by_sms);
   elements.adminStaffProfileForm.elements.booking_requires_approval.checked = profile.booking_requires_approval !== false;
-  elements.adminStaffProfileForm.elements.linked_user_email.value = "";
+  elements.adminStaffProfileForm.elements.linked_user_email.value = profile.linked_user_email || "";
   elements.adminStaffProfileForm.elements.schedule_published.checked = Boolean(profile.schedule_published);
   elements.adminStaffProfileForm.elements.active.checked = Boolean(profile.active);
   if (elements.adminStaffProfileId) {
@@ -2100,6 +2100,7 @@ function renderStaffCatalogCard(profile) {
       <div class="room-meta">
         <span class="pill">${formatMoney(profile.add_on_price_cents)}</span>
         <span class="pill ${profile.active ? "" : "muted"}">${profile.active ? "Active" : "Inactive"}</span>
+        ${profile.linked_user_email ? `<span class="pill">Linked ${escapeHtml(profile.linked_user_email)}</span>` : ""}
       </div>
       ${renderStaffTagRow("Skills", profile.skills || [])}
       ${renderStaffTagRow("Talents", profile.talents || [])}

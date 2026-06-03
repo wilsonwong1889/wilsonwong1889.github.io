@@ -2,6 +2,7 @@ import uuid
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -20,6 +21,12 @@ class StaffProfile(Base):
         nullable=True,
         index=True,
     )
+    user = relationship("User")
+
+    @property
+    def linked_user_email(self):
+        return self.user.email if self.user else None
+
     role_title = Column(String)
     # Where booking-request notifications go (falls back to the linked account).
     notification_email = Column(String)

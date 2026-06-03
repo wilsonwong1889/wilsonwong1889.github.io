@@ -34,7 +34,7 @@ from app.schemas.promo_code import (
     PromoCodeOut,
     PromoCodeUpdate,
 )
-from app.schemas.staff import StaffPhotoUploadOut, StaffProfileCreate, StaffProfileOut, StaffProfileUpdate
+from app.schemas.staff import AdminStaffProfileOut, StaffPhotoUploadOut, StaffProfileCreate, StaffProfileUpdate
 from app.schemas.staff_booking import StaffBookingOut
 from app.schemas.user import AdminUserAccountOut, AdminUserDeleteConfirm, AdminUserRoleUpdate
 from app.core.image_utils import ACCEPTED_PHOTO_EXTENSIONS, MAX_PHOTO_BYTES, to_jpeg_bytes
@@ -226,7 +226,7 @@ def admin_recent_activity(
     return list_recent_admin_activity(db, limit=limit)
 
 
-@router.get("/staff", response_model=List[StaffProfileOut])
+@router.get("/staff", response_model=List[AdminStaffProfileOut])
 def admin_list_staff_profiles(
     db: Session = Depends(get_db),
     admin: User = Depends(get_admin_user),
@@ -235,7 +235,7 @@ def admin_list_staff_profiles(
     return list_staff_profiles(db)
 
 
-@router.post("/staff", response_model=StaffProfileOut, status_code=201)
+@router.post("/staff", response_model=AdminStaffProfileOut, status_code=201)
 def admin_create_staff_profile(
     payload: StaffProfileCreate,
     db: Session = Depends(get_db),
@@ -257,7 +257,7 @@ def admin_create_staff_profile(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.put("/staff/{staff_profile_id}", response_model=StaffProfileOut)
+@router.put("/staff/{staff_profile_id}", response_model=AdminStaffProfileOut)
 def admin_update_staff_profile(
     staff_profile_id: str,
     payload: StaffProfileUpdate,

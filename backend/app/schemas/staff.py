@@ -40,8 +40,7 @@ class StaffProfileCreate(BaseModel):
     notify_by_email: bool = True
     notify_by_sms: bool = False
     booking_requires_approval: bool = True
-    # Write-only: links/creates the staff login account by email and grants the
-    # Staff role. Not echoed back in StaffProfileOut.
+    # Links the staff login account by email and grants the Staff role.
     linked_user_email: Optional[str] = Field(default=None, max_length=120)
     booking_enabled: bool = True
     schedule_published: bool = False
@@ -120,6 +119,10 @@ class StaffProfileOut(BaseModel):
         return normalize_string_list(value)
 
     model_config = {"from_attributes": True}
+
+
+class AdminStaffProfileOut(StaffProfileOut):
+    linked_user_email: Optional[str] = None
 
 
 class StaffPhotoUploadOut(BaseModel):
