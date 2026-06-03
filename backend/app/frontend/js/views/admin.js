@@ -1219,8 +1219,25 @@ function setStaffPhotoPreview(photoUrl, name = "Staff member") {
   elements.adminStaffPhotoPreview.classList.toggle("empty-state", !photoUrl);
 }
 
+function setStaffFeedback(message, kind) {
+  const box = elements.adminStaffFeedback;
+  if (!box) {
+    return;
+  }
+  if (!message) {
+    box.textContent = "";
+    box.classList.add("hidden");
+    box.classList.remove("is-error", "is-success");
+    return;
+  }
+  box.textContent = message;
+  box.classList.remove("hidden", "is-error", "is-success");
+  box.classList.add(kind === "error" ? "is-error" : "is-success");
+}
+
 function resetStaffProfileForm() {
   editingStaffProfileId = null;
+  setStaffFeedback(null);
   elements.adminStaffProfileForm?.reset();
   if (elements.adminStaffProfileId) {
     elements.adminStaffProfileId.value = "";
@@ -2481,6 +2498,8 @@ export function initAdminView(actions) {
     event.preventDefault();
     const form = elements.adminStaffProfileForm;
     const file = elements.adminStaffPhotoFile?.files?.[0];
+    const isEditing = Boolean(editingStaffProfileId);
+    setStaffFeedback(null);
 
     try {
       setState({ message: editingStaffProfileId ? "Updating staff profile..." : "Creating staff profile..." });
@@ -2513,16 +2532,28 @@ export function initAdminView(actions) {
         active: form.elements.active.checked,
       };
 
+      let savedProfile;
       if (editingStaffProfileId) {
-        await api.adminUpdateStaffProfile(editingStaffProfileId, payload);
+        savedProfile = await api.adminUpdateStaffProfile(editingStaffProfileId, payload);
       } else {
-        await api.adminCreateStaffProfile(payload);
+        savedProfile = await api.adminCreateStaffProfile(payload);
       }
 
       resetStaffProfileForm();
       setActiveAdminSubpage("staff", "editor");
+      const profileName = savedProfile?.name || payload.name;
+      const linkNote = payload.linked_user_email
+        ? savedProfile?.user_id
+          ? ` and linked to ${payload.linked_user_email} (Staff access granted).`
+          : ` (account link to ${payload.linked_user_email} could not be confirmed).`
+        : ".";
+      setStaffFeedback(
+        `${isEditing ? "Updated" : "Created"} staff profile “${profileName}”${linkNote}`,
+        "success",
+      );
       await actions.refreshAll("Staff profile saved.");
     } catch (error) {
+      setStaffFeedback(error?.message || "Could not save the staff profile.", "error");
       setState({ message: error.message });
     }
   });

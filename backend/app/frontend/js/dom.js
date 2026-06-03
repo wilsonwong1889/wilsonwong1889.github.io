@@ -122,6 +122,7 @@ export const elements = {
   adminRoomCreateStaffOptions: document.getElementById("admin-room-create-staff-options"),
   adminStaffProfileForm: document.getElementById("admin-staff-profile-form"),
   adminStaffProfileId: document.getElementById("admin-staff-profile-id"),
+  adminStaffFeedback: document.getElementById("admin-staff-feedback"),
   adminStaffPhotoFile: document.getElementById("admin-staff-photo-file"),
   adminStaffPhotoPreview: document.getElementById("admin-staff-photo-preview"),
   adminStaffPhotoUrl: document.getElementById("admin-staff-photo-url"),
