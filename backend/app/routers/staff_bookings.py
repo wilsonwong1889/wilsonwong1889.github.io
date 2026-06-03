@@ -53,6 +53,7 @@ def staff_availability(
     staff_profile_id: str,
     date_value: date = Query(alias="date"),
     db: Session = Depends(get_db),
+    _: None = Depends(booking_rate_limit),
 ):
     try:
         return get_staff_availability(db, staff_profile_id, date_value)

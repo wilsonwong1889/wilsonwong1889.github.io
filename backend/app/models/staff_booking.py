@@ -6,8 +6,10 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
+    UniqueConstraint,
     func,
     text,
 )
@@ -53,6 +55,10 @@ class StaffBooking(Base):
             "'Completed','Declined','Expired','Cancelled','Refunded')",
             name="staff_booking_status_check",
         ),
+        UniqueConstraint("payment_intent_id", name="uq_staff_bookings_payment_intent_id"),
+        Index("ix_staff_bookings_profile_start_time", staff_profile_id, start_time),
+        Index("ix_staff_bookings_status_start_time", status, start_time),
+        Index("ix_staff_bookings_user_start_time", user_id, start_time),
         # A staff member can't be double-held: a Requested or accepted booking
         # blocks the slot just like a paid one.
         ExcludeConstraint(

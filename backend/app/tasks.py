@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+
+from sqlalchemy.exc import IntegrityError
 
 from app.celery_app import task
 from app.config import settings
 from app.database import SessionLocal
 from app.monitoring import record_task_items, record_task_run
-from app.models.booking import Booking, NotificationLog
+from app.models.booking import Booking, NotificationLog, WebhookEventLog
 from app.models.room import Room
 from app.models.staff_booking import StaffBooking
 from app.models.staff_profile import StaffProfile
@@ -72,6 +75,98 @@ def _get_user(db, user_id: str):
     return db.query(User).filter(User.id == user_id).first()
 
 
+def _json_safe_details(value) -> dict:
+    if isinstance(value, dict):
+        return json.loads(json.dumps(value, default=str))
+    return {"result": json.loads(json.dumps(value, default=str))}
+
+
+def _duplicate_webhook_result(event_log: WebhookEventLog, *, processing: bool = False) -> dict:
+    details = event_log.details if isinstance(event_log.details, dict) else {}
+    result = dict(details)
+    result.setdefault("received", True)
+    result["duplicate"] = True
+    result["event_id"] = event_log.event_id
+    result["webhook_event_status"] = event_log.status
+    if processing:
+        result["processing"] = True
+    return result
+
+
+def _restart_failed_webhook_event(db, event_log: WebhookEventLog, event_type: str) -> WebhookEventLog:
+    now = datetime.now(timezone.utc)
+    event_log.status = "Processing"
+    event_log.event_type = event_type
+    event_log.attempt_count = (event_log.attempt_count or 0) + 1
+    event_log.last_error = None
+    event_log.updated_at = now
+    db.commit()
+    db.refresh(event_log)
+    return event_log
+
+
+def _claim_webhook_event(db, event: dict) -> tuple[Optional[WebhookEventLog], Optional[dict]]:
+    event_id = str(event.get("id") or "").strip()
+    if not event_id:
+        return None, None
+
+    event_type = str(event.get("type") or "unknown")
+    existing = db.query(WebhookEventLog).filter(WebhookEventLog.event_id == event_id).first()
+    if existing:
+        if existing.status == "Processed":
+            return existing, _duplicate_webhook_result(existing)
+        if existing.status == "Processing":
+            return existing, _duplicate_webhook_result(existing, processing=True)
+        return _restart_failed_webhook_event(db, existing, event_type), None
+
+    event_log = WebhookEventLog(
+        event_id=event_id,
+        event_type=event_type,
+        status="Processing",
+        attempt_count=1,
+    )
+    db.add(event_log)
+    try:
+        db.commit()
+        db.refresh(event_log)
+        return event_log, None
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(WebhookEventLog).filter(WebhookEventLog.event_id == event_id).first()
+        if not existing:
+            raise
+        if existing.status == "Processed":
+            return existing, _duplicate_webhook_result(existing)
+        if existing.status == "Processing":
+            return existing, _duplicate_webhook_result(existing, processing=True)
+        return _restart_failed_webhook_event(db, existing, event_type), None
+
+
+def _mark_webhook_event_processed(db, event_log: WebhookEventLog, result: dict) -> None:
+    now = datetime.now(timezone.utc)
+    event_log.status = "Processed"
+    event_log.details = _json_safe_details(result)
+    event_log.last_error = None
+    event_log.processed_at = now
+    event_log.updated_at = now
+    db.commit()
+
+
+def _mark_webhook_event_failed(db, event_log: WebhookEventLog, exc: Exception) -> None:
+    event_log_id = event_log.id
+    db.rollback()
+    current_log = db.query(WebhookEventLog).filter(WebhookEventLog.id == event_log_id).first()
+    if not current_log:
+        return
+    now = datetime.now(timezone.utc)
+    error_message = str(exc)
+    current_log.status = "Failed"
+    current_log.last_error = error_message
+    current_log.details = _json_safe_details({"error": error_message})
+    current_log.updated_at = now
+    db.commit()
+
+
 @task(name="app.tasks.sync_suitedash_contact")
 def sync_suitedash_contact_task(user_id: str, source: str, role: Optional[str] = None):
     db = SessionLocal()
@@ -121,19 +216,36 @@ def sync_suitedash_contact_task(user_id: str, source: str, role: Optional[str] =
         db.close()
 
 
-@task(name="app.tasks.process_webhook_event")
+@task(
+    name="app.tasks.process_webhook_event",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 5},
+)
 def process_webhook_event_task(event: dict):
     db = SessionLocal()
     try:
-        metadata = event.get("data", {}).get("object", {}).get("metadata", {}) or {}
-        booking_type = metadata.get("booking_type")
-        if booking_type == "staff":
-            result = handle_staff_booking_payment_webhook_event(db, event)
-        else:
-            try:
-                result = handle_payment_webhook_event(db, event)
-            except ValueError:
+        event_log, duplicate_result = _claim_webhook_event(db, event)
+        if duplicate_result:
+            record_task_run("process_webhook_event")
+            return duplicate_result
+        try:
+            metadata = event.get("data", {}).get("object", {}).get("metadata", {}) or {}
+            booking_type = metadata.get("booking_type")
+            if booking_type == "staff":
                 result = handle_staff_booking_payment_webhook_event(db, event)
+            else:
+                try:
+                    result = handle_payment_webhook_event(db, event)
+                except ValueError:
+                    result = handle_staff_booking_payment_webhook_event(db, event)
+        except Exception as exc:
+            if event_log:
+                _mark_webhook_event_failed(db, event_log, exc)
+            raise
+        if event_log:
+            _mark_webhook_event_processed(db, event_log, result)
         record_task_run("process_webhook_event")
         return result
     finally:

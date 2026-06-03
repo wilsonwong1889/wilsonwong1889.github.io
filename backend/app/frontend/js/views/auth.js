@@ -308,12 +308,15 @@ function applyLoginError(message) {
   if (lowered.includes("valid email")) {
     setLoginFieldFeedback("email", "Enter a valid email address to continue.");
     showAuthFeedback("Check your email address and try again.", "error");
-  } else if (lowered.includes("couldn't find an account") || lowered.includes("not found")) {
-    setLoginFieldFeedback("email", "No account found with that email. Check for typos or sign up.");
-    showAuthFeedback("We couldn't find an account with that email address.", "error");
-  } else if (lowered.includes("wrong password")) {
-    setLoginFieldFeedback("password", "Incorrect password. Try again or use Forgot password.");
-    showAuthFeedback("The password you entered is incorrect.", "error");
+  } else if (
+    lowered.includes("invalid email or password") ||
+    lowered.includes("wrong password") ||
+    lowered.includes("couldn't find an account") ||
+    lowered.includes("not found")
+  ) {
+    setLoginFieldFeedback("email", "Check the email address.");
+    setLoginFieldFeedback("password", "Check the password or use Forgot password.");
+    showAuthFeedback("Invalid email or password.", "error");
   } else {
     showAuthFeedback(normalizedMessage, "error");
   }

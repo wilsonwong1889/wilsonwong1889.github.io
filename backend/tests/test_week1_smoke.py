@@ -57,7 +57,16 @@ class AppSmokeTest(unittest.TestCase):
 
         from app.database import Base, SessionLocal, engine
         from app.main import app
-        from app.models.booking import AuditLog, Booking, BookingSlot, NotificationLog, Refund, Review
+        from app.models.booking import (
+            AuditLog,
+            Booking,
+            BookingSlot,
+            BookingStaffAssignment,
+            NotificationLog,
+            Refund,
+            Review,
+            WebhookEventLog,
+        )
         from app.models.promo_code import PromoCode
         from app.models.room import Room
         from app.models.staff_booking import StaffBooking
@@ -71,9 +80,11 @@ class AppSmokeTest(unittest.TestCase):
         cls.AuditLog = AuditLog
         cls.Booking = Booking
         cls.BookingSlot = BookingSlot
+        cls.BookingStaffAssignment = BookingStaffAssignment
         cls.NotificationLog = NotificationLog
         cls.Refund = Refund
         cls.Review = Review
+        cls.WebhookEventLog = WebhookEventLog
         cls.PromoCode = PromoCode
         cls.Room = Room
         cls.StaffBooking = StaffBooking
@@ -83,6 +94,8 @@ class AppSmokeTest(unittest.TestCase):
         cls.ensure_promo_codes = staticmethod(ensure_promo_codes)
         cls.ensure_rooms = staticmethod(ensure_rooms)
 
+        with cls.engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
         cls.Base.metadata.create_all(bind=cls.engine)
 
         from fastapi.testclient import TestClient
@@ -100,9 +113,11 @@ class AppSmokeTest(unittest.TestCase):
             for model in (
                 self.AuditLog,
                 self.NotificationLog,
+                self.WebhookEventLog,
                 self.Refund,
                 self.Review,
                 self.PromoCode,
+                self.BookingStaffAssignment,
                 self.BookingSlot,
                 self.Booking,
                 self.StaffBooking,
@@ -726,15 +741,15 @@ class AppSmokeTest(unittest.TestCase):
             "/api/auth/login",
             data={"username": "missing@example.com", "password": signup_payload["password"]},
         )
-        self.assertEqual(response.status_code, 404, response.text)
-        self.assertEqual(response.json()["detail"], "We couldn't find an account with that email.")
+        self.assertEqual(response.status_code, 401, response.text)
+        self.assertEqual(response.json()["detail"], "Invalid email or password.")
 
         response = self.client.post(
             "/api/auth/login",
             data={"username": signup_payload["email"], "password": "WrongPassword123!"},
         )
         self.assertEqual(response.status_code, 401, response.text)
-        self.assertEqual(response.json()["detail"], "Wrong password. Try again or reset it.")
+        self.assertEqual(response.json()["detail"], "Invalid email or password.")
 
         response = self.client.post(
             "/api/auth/forgot-password",
@@ -771,7 +786,7 @@ class AppSmokeTest(unittest.TestCase):
             data={"username": signup_payload["email"], "password": signup_payload["password"]},
         )
         self.assertEqual(response.status_code, 401, response.text)
-        self.assertEqual(response.json()["detail"], "Wrong password. Try again or reset it.")
+        self.assertEqual(response.json()["detail"], "Invalid email or password.")
 
         response = self.client.post(
             "/api/auth/login",
@@ -2393,15 +2408,19 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         booking = response.json()
 
-        # Customers can no longer reschedule — admin-only now.
+        # Customers can reschedule their own active bookings.
         response = self.client.post(
             f"/api/bookings/{booking['id']}/reschedule",
             headers=user_headers,
             json={
-                "start_time": self._future_time(day=20, hour=12, minute=0).isoformat(),
+                "start_time": self._future_time(day=20, hour=11, minute=0).isoformat(),
             },
         )
-        self.assertEqual(response.status_code, 403, response.text)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(
+            datetime.fromisoformat(response.json()["start_time"].replace("Z", "+00:00")),
+            self._future_time(day=20, hour=11).astimezone(timezone.utc),
+        )
 
         response = self.client.post(
             "/api/auth/signup",

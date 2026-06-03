@@ -228,6 +228,7 @@ class PaymentTest(BaseAppTest):
         self.assertTrue(pending_booking["payment_intent_id"].startswith("pi_"))
 
         event = {
+            "id": "evt_payment_success_analytics",
             "type": "payment_intent.succeeded",
             "data": {
                 "object": {
@@ -525,6 +526,7 @@ class PaymentTest(BaseAppTest):
         self.assertEqual(booking["status"], "PendingPayment")
 
         event = {
+            "id": "evt_duplicate_storm_payment_success",
             "type": "payment_intent.succeeded",
             "data": {
                 "object": {
@@ -542,6 +544,7 @@ class PaymentTest(BaseAppTest):
         ).hexdigest()
 
         # Storm the endpoint with 20 duplicate deliveries.
+        duplicate_flags = []
         storm_statuses = []
         for _ in range(20):
             r = self.client.post(
@@ -553,10 +556,13 @@ class PaymentTest(BaseAppTest):
                 },
             )
             self.assertEqual(r.status_code, 200)
-            storm_statuses.append(r.json().get("status"))
+            body = r.json()
+            storm_statuses.append(body.get("status"))
+            duplicate_flags.append(body.get("duplicate", False))
 
         # Every delivery should report the booking as Paid (idempotent).
         self.assertTrue(all(status == "Paid" for status in storm_statuses))
+        self.assertEqual(sum(1 for is_duplicate in duplicate_flags if is_duplicate), 19)
 
         resp = self.client.get(f"/api/bookings/{booking['id']}", headers=user_headers)
         self.assertEqual(resp.status_code, 200)
@@ -575,8 +581,45 @@ class PaymentTest(BaseAppTest):
                 .filter(self.NotificationLog.type == "booking_confirmation_email")
                 .count()
             )
+            webhook_event = (
+                db.query(self.WebhookEventLog)
+                .filter(self.WebhookEventLog.event_id == "evt_duplicate_storm_payment_success")
+                .first()
+            )
 
         # Exactly one paid-audit entry and one confirmation-email queue entry
         # despite 20 duplicate deliveries.
         self.assertEqual(paid_audits, 1)
         self.assertEqual(confirmation_notifications, 1)
+        self.assertIsNotNone(webhook_event)
+        self.assertEqual(webhook_event.status, "Processed")
+        self.assertEqual(webhook_event.attempt_count, 1)
+
+    def test_32_webhook_worker_records_failed_event_for_retry_visibility(self) -> None:
+        from app.tasks import process_webhook_event_task
+
+        event = {
+            "id": "evt_missing_booking_failure",
+            "type": "payment_intent.succeeded",
+            "data": {
+                "object": {
+                    "id": "pi_stub_missing_booking",
+                    "metadata": {"booking_id": "00000000-0000-0000-0000-000000000001"},
+                }
+            },
+        }
+
+        with self.assertRaises(ValueError):
+            process_webhook_event_task(event)
+
+        with self.SessionLocal() as db:
+            webhook_event = (
+                db.query(self.WebhookEventLog)
+                .filter(self.WebhookEventLog.event_id == "evt_missing_booking_failure")
+                .first()
+            )
+
+        self.assertIsNotNone(webhook_event)
+        self.assertEqual(webhook_event.status, "Failed")
+        self.assertEqual(webhook_event.attempt_count, 1)
+        self.assertIn("not found", webhook_event.last_error)

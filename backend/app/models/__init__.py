@@ -1,4 +1,13 @@
-from app.models.booking import AuditLog, Booking, BookingSlot, NotificationLog, Refund, Review
+from app.models.booking import (
+    AuditLog,
+    Booking,
+    BookingSlot,
+    BookingStaffAssignment,
+    NotificationLog,
+    Refund,
+    Review,
+    WebhookEventLog,
+)
 from app.models.intake import Intake
 from app.models.membership import UserMembership
 from app.models.staff_availability import StaffAvailabilityException, StaffAvailabilityRule
@@ -12,6 +21,7 @@ __all__ = [
     "AuditLog",
     "Booking",
     "BookingSlot",
+    "BookingStaffAssignment",
     "Intake",
     "NotificationLog",
     "Refund",
@@ -24,4 +34,5 @@ __all__ = [
     "StaffProfile",
     "User",
     "UserMembership",
+    "WebhookEventLog",
 ]

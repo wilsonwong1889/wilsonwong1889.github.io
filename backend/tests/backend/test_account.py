@@ -235,13 +235,17 @@ class AccountTest(BaseAppTest):
         self.assertEqual(resp.status_code, 201)
         booking = resp.json()
 
-        # Customers can no longer reschedule themselves — only admins can.
+        # Customers can reschedule their own active bookings.
         resp = self.client.post(
             f"/api/bookings/{booking['id']}/reschedule",
             headers=user_headers,
-            json={"start_time": self._future_time(day=20, hour=12, minute=0).isoformat()},
+            json={"start_time": self._future_time(day=20, hour=11, minute=0).isoformat()},
         )
-        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(
+            datetime.fromisoformat(resp.json()["start_time"].replace("Z", "+00:00")),
+            self._future_time(day=20, hour=11).astimezone(timezone.utc),
+        )
 
         resp = self.client.post(
             "/api/auth/signup",

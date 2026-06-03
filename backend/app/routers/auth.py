@@ -32,6 +32,8 @@ from app.services.booking_service import create_notification_log
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 auth_rate_limit = rate_limit_dependency("auth", settings.AUTH_RATE_LIMIT_MAX_REQUESTS)
 email_adapter = TypeAdapter(EmailStr)
+DUMMY_PASSWORD_HASH = hash_password(token_urlsafe(32))
+INVALID_CREDENTIALS_DETAIL = "Invalid email or password."
 
 
 def _generate_two_factor_code() -> str:
@@ -263,10 +265,9 @@ def login(
 ):
     email = _validate_email_address(form_data.username)
     user = db.query(User).filter(User.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="We couldn't find an account with that email.")
-    if not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Wrong password. Try again or reset it.")
+    password_hash = user.password_hash if user else DUMMY_PASSWORD_HASH
+    if not verify_password(form_data.password, password_hash) or not user:
+        raise HTTPException(status_code=401, detail=INVALID_CREDENTIALS_DETAIL)
 
     if user.two_factor_enabled:
         return _create_two_factor_challenge(db, user)

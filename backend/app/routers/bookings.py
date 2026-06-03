@@ -5,10 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_admin_user, get_current_user, get_optional_current_user
+from app.core.dependencies import get_current_user, get_optional_current_user
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
-from app.models.booking import Booking
 from app.models.user import User
 from app.schemas.booking import (
     BookingAvailabilityOut,
@@ -67,6 +66,7 @@ def room_availability(
     room_id: str,
     date_value: date = Query(alias="date"),
     db: Session = Depends(get_db),
+    _: None = Depends(booking_rate_limit),
 ):
     try:
         return get_room_availability(db, room_id, date_value)
@@ -78,6 +78,7 @@ def room_availability(
 def monthly_availability(
     month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
     db: Session = Depends(get_db),
+    _: None = Depends(booking_rate_limit),
 ):
     return get_monthly_availability_summary(db, month)
 
@@ -98,6 +99,8 @@ def create_reservation(
         )
     except PastBookingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except BookingConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -295,18 +298,18 @@ def cancel_my_booking(
 
 
 @router.post("/bookings/{booking_id}/reschedule", response_model=BookingOut)
-def reschedule_booking_admin_only(
+def reschedule_my_booking(
     booking_id: str,
     payload: BookingRescheduleIn,
     db: Session = Depends(get_db),
-    admin: User = Depends(get_admin_user),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(booking_rate_limit),
 ):
-    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    booking = get_booking_for_user(db, booking_id, current_user)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     try:
-        return reschedule_booking(db, booking, admin, payload)
+        return reschedule_booking(db, booking, current_user, payload)
     except BookingConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:

@@ -49,6 +49,8 @@ class BookingPaymentE2ETest(unittest.TestCase):
         cls.Room = Room
         cls.ensure_admin_user = staticmethod(ensure_admin_user)
 
+        with cls.engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
         cls.Base.metadata.create_all(bind=cls.engine)
 
         from fastapi.testclient import TestClient

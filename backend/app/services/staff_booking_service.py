@@ -9,7 +9,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -33,6 +33,7 @@ from app.services.booking_service import (
     create_notification_log,
     ensure_booking_start_not_in_past,
     ensure_single_booking_per_day,
+    is_database_booking_conflict,
     is_booking_date_before_today,
 )
 from app.services.payment_service import (
@@ -535,7 +536,7 @@ def _create_staff_booking_record(
     validate_booking_window(normalized_start, end_time)
     ensure_staff_window_is_available(db, profile.id, normalized_start, end_time)
     if enforce_daily_limit:
-        ensure_single_booking_per_day(db, user, normalized_start)
+        ensure_single_booking_per_day(db, user, normalized_start, duration_minutes)
     ensure_staff_is_available(db, profile.id, normalized_start, end_time)
     original_price_cents = calculate_price_cents(get_staff_booking_rate_cents(profile), duration_minutes)
     promo_result = apply_promo_code_to_amount(db, promo_code, original_price_cents, user)
@@ -565,8 +566,10 @@ def _create_staff_booking_record(
     try:
         db.add(booking)
         db.commit()
-    except IntegrityError as exc:
+    except (IntegrityError, OperationalError) as exc:
         db.rollback()
+        if not is_database_booking_conflict(exc):
+            raise
         raise StaffBookingConflictError("Selected time is no longer available") from exc
 
     db.refresh(booking)
@@ -816,6 +819,19 @@ def reschedule_staff_booking(
     end_time = normalized_start + timedelta(minutes=booking.duration_minutes)
     validate_booking_window(normalized_start, end_time)
     ensure_staff_window_is_available(db, booking.staff_profile_id, normalized_start, end_time)
+    limit_user = user
+    if booking.user_id and booking.user_id != user.id:
+        owner = db.query(User).filter(User.id == booking.user_id).first()
+        if owner:
+            limit_user = owner
+    if not user_has_admin_access(limit_user):
+        ensure_single_booking_per_day(
+            db,
+            limit_user,
+            normalized_start,
+            booking.duration_minutes,
+            exclude_staff_booking_id=booking.id,
+        )
     ensure_staff_is_available(
         db,
         booking.staff_profile_id,
@@ -823,19 +839,25 @@ def reschedule_staff_booking(
         end_time,
         exclude_staff_booking_id=booking.id,
     )
-    booking.start_time = normalized_start
-    booking.end_time = end_time
-    create_audit_log(
-        db,
-        actor_id=user.id,
-        booking_id=None,
-        action="staff_booking_rescheduled",
-        details={
-            "staff_booking_id": str(booking.id),
-            "new_start_time": normalized_start.isoformat(),
-        },
-    )
-    db.commit()
+    try:
+        booking.start_time = normalized_start
+        booking.end_time = end_time
+        create_audit_log(
+            db,
+            actor_id=user.id,
+            booking_id=None,
+            action="staff_booking_rescheduled",
+            details={
+                "staff_booking_id": str(booking.id),
+                "new_start_time": normalized_start.isoformat(),
+            },
+        )
+        db.commit()
+    except (IntegrityError, OperationalError) as exc:
+        db.rollback()
+        if not is_database_booking_conflict(exc):
+            raise
+        raise StaffBookingConflictError("Selected time is no longer available") from exc
     db.refresh(booking)
     return attach_staff_profile_snapshot(db, booking)
 

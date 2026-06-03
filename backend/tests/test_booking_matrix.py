@@ -88,13 +88,25 @@ class BookingServiceMatrixTest(unittest.TestCase):
         from app.core.security import hash_password
         from app.database import Base, SessionLocal, engine
         from app.main import app
-        from app.models.booking import AuditLog, Booking, BookingSlot, NotificationLog, Refund, Review
+        from app.models.booking import (
+            AuditLog,
+            Booking,
+            BookingSlot,
+            BookingStaffAssignment,
+            NotificationLog,
+            Refund,
+            Review,
+            WebhookEventLog,
+        )
         from app.models.promo_code import PromoCode
         from app.models.room import Room
+        from app.models.staff_booking import StaffBooking
         from app.models.staff_profile import StaffProfile
         from app.models.user import User
         from app.schemas.booking import BookingCreate, GuestBookingCreate, ManualBookingCreate, RefundCreate
+        from app.schemas.staff_booking import StaffBookingRescheduleIn
         from app.services import booking_service
+        from app.services.staff_booking_service import StaffBookingConflictError, reschedule_staff_booking
         from app.services.booking_service import (
             BookingConflictError,
             DailyBookingLimitError,
@@ -146,22 +158,27 @@ class BookingServiceMatrixTest(unittest.TestCase):
         cls.AuditLog = AuditLog
         cls.Booking = Booking
         cls.BookingSlot = BookingSlot
+        cls.BookingStaffAssignment = BookingStaffAssignment
         cls.NotificationLog = NotificationLog
         cls.Refund = Refund
         cls.Review = Review
+        cls.WebhookEventLog = WebhookEventLog
         cls.PromoCode = PromoCode
         cls.Room = Room
+        cls.StaffBooking = StaffBooking
         cls.StaffProfile = StaffProfile
         cls.User = User
         cls.BookingCreate = BookingCreate
         cls.GuestBookingCreate = GuestBookingCreate
         cls.ManualBookingCreate = ManualBookingCreate
         cls.RefundCreate = RefundCreate
+        cls.StaffBookingRescheduleIn = StaffBookingRescheduleIn
         cls.BookingConflictError = BookingConflictError
         cls.DailyBookingLimitError = DailyBookingLimitError
         cls.PaymentSessionError = PaymentSessionError
         cls.StaffAvailabilityError = StaffAvailabilityError
         cls.StaffSelectionError = StaffSelectionError
+        cls.StaffBookingConflictError = StaffBookingConflictError
         cls.build_slot_starts = staticmethod(build_slot_starts)
         cls.calculate_booking_total_cents = staticmethod(calculate_booking_total_cents)
         cls.calculate_price_cents = staticmethod(calculate_price_cents)
@@ -187,6 +204,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
         cls.list_room_reviews = staticmethod(list_room_reviews)
         cls.mark_booking_paid = staticmethod(mark_booking_paid)
         cls.reschedule_booking = staticmethod(reschedule_booking)
+        cls.reschedule_staff_booking = staticmethod(reschedule_staff_booking)
         cls.normalize_booking_start = staticmethod(normalize_booking_start)
         cls.process_refund = staticmethod(process_refund)
         cls.serialize_admin_booking = staticmethod(serialize_admin_booking)
@@ -196,6 +214,8 @@ class BookingServiceMatrixTest(unittest.TestCase):
         cls.PaymentConfigurationError = PaymentConfigurationError
         cls.memory_holds = reservation_service._memory_holds
 
+        with cls.engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
         cls.Base.metadata.create_all(bind=cls.engine)
 
     @classmethod
@@ -232,11 +252,14 @@ class BookingServiceMatrixTest(unittest.TestCase):
             for model in (
                 self.AuditLog,
                 self.NotificationLog,
+                self.WebhookEventLog,
                 self.Refund,
                 self.Review,
                 self.PromoCode,
+                self.BookingStaffAssignment,
                 self.BookingSlot,
                 self.Booking,
+                self.StaffBooking,
                 self.Room,
                 self.StaffProfile,
                 self.User,
@@ -468,6 +491,13 @@ class BookingServiceMatrixTest(unittest.TestCase):
             self.assertEqual(booking.staff_assignments[0]["photo_url"], "/assets/media/staff/sound.jpg")
             self.assertEqual(booking.user_full_name_snapshot, "Sound Client")
             self.assertEqual(booking.user_phone_snapshot, "5552223333")
+            guard = (
+                db.query(self.BookingStaffAssignment)
+                .filter(self.BookingStaffAssignment.booking_id == booking.id)
+                .one()
+            )
+            self.assertEqual(guard.staff_key, "sound-engineer")
+            self.assertEqual(guard.staff_name, "Sound Engineer")
 
     def test_118_create_booking_rejects_invalid_staff_selection(self) -> None:
         with self.SessionLocal() as db:
@@ -534,6 +564,145 @@ class BookingServiceMatrixTest(unittest.TestCase):
             )
             self.assertEqual(replacement.status, "PendingPayment")
 
+    def test_120b_staff_assignment_db_guard_blocks_overlap_without_app_check(self) -> None:
+        staff_roles = [{"id": "producer", "name": "Producer", "add_on_price_cents": 2000}]
+        with self.SessionLocal() as db:
+            user_one = self._create_user(db, email_prefix="producer-one")
+            user_two = self._create_user(db, email_prefix="producer-two")
+            room_one = self._create_room(db, name="Producer Room One", staff_roles=staff_roles)
+            room_two = self._create_room(db, name="Producer Room Two", staff_roles=staff_roles)
+            start_time = self._aware_time(day=1, hour=15)
+            first = self._create_pending_booking(
+                db,
+                user=user_one,
+                room=room_one,
+                start_time=start_time,
+                staff_assignments=["producer"],
+            )
+
+            second = self.Booking(
+                user_id=user_two.id,
+                room_id=room_two.id,
+                start_time=first.start_time,
+                end_time=first.end_time,
+                duration_minutes=60,
+                price_cents=5000,
+                currency="CAD",
+                status="PendingPayment",
+                booking_code=f"BOOK{uuid4().hex[:8].upper()}",
+                user_email_snapshot=user_two.email,
+                user_full_name_snapshot=user_two.full_name,
+                user_phone_snapshot=user_two.phone,
+                payment_intent_id=f"pi_stub_{uuid4().hex[:18]}",
+                staff_assignments=[],
+            )
+            db.add(second)
+            db.flush()
+            db.add(
+                self.BookingStaffAssignment(
+                    booking_id=second.id,
+                    room_id=room_two.id,
+                    staff_key="producer",
+                    staff_name="Producer",
+                    start_time=second.start_time,
+                    end_time=second.end_time,
+                )
+            )
+            with self.assertRaises(IntegrityError):
+                db.commit()
+            db.rollback()
+
+    def test_120c_payment_intent_ids_are_unique_across_booking_tables(self) -> None:
+        with self.SessionLocal() as db:
+            user_one = self._create_user(db, email_prefix="payment-one")
+            user_two = self._create_user(db, email_prefix="payment-two")
+            room_one = self._create_room(db, name="Payment Room One")
+            room_two = self._create_room(db, name="Payment Room Two")
+            payment_intent_id = f"pi_stub_unique_{uuid4().hex[:12]}"
+
+            first_booking = self._insert_booking_direct(
+                db,
+                user=user_one,
+                room=room_one,
+                start_time=self._aware_time(day=1, hour=12),
+                payment_intent_id=payment_intent_id,
+                create_slots=False,
+            )
+            db.commit()
+            duplicate_booking = self.Booking(
+                user_id=user_two.id,
+                room_id=room_two.id,
+                start_time=self.normalize_booking_start(self._aware_time(day=1, hour=15)),
+                end_time=self.normalize_booking_start(self._aware_time(day=1, hour=16)),
+                duration_minutes=60,
+                price_cents=5000,
+                currency="CAD",
+                status="Paid",
+                booking_code=f"BOOK{uuid4().hex[:8].upper()}",
+                user_email_snapshot=user_two.email,
+                user_full_name_snapshot=user_two.full_name,
+                user_phone_snapshot=user_two.phone,
+                payment_intent_id=first_booking.payment_intent_id,
+                confirmed_at=datetime.now(timezone.utc),
+            )
+            db.add(duplicate_booking)
+            with self.assertRaises(IntegrityError):
+                db.commit()
+            db.rollback()
+
+            profile = self.StaffProfile(
+                name="Unique Payment Staff",
+                booking_rate_cents=5000,
+                booking_enabled=True,
+                active=True,
+            )
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
+            staff_payment_intent_id = f"pi_stub_staff_unique_{uuid4().hex[:12]}"
+            first_staff_start = self.normalize_booking_start(self._aware_time(day=2, hour=10))
+            second_staff_start = self.normalize_booking_start(self._aware_time(day=2, hour=15))
+            db.add(
+                self.StaffBooking(
+                    user_id=user_one.id,
+                    staff_profile_id=profile.id,
+                    start_time=first_staff_start,
+                    end_time=first_staff_start + timedelta(minutes=60),
+                    duration_minutes=60,
+                    price_cents=5000,
+                    currency="CAD",
+                    status="Paid",
+                    booking_code=f"STAFF{uuid4().hex[:8].upper()}",
+                    user_email_snapshot=user_one.email,
+                    user_full_name_snapshot=user_one.full_name,
+                    user_phone_snapshot=user_one.phone,
+                    payment_intent_id=staff_payment_intent_id,
+                    confirmed_at=datetime.now(timezone.utc),
+                )
+            )
+            db.commit()
+            db.add(
+                self.StaffBooking(
+                    user_id=user_two.id,
+                    staff_profile_id=profile.id,
+                    start_time=second_staff_start,
+                    end_time=second_staff_start + timedelta(minutes=60),
+                    duration_minutes=60,
+                    price_cents=5000,
+                    currency="CAD",
+                    status="Paid",
+                    booking_code=f"STAFF{uuid4().hex[:8].upper()}",
+                    user_email_snapshot=user_two.email,
+                    user_full_name_snapshot=user_two.full_name,
+                    user_phone_snapshot=user_two.phone,
+                    payment_intent_id=staff_payment_intent_id,
+                    confirmed_at=datetime.now(timezone.utc),
+                )
+            )
+            with self.assertRaises(IntegrityError):
+                db.commit()
+            db.rollback()
+
     def test_120a_db_exclusion_constraint_blocks_overlapping_bookings_without_slots(self) -> None:
         with self.SessionLocal() as db:
             user = self._create_user(db)
@@ -594,6 +763,101 @@ class BookingServiceMatrixTest(unittest.TestCase):
                     start_time=self._aware_time(day=2, hour=15),
                     duration_minutes=60,
                 )
+
+    def test_121a_customer_daily_limit_counts_standalone_staff_bookings(self) -> None:
+        with self.SessionLocal() as db:
+            user = self._create_user(db)
+            room = self._create_room(db, name="Room After Staff")
+            profile = self.StaffProfile(
+                name="Daily Limit Engineer",
+                booking_rate_cents=5000,
+                booking_enabled=True,
+                active=True,
+            )
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
+            staff_start = self.normalize_booking_start(self._aware_time(day=2, hour=10))
+            db.add(
+                self.StaffBooking(
+                    user_id=user.id,
+                    staff_profile_id=profile.id,
+                    start_time=staff_start,
+                    end_time=staff_start + timedelta(minutes=240),
+                    duration_minutes=240,
+                    price_cents=20000,
+                    currency="CAD",
+                    status="Requested",
+                    booking_code=f"STAFF{uuid4().hex[:8].upper()}",
+                    user_email_snapshot=user.email,
+                    user_full_name_snapshot=user.full_name,
+                    user_phone_snapshot=user.phone,
+                )
+            )
+            db.commit()
+
+            with self.assertRaises(self.DailyBookingLimitError):
+                self._create_pending_booking(
+                    db,
+                    user=user,
+                    room=room,
+                    start_time=self._aware_time(day=2, hour=14),
+                    duration_minutes=120,
+                )
+
+    def test_121b_staff_reschedule_db_guard_returns_conflict(self) -> None:
+        with self.SessionLocal() as db:
+            admin = self._create_user(db, email_prefix="staff-admin", is_admin=True)
+            user_one = self._create_user(db, email_prefix="staff-one")
+            user_two = self._create_user(db, email_prefix="staff-two")
+            profile = self.StaffProfile(
+                name="Race Guard Engineer",
+                booking_rate_cents=5000,
+                booking_enabled=True,
+                active=True,
+            )
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
+
+            first_start = self.normalize_booking_start(self._aware_time(day=3, hour=10))
+            second_start = self.normalize_booking_start(self._aware_time(day=3, hour=15))
+            first = self.StaffBooking(
+                user_id=user_one.id,
+                staff_profile_id=profile.id,
+                start_time=first_start,
+                end_time=first_start + timedelta(minutes=60),
+                duration_minutes=60,
+                price_cents=5000,
+                currency="CAD",
+                status="Requested",
+                booking_code=f"STAFF{uuid4().hex[:8].upper()}",
+                user_email_snapshot=user_one.email,
+                user_full_name_snapshot=user_one.full_name,
+                user_phone_snapshot=user_one.phone,
+            )
+            second = self.StaffBooking(
+                user_id=user_two.id,
+                staff_profile_id=profile.id,
+                start_time=second_start,
+                end_time=second_start + timedelta(minutes=60),
+                duration_minutes=60,
+                price_cents=5000,
+                currency="CAD",
+                status="Requested",
+                booking_code=f"STAFF{uuid4().hex[:8].upper()}",
+                user_email_snapshot=user_two.email,
+                user_full_name_snapshot=user_two.full_name,
+                user_phone_snapshot=user_two.phone,
+            )
+            db.add_all([first, second])
+            db.commit()
+            db.refresh(second)
+
+            payload = self.StaffBookingRescheduleIn(start_time=first_start)
+            with patch("app.services.staff_booking_service.ensure_staff_is_available"):
+                with self.assertRaises(self.StaffBookingConflictError):
+                    self.reschedule_staff_booking(db, second, admin, payload)
 
     def test_122_admin_self_booking_bypasses_daily_limit(self) -> None:
         with self.SessionLocal() as db:
@@ -681,6 +945,39 @@ class BookingServiceMatrixTest(unittest.TestCase):
                     duration_minutes=180,
                 )
 
+    def test_125a_coming_soon_room_is_not_bookable(self) -> None:
+        with self.SessionLocal() as db:
+            user = self._create_user(db)
+            room = self._create_room(db)
+            room.coming_soon = True
+            db.commit()
+
+            with self.assertRaises(ValueError):
+                self._create_pending_booking(
+                    db,
+                    user=user,
+                    room=room,
+                    start_time=self._aware_time(day=4, hour=10),
+                )
+
+            with self.assertRaises(ValueError):
+                self.get_room_availability(db, str(room.id), self._aware_date(4))
+
+    def test_125b_tbc_room_is_not_bookable(self) -> None:
+        with self.SessionLocal() as db:
+            user = self._create_user(db)
+            room = self._create_room(db)
+            room.status = "tbc"
+            db.commit()
+
+            with self.assertRaises(ValueError):
+                self._create_pending_booking(
+                    db,
+                    user=user,
+                    room=room,
+                    start_time=self._aware_time(day=4, hour=11),
+                )
+
     def test_126_availability_reports_timezone_and_open_slot(self) -> None:
         with self.SessionLocal() as db:
             room = self._create_room(db)
@@ -707,6 +1004,21 @@ class BookingServiceMatrixTest(unittest.TestCase):
 
             self.assertNotIn(self._aware_time(day=5, hour=10).isoformat(), availability["available_start_times"])
             self.assertIn(self._aware_time(day=5, hour=11).isoformat(), availability["available_start_times"])
+
+    def test_127a_reservation_hold_rejects_booked_slot(self) -> None:
+        with self.SessionLocal() as db:
+            user = self._create_user(db)
+            room = self._create_room(db)
+            start_time = self._aware_time(day=5, hour=12)
+            self._create_pending_booking(
+                db,
+                user=user,
+                room=room,
+                start_time=start_time,
+            )
+
+            with self.assertRaises(self.BookingConflictError):
+                self.create_reservation_hold(db, room.id, start_time, 60)
 
     def test_128_availability_clamps_to_room_max_duration(self) -> None:
         with self.SessionLocal() as db:
@@ -831,6 +1143,10 @@ class BookingServiceMatrixTest(unittest.TestCase):
                 db.query(self.BookingSlot).filter(self.BookingSlot.booking_id == booking.id).count(),
                 0,
             )
+            self.assertEqual(
+                db.query(self.BookingStaffAssignment).filter(self.BookingStaffAssignment.booking_id == booking.id).count(),
+                0,
+            )
 
     def test_133_expire_stale_pending_bookings_only_cleans_old_pending(self) -> None:
         with self.SessionLocal() as db:
@@ -926,6 +1242,42 @@ class BookingServiceMatrixTest(unittest.TestCase):
                     admin,
                     self.RefundCreate(amount_cents=booking.price_cents + 1, reason="Too much"),
                 )
+
+    def test_136a_partial_refund_keeps_booking_and_staff_guard_active(self) -> None:
+        staff_roles = [{"id": "engineer", "name": "Engineer", "add_on_price_cents": 2500}]
+        with self.SessionLocal() as db:
+            admin = self._create_user(db, email_prefix="admin", is_admin=True)
+            user = self._create_user(db)
+            room = self._create_room(db, staff_roles=staff_roles)
+            booking = self._create_pending_booking(
+                db,
+                user=user,
+                room=room,
+                start_time=self._aware_time(day=7, hour=13),
+                staff_assignments=["engineer"],
+            )
+            self.mark_booking_paid(db, booking, booking.payment_intent_id)
+
+            refund = self.process_refund(
+                db,
+                str(booking.id),
+                admin,
+                self.RefundCreate(amount_cents=1000, reason="Partial credit"),
+            )
+            db.refresh(booking)
+
+            self.assertEqual(refund.amount_cents, 1000)
+            self.assertEqual(booking.status, "Paid")
+            self.assertGreater(
+                db.query(self.BookingSlot).filter(self.BookingSlot.booking_id == booking.id).count(),
+                0,
+            )
+            self.assertEqual(
+                db.query(self.BookingStaffAssignment)
+                .filter(self.BookingStaffAssignment.booking_id == booking.id)
+                .count(),
+                1,
+            )
 
     def test_137_clear_bookings_for_admin_day_only_deletes_target_day(self) -> None:
         with self.SessionLocal() as db:
@@ -1210,6 +1562,41 @@ class BookingServiceMatrixTest(unittest.TestCase):
             self.assertEqual(result["status"], "Refunded")
             self.assertEqual(booking.status, "Refunded")
 
+    def test_142a_webhook_partial_charge_refund_keeps_booking_active(self) -> None:
+        with self.SessionLocal() as db:
+            user = self._create_user(db)
+            room = self._create_room(db)
+            booking = self._create_pending_booking(
+                db,
+                user=user,
+                room=room,
+                start_time=self._aware_time(day=8, hour=15),
+            )
+            self.mark_booking_paid(db, booking, booking.payment_intent_id)
+
+            result = self.handle_payment_webhook_event(
+                db,
+                {
+                    "type": "charge.refunded",
+                    "data": {
+                        "object": {
+                            "id": booking.payment_intent_id,
+                            "amount": booking.price_cents,
+                            "amount_refunded": 1000,
+                            "metadata": {"booking_id": str(booking.id)},
+                        }
+                    },
+                },
+            )
+            db.refresh(booking)
+
+            self.assertEqual(result["status"], "Paid")
+            self.assertEqual(booking.status, "Paid")
+            self.assertGreater(
+                db.query(self.BookingSlot).filter(self.BookingSlot.booking_id == booking.id).count(),
+                0,
+            )
+
     def test_143_list_bookings_for_user_expires_stale_pending_first(self) -> None:
         with self.SessionLocal() as db:
             user = self._create_user(db)
@@ -1379,6 +1766,14 @@ def _add_booking_schema_model_tests() -> None:
                 start_time=self._aware_time(hour=10, minute=30),
                 duration_minutes=60,
             )
+
+    def test_027a_room_create_normalizes_valid_status(self) -> None:
+        room = self.RoomCreate(name="Status Room", status="TBC")
+        self.assertEqual(room.status, "tbc")
+
+    def test_027b_room_create_rejects_invalid_status(self) -> None:
+        with self.assertRaises(ValueError):
+            self.RoomCreate(name="Status Room", status="offline")
 
     def test_028_booking_create_rejects_non_zero_seconds(self) -> None:
         with self.assertRaises(ValueError):

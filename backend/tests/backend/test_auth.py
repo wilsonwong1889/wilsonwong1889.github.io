@@ -179,15 +179,15 @@ class AuthTest(BaseAppTest):
             "/api/auth/login",
             data={"username": "missing@example.com", "password": signup_payload["password"]},
         )
-        self.assertEqual(resp.status_code, 404)
-        self.assertEqual(resp.json()["detail"], "We couldn't find an account with that email.")
+        self.assertEqual(resp.status_code, 401)
+        self.assertEqual(resp.json()["detail"], "Invalid email or password.")
 
         resp = self.client.post(
             "/api/auth/login",
             data={"username": signup_payload["email"], "password": "WrongPassword123!"},
         )
         self.assertEqual(resp.status_code, 401)
-        self.assertEqual(resp.json()["detail"], "Wrong password. Try again or reset it.")
+        self.assertEqual(resp.json()["detail"], "Invalid email or password.")
 
         resp = self.client.post(
             "/api/auth/forgot-password",
@@ -224,7 +224,7 @@ class AuthTest(BaseAppTest):
             data={"username": signup_payload["email"], "password": signup_payload["password"]},
         )
         self.assertEqual(resp.status_code, 401)
-        self.assertEqual(resp.json()["detail"], "Wrong password. Try again or reset it.")
+        self.assertEqual(resp.json()["detail"], "Invalid email or password.")
 
         resp = self.client.post(
             "/api/auth/login",

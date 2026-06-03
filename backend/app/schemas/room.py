@@ -23,6 +23,19 @@ def validate_room_max_duration(value: int) -> int:
     return value
 
 
+ROOM_STATUS_VALUES = ("available", "in_progress", "tbc")
+
+
+def validate_room_status(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return value
+    normalized = value.strip().lower()
+    if normalized not in ROOM_STATUS_VALUES:
+        allowed = ", ".join(ROOM_STATUS_VALUES)
+        raise ValueError(f"Room status must be one of: {allowed}")
+    return normalized
+
+
 class RoomCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -49,7 +62,10 @@ class RoomCreate(BaseModel):
     def validate_max_booking_duration(cls, value: int) -> int:
         return validate_room_max_duration(value)
 
-ROOM_STATUS_VALUES = ("available", "in_progress", "tbc")
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        return validate_room_status(value) or "available"
 
 
 class RoomOut(BaseModel):
@@ -113,6 +129,11 @@ class RoomUpdate(BaseModel):
         if value is None:
             return value
         return validate_room_max_duration(value)
+
+    @field_validator("status")
+    @classmethod
+    def validate_optional_status(cls, value: Optional[str]) -> Optional[str]:
+        return validate_room_status(value)
 
 
 class RoomPhotoUploadOut(BaseModel):

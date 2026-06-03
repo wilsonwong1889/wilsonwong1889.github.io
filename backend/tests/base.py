@@ -46,7 +46,16 @@ class BaseAppTest(unittest.TestCase):
 
         from app.database import Base, SessionLocal, engine
         from app.main import app
-        from app.models.booking import AuditLog, Booking, BookingSlot, NotificationLog, Refund, Review
+        from app.models.booking import (
+            AuditLog,
+            Booking,
+            BookingSlot,
+            BookingStaffAssignment,
+            NotificationLog,
+            Refund,
+            Review,
+            WebhookEventLog,
+        )
         from app.models.intake import Intake
         from app.models.membership import UserMembership
         from app.models.promo_code import PromoCode
@@ -64,9 +73,11 @@ class BaseAppTest(unittest.TestCase):
         cls.AuditLog = AuditLog
         cls.Booking = Booking
         cls.BookingSlot = BookingSlot
+        cls.BookingStaffAssignment = BookingStaffAssignment
         cls.NotificationLog = NotificationLog
         cls.Refund = Refund
         cls.Review = Review
+        cls.WebhookEventLog = WebhookEventLog
         cls.Intake = Intake
         cls.UserMembership = UserMembership
         cls.StaffAvailabilityRule = StaffAvailabilityRule
@@ -81,6 +92,8 @@ class BaseAppTest(unittest.TestCase):
         cls.ensure_promo_codes = staticmethod(ensure_promo_codes)
         cls.ensure_rooms = staticmethod(ensure_rooms)
 
+        with cls.engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
         cls.Base.metadata.create_all(bind=cls.engine)
 
         from fastapi.testclient import TestClient
@@ -98,6 +111,7 @@ class BaseAppTest(unittest.TestCase):
             for model in (
                 self.AuditLog,
                 self.NotificationLog,
+                self.WebhookEventLog,
                 self.Refund,
                 self.Review,
                 self.Intake,
@@ -106,6 +120,7 @@ class BaseAppTest(unittest.TestCase):
                 self.StaffAvailabilityRule,
                 self.StaffAvailabilityException,
                 self.StaffBookingResponseToken,
+                self.BookingStaffAssignment,
                 self.BookingSlot,
                 self.Booking,
                 self.StaffBooking,

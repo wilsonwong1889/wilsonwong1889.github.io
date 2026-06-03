@@ -6,6 +6,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     CheckConstraint,
@@ -57,6 +58,10 @@ class Booking(Base):
             "status IN ('PendingPayment','Paid','Completed','Cancelled','Refunded')",
             name="booking_status_check",
         ),
+        UniqueConstraint("payment_intent_id", name="uq_bookings_payment_intent_id"),
+        Index("ix_bookings_room_start_time", room_id, start_time),
+        Index("ix_bookings_status_start_time", status, start_time),
+        Index("ix_bookings_user_start_time", user_id, start_time),
         ExcludeConstraint(
             ("room_id", "="),
             (func.tstzrange(start_time, end_time, "[)"), "&&"),
@@ -110,6 +115,32 @@ class BookingSlot(Base):
     slot_start = Column(DateTime(timezone=True), nullable=False)
 
 
+class BookingStaffAssignment(Base):
+    __tablename__ = "booking_staff_assignments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    booking_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("bookings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    room_id = Column(UUID(as_uuid=True), ForeignKey("rooms.id", ondelete="CASCADE"), nullable=False, index=True)
+    staff_key = Column(String, nullable=False, index=True)
+    staff_name = Column(String)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (
+        ExcludeConstraint(
+            ("staff_key", "="),
+            (func.tstzrange(start_time, end_time, "[)"), "&&"),
+            using="gist",
+            name="booking_staff_assignment_time_excl",
+        ),
+    )
+
+
 class Refund(Base):
     __tablename__ = "refunds"
     __table_args__ = (
@@ -133,6 +164,9 @@ class Refund(Base):
 
 class NotificationLog(Base):
     __tablename__ = "notification_logs"
+    __table_args__ = (
+        Index("ix_notification_logs_booking_type", "booking_id", "type"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
@@ -142,6 +176,28 @@ class NotificationLog(Base):
     details = Column(JSONB)
     sent_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class WebhookEventLog(Base):
+    __tablename__ = "webhook_event_logs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('Processing','Processed','Failed')",
+            name="webhook_event_log_status_check",
+        ),
+        UniqueConstraint("event_id", name="uq_webhook_event_logs_event_id"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_id = Column(String, nullable=False)
+    event_type = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="Processing")
+    attempt_count = Column(Integer, nullable=False, default=1)
+    details = Column(JSONB)
+    last_error = Column(String)
+    processed_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Review(Base):
@@ -162,6 +218,9 @@ class Review(Base):
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_logs_created_at", "created_at"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     actor_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
