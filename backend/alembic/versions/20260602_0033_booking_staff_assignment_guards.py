@@ -60,7 +60,7 @@ def upgrade() -> None:
             FROM bookings
             WHERE status IN ('PendingPayment', 'Paid', 'Completed')
               AND staff_assignments IS NOT NULL
-              AND jsonb_array_length(staff_assignments) > 0
+              AND jsonb_array_length(staff_assignments::jsonb) > 0
             """
         )
     ).mappings()
