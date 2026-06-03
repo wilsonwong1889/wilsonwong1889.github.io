@@ -185,6 +185,7 @@ class AdminActionsTest(BaseAppTest):
                 add_on_price_cents=0,
                 service_types=["Recording"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(profile)
@@ -434,6 +435,7 @@ class AdminActionsTest(BaseAppTest):
                 add_on_price_cents=0,
                 service_types=["Recording"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(room)

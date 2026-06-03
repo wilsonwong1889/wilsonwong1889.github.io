@@ -45,6 +45,9 @@ class StaffProfile(Base):
     equipment_rental_cost_cents = Column(Integer, nullable=False, default=0)
     service_types = Column(JSONB, default=list)
     booking_enabled = Column(Boolean, nullable=False, default=True)
+    # When true, the admin has published this staff member's schedule so the
+    # public can see availability and request to book them.
+    schedule_published = Column(Boolean, nullable=False, default=False)
     active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

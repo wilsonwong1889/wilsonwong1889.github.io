@@ -39,7 +39,7 @@ class StaffPortalTest(BaseAppTest):
         self._register(email)
         resp = self.client.post(
             "/api/admin/staff",
-            json={"name": name, "booking_rate_cents": 6000, "linked_user_email": email, "active": True},
+            json={"name": name, "booking_rate_cents": 6000, "linked_user_email": email, "active": True, "schedule_published": True},
             headers=admin,
         )
         self.assertEqual(resp.status_code, 201, resp.text)

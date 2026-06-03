@@ -263,6 +263,16 @@ def _availability_windows_for_staff_date(
         has_availability_rules,
     )
 
+    # Unpublished schedules aren't bookable by the public — the staff member is
+    # still listed, but shows no available times until an admin publishes.
+    published = (
+        db.query(StaffProfile.schedule_published)
+        .filter(StaffProfile.id == staff_profile_id)
+        .scalar()
+    )
+    if not published:
+        return []
+
     open_hour, close_hour = get_booking_window_hours()
     if has_availability_rules(db, staff_profile_id):
         return available_windows_for_date(db, staff_profile_id, target_date)

@@ -1261,6 +1261,7 @@ function populateStaffProfileForm(profile) {
   elements.adminStaffProfileForm.elements.notify_by_sms.checked = Boolean(profile.notify_by_sms);
   elements.adminStaffProfileForm.elements.booking_requires_approval.checked = profile.booking_requires_approval !== false;
   elements.adminStaffProfileForm.elements.linked_user_email.value = "";
+  elements.adminStaffProfileForm.elements.schedule_published.checked = Boolean(profile.schedule_published);
   elements.adminStaffProfileForm.elements.active.checked = Boolean(profile.active);
   if (elements.adminStaffProfileId) {
     elements.adminStaffProfileId.value = profile.id;
@@ -2508,6 +2509,7 @@ export function initAdminView(actions) {
         notify_by_sms: form.elements.notify_by_sms.checked,
         booking_requires_approval: form.elements.booking_requires_approval.checked,
         linked_user_email: form.elements.linked_user_email.value.trim() || null,
+        schedule_published: form.elements.schedule_published.checked,
         active: form.elements.active.checked,
       };
 

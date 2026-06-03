@@ -654,6 +654,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
                 name="Unique Payment Staff",
                 booking_rate_cents=5000,
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(profile)
@@ -772,6 +773,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
                 name="Daily Limit Engineer",
                 booking_rate_cents=5000,
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(profile)
@@ -814,6 +816,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
                 name="Race Guard Engineer",
                 booking_rate_cents=5000,
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(profile)

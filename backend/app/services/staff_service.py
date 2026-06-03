@@ -124,6 +124,7 @@ def create_staff_profile(db: Session, payload: StaffProfileCreate) -> StaffProfi
         notify_by_sms=payload.notify_by_sms,
         booking_requires_approval=payload.booking_requires_approval,
         booking_enabled=payload.booking_enabled,
+        schedule_published=payload.schedule_published,
         active=payload.active,
     )
     _link_staff_account(db, profile, payload.linked_user_email)
@@ -183,6 +184,8 @@ def update_staff_profile(db: Session, profile_id: str, payload: StaffProfileUpda
         _link_staff_account(db, profile, update_data["linked_user_email"])
     if "booking_enabled" in update_data and update_data["booking_enabled"] is not None:
         profile.booking_enabled = update_data["booking_enabled"]
+    if "schedule_published" in update_data and update_data["schedule_published"] is not None:
+        profile.schedule_published = update_data["schedule_published"]
     if "active" in update_data and update_data["active"] is not None:
         profile.active = update_data["active"]
 

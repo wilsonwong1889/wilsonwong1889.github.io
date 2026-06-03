@@ -138,6 +138,12 @@ async function loadDashboard() {
   el("staff-dashboard-body")?.classList.remove("hidden");
   const title = el("staff-dashboard-title");
   if (title) title.textContent = `${profile.name}'s dashboard`;
+  const subtitle = el("staff-dashboard-subtitle");
+  if (subtitle) {
+    subtitle.textContent = profile.schedule_published
+      ? "Your schedule is published — customers can request to book you."
+      : "Set your availability and respond to requests. An admin publishes your schedule to make it public.";
+  }
   await Promise.all([renderRequests(), renderRules(), renderExceptions()]);
 }
 

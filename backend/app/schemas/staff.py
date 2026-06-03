@@ -44,6 +44,7 @@ class StaffProfileCreate(BaseModel):
     # Staff role. Not echoed back in StaffProfileOut.
     linked_user_email: Optional[str] = Field(default=None, max_length=120)
     booking_enabled: bool = True
+    schedule_published: bool = False
     active: bool = True
 
     @field_validator("skills", "talents", "service_types", "services", "headshot_urls", mode="before")
@@ -74,6 +75,7 @@ class StaffProfileUpdate(BaseModel):
     booking_requires_approval: Optional[bool] = None
     linked_user_email: Optional[str] = Field(default=None, max_length=120)
     booking_enabled: Optional[bool] = None
+    schedule_published: Optional[bool] = None
     active: Optional[bool] = None
 
     @field_validator("skills", "talents", "service_types", "services", "headshot_urls", mode="before")
@@ -107,6 +109,7 @@ class StaffProfileOut(BaseModel):
     notify_by_sms: bool = False
     booking_requires_approval: bool = True
     booking_enabled: bool
+    schedule_published: bool = False
     active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None

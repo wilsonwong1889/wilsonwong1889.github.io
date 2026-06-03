@@ -39,6 +39,7 @@ class StaffTest(BaseAppTest):
                 booking_rate_cents=6500,
                 service_types=["Podcast support", "Consultation"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(promo_code)
@@ -175,6 +176,7 @@ class StaffTest(BaseAppTest):
                 booking_rate_cents=7000,
                 service_types=["Producer session"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(profile)

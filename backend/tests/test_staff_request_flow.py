@@ -37,7 +37,7 @@ class StaffRequestFlowTest(BaseAppTest):
     def _staff_id(self, admin_headers) -> str:
         resp = self.client.post(
             "/api/admin/staff",
-            json={"name": "Request Engineer", "booking_rate_cents": 6000, "active": True},
+            json={"name": "Request Engineer", "booking_rate_cents": 6000, "active": True, "schedule_published": True},
             headers=admin_headers,
         )
         self.assertEqual(resp.status_code, 201, resp.text)

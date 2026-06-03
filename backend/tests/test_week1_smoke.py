@@ -1125,6 +1125,7 @@ class AppSmokeTest(unittest.TestCase):
                 booking_rate_cents=6500,
                 service_types=["Podcast support", "Consultation"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(promo_code)
@@ -1268,6 +1269,7 @@ class AppSmokeTest(unittest.TestCase):
                 booking_rate_cents=7000,
                 service_types=["Producer session"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(profile)
@@ -1589,6 +1591,7 @@ class AppSmokeTest(unittest.TestCase):
                 add_on_price_cents=0,
                 service_types=["Recording"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(profile)
