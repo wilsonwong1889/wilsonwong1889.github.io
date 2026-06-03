@@ -73,9 +73,11 @@ from app.services.promo_code_service import (
     update_promo_code,
 )
 from app.services.staff_service import (
+    StaffPhotoError,
     create_staff_profile,
     delete_staff_profile,
     list_staff_profiles,
+    save_staff_photo,
     update_staff_profile,
 )
 from app.services.staff_booking_service import (
@@ -95,7 +97,6 @@ from app.services.suitedash_service import (
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 admin_rate_limit = rate_limit_dependency("admin", settings.ADMIN_RATE_LIMIT_MAX_REQUESTS)
-STAFF_MEDIA_DIR = Path(__file__).resolve().parents[1] / "frontend" / "media" / "staff"
 ROOM_MEDIA_DIR = Path(__file__).resolve().parents[1] / "frontend" / "media" / "rooms"
 
 
@@ -308,22 +309,11 @@ async def admin_upload_staff_photo(
     admin: User = Depends(get_admin_user),
     _: None = Depends(admin_rate_limit),
 ):
-    filename = (photo.filename or "").lower()
-    if not any(filename.endswith(ext) for ext in ACCEPTED_PHOTO_EXTENSIONS):
-        raise HTTPException(status_code=400, detail="Upload a JPG, PNG, or WebP photo.")
-
-    file_bytes = await photo.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded photo is empty.")
-    if len(file_bytes) > MAX_PHOTO_BYTES:
-        raise HTTPException(status_code=400, detail="Photo must be 20 MB or smaller.")
-
-    jpeg_bytes = to_jpeg_bytes(file_bytes)
-    STAFF_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-    saved_filename = f"{uuid4().hex}.jpg"
-    saved_path = STAFF_MEDIA_DIR / saved_filename
-    saved_path.write_bytes(jpeg_bytes)
-    return {"photo_url": f"/assets/media/staff/{saved_filename}"}
+    try:
+        photo_url = save_staff_photo(await photo.read(), photo.filename)
+    except StaffPhotoError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"photo_url": photo_url}
 
 
 @router.post("/rooms/photo", response_model=RoomPhotoUploadOut)

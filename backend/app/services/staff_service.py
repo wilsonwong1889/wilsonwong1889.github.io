@@ -1,18 +1,52 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import uuid4
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.image_utils import ACCEPTED_PHOTO_EXTENSIONS, MAX_PHOTO_BYTES, to_jpeg_bytes
 from app.models.room import Room
 from app.models.staff_profile import StaffProfile
 from app.models.user import User
 from app.roles import USER_ROLE_STAFF, user_has_admin_access
-from app.schemas.staff import StaffProfileCreate, StaffProfileUpdate
+from app.schemas.staff import StaffProfileCreate, StaffProfileUpdate, StaffSelfProfileUpdate
 from app.staffing import build_staff_snapshot, normalize_staff_roles, normalize_string_list
 
 STAFF_MEDIA_DIR = Path(__file__).resolve().parents[1] / "frontend" / "media" / "staff"
+
+
+class StaffPhotoError(ValueError):
+    """Raised when an uploaded staff photo is invalid."""
+
+
+def save_staff_photo(file_bytes: bytes, filename: str | None) -> str:
+    """Validate, normalize to JPEG, and store a staff photo. Returns its URL.
+    Shared by the admin editor and the staff self-service portal."""
+    lowered = (filename or "").lower()
+    if not any(lowered.endswith(ext) for ext in ACCEPTED_PHOTO_EXTENSIONS):
+        raise StaffPhotoError("Upload a JPG, PNG, or WebP photo.")
+    if not file_bytes:
+        raise StaffPhotoError("Uploaded photo is empty.")
+    if len(file_bytes) > MAX_PHOTO_BYTES:
+        raise StaffPhotoError("Photo must be 20 MB or smaller.")
+    jpeg_bytes = to_jpeg_bytes(file_bytes)
+    STAFF_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    saved_filename = f"{uuid4().hex}.jpg"
+    (STAFF_MEDIA_DIR / saved_filename).write_bytes(jpeg_bytes)
+    return f"/assets/media/staff/{saved_filename}"
+
+
+def update_own_staff_profile(
+    db: Session, profile: StaffProfile, payload: StaffSelfProfileUpdate
+) -> StaffProfile:
+    """Staff self-edit: apply only the fields a staff member is allowed to
+    change. Admin-only fields (pricing, schedule_published, linked_user_email,
+    booking_enabled, active, booking_requires_approval) are not part of the
+    self-update schema and cannot be set here."""
+    self_data = payload.model_dump(exclude_unset=True)
+    return update_staff_profile(db, profile.id, StaffProfileUpdate(**self_data))
 
 
 def _clean(value: str | None) -> str | None:

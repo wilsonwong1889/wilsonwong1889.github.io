@@ -85,6 +85,37 @@ class StaffProfileUpdate(BaseModel):
         return normalize_string_list(value)
 
 
+class StaffSelfProfileUpdate(BaseModel):
+    """Fields a staff member may edit on their OWN profile. Deliberately omits
+    pricing, schedule_published, linked_user_email, booking_enabled, active and
+    booking_requires_approval — those stay admin-only."""
+
+    name: Optional[str] = Field(default=None, min_length=2, max_length=80)
+    description: Optional[str] = Field(default=None, max_length=500)
+    bio: Optional[str] = Field(default=None, max_length=4000)
+    skills: Optional[List[str]] = None
+    talents: Optional[List[str]] = None
+    services: Optional[List[str]] = None
+    photo_url: Optional[str] = None
+    headshot_urls: Optional[List[str]] = None
+    portfolio_url: Optional[str] = Field(default=None, max_length=500)
+    service_types: Optional[List[str]] = None
+    role_title: Optional[str] = Field(default=None, max_length=120)
+    notification_email: Optional[str] = Field(default=None, max_length=120)
+    notification_phone: Optional[str] = Field(default=None, max_length=40)
+    notify_by_email: Optional[bool] = None
+    notify_by_sms: Optional[bool] = None
+
+    model_config = {"extra": "forbid"}
+
+    @field_validator("skills", "talents", "service_types", "services", "headshot_urls", mode="before")
+    @classmethod
+    def normalize_optional_lists(cls, value):
+        if value is None:
+            return value
+        return normalize_string_list(value)
+
+
 class StaffProfileOut(BaseModel):
     id: UUID
     name: str

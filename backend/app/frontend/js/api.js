@@ -490,6 +490,20 @@ export const api = {
   deleteMyAvailabilityException(exceptionId) {
     return request(`/api/staff/me/availability/exceptions/${exceptionId}`, { method: "DELETE" });
   },
+  updateMyStaffProfile(payload) {
+    return request("/api/staff/me", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+  uploadMyStaffPhoto(file) {
+    const formData = new FormData();
+    formData.append("photo", file);
+    return request("/api/staff/me/photo", {
+      method: "POST",
+      body: formData,
+    });
+  },
   getMyBookingRequests() {
     return request("/api/staff/me/booking-requests");
   },

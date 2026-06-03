@@ -84,6 +84,44 @@
         <div id="staff-dashboard-body" class="hidden">
           <section class="panel panel-wide">
             <div class="panel-header">
+              <p class="panel-kicker">Your profile</p>
+              <h2>Profile &amp; details</h2>
+              <p class="panel-copy">Edit how you appear to customers. Pricing, publishing your schedule, your account link, and studio assignments are managed by an admin.</p>
+            </div>
+            <form id="staff-profile-form" class="stack-form intake-form">
+              <div class="intake-form-grid">
+                <label><span>Display name</span><input type="text" name="name" required minlength="2" maxlength="80" /></label>
+                <label><span>Role title</span><input type="text" name="role_title" maxlength="120" placeholder="Sound Engineer" /></label>
+              </div>
+              <label><span>Service summary</span><textarea name="description" rows="2" maxlength="500" placeholder="Live engineering, vocal coaching, and session setup support"></textarea></label>
+              <label><span>Bio</span><textarea name="bio" rows="4" maxlength="4000" placeholder="Tell customers about your experience"></textarea></label>
+              <div class="intake-form-grid">
+                <label><span>Skills</span><textarea name="skills" rows="2" placeholder="Pro Tools, Mic placement, Dialogue cleanup"></textarea></label>
+                <label><span>Talents</span><textarea name="talents" rows="2" placeholder="Vocal comping, Lighting setups"></textarea></label>
+              </div>
+              <div class="intake-form-grid">
+                <label><span>Services</span><textarea name="services" rows="2" placeholder="Recording, Mixing, Mastering"></textarea></label>
+                <label><span>Service types</span><textarea name="service_types" rows="2" placeholder="recording, podcast, video"></textarea></label>
+              </div>
+              <p class="field-help">Separate skills, talents, services, and service types with commas.</p>
+              <label><span>Portfolio URL <span class="intake-optional">(optional)</span></span><input type="url" name="portfolio_url" maxlength="500" placeholder="https://" /></label>
+              <div class="intake-form-grid">
+                <label><span>Notification email <span class="intake-optional">(optional)</span></span><input type="email" name="notification_email" maxlength="120" placeholder="Where booking requests are emailed" /></label>
+                <label><span>Notification phone <span class="intake-optional">(optional)</span></span><input type="tel" name="notification_phone" maxlength="40" placeholder="For SMS booking requests" /></label>
+              </div>
+              <label class="checkbox-row"><input type="checkbox" name="notify_by_email" /><span>Notify me by email</span></label>
+              <label class="checkbox-row"><input type="checkbox" name="notify_by_sms" /><span>Notify me by SMS</span></label>
+              <label><span>Profile photo</span><input id="staff-profile-photo-file" type="file" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp" /></label>
+              <input id="staff-profile-photo-url" type="hidden" name="photo_url" />
+              <div id="staff-profile-photo-preview" class="staff-photo-preview empty-state">Upload a JPG photo to show on your public profile.</div>
+              <p class="field-help">JPG, PNG, WebP, or HEIC. Maximum 20 MB.</p>
+              <p id="staff-profile-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
+              <div class="hero-actions"><button class="primary-button" type="submit">Save profile</button></div>
+            </form>
+          </section>
+
+          <section class="panel panel-wide">
+            <div class="panel-header">
               <p class="panel-kicker">Requests</p>
               <h2>Booking requests</h2>
               <p class="panel-copy">Accept or decline sessions clients have requested with you.</p>

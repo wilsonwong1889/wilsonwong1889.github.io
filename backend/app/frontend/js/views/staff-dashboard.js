@@ -33,6 +33,60 @@ function escapeHtml(value) {
   ));
 }
 
+function setProfileFeedback(message, type) {
+  const node = el("staff-profile-feedback");
+  if (!node) return;
+  if (!message) {
+    node.textContent = "";
+    node.classList.add("hidden");
+    node.classList.remove("is-error", "is-success");
+    return;
+  }
+  node.textContent = message;
+  node.classList.remove("hidden", "is-error", "is-success");
+  node.classList.add(type === "error" ? "is-error" : "is-success");
+}
+
+function parseList(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function setProfilePhotoPreview(photoUrl) {
+  const node = el("staff-profile-photo-preview");
+  if (!node) return;
+  if (photoUrl) {
+    node.innerHTML = `<img src="${escapeHtml(photoUrl)}" alt="Profile photo" />`;
+    node.classList.remove("empty-state");
+  } else {
+    node.textContent = "Upload a JPG photo to show on your public profile.";
+    node.classList.add("empty-state");
+  }
+}
+
+function populateProfileForm(profile) {
+  const form = el("staff-profile-form");
+  if (!form) return;
+  form.elements.name.value = profile.name || "";
+  form.elements.role_title.value = profile.role_title || "";
+  form.elements.description.value = profile.description || "";
+  form.elements.bio.value = profile.bio || "";
+  form.elements.skills.value = (profile.skills || []).join(", ");
+  form.elements.talents.value = (profile.talents || []).join(", ");
+  form.elements.services.value = (profile.services || []).join(", ");
+  form.elements.service_types.value = (profile.service_types || []).join(", ");
+  form.elements.portfolio_url.value = profile.portfolio_url || "";
+  form.elements.notification_email.value = profile.notification_email || "";
+  form.elements.notification_phone.value = profile.notification_phone || "";
+  form.elements.notify_by_email.checked = profile.notify_by_email !== false;
+  form.elements.notify_by_sms.checked = Boolean(profile.notify_by_sms);
+  const photoUrlField = el("staff-profile-photo-url");
+  if (photoUrlField) photoUrlField.value = profile.photo_url || "";
+  setProfilePhotoPreview(profile.photo_url);
+}
+
 async function renderRequests() {
   const list = el("staff-requests-list");
   if (!list) return;
@@ -144,11 +198,51 @@ async function loadDashboard() {
       ? "Your schedule is published — customers can request to book you."
       : "Set your availability and respond to requests. An admin publishes your schedule to make it public.";
   }
+  populateProfileForm(profile);
   await Promise.all([renderRequests(), renderRules(), renderExceptions()]);
 }
 
 export function initStaffDashboardView() {
   if (CURRENT_PAGE !== "staff-dashboard") return;
+
+  el("staff-profile-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    setProfileFeedback(null);
+    try {
+      let photoUrl = el("staff-profile-photo-url")?.value || null;
+      const file = el("staff-profile-photo-file")?.files?.[0];
+      if (file) {
+        const upload = await api.uploadMyStaffPhoto(file);
+        photoUrl = upload.photo_url;
+      }
+      const payload = {
+        name: form.elements.name.value.trim(),
+        role_title: form.elements.role_title.value.trim() || null,
+        description: form.elements.description.value.trim() || null,
+        bio: form.elements.bio.value.trim() || null,
+        skills: parseList(form.elements.skills.value),
+        talents: parseList(form.elements.talents.value),
+        services: parseList(form.elements.services.value),
+        service_types: parseList(form.elements.service_types.value),
+        portfolio_url: form.elements.portfolio_url.value.trim() || null,
+        notification_email: form.elements.notification_email.value.trim() || null,
+        notification_phone: form.elements.notification_phone.value.trim() || null,
+        notify_by_email: form.elements.notify_by_email.checked,
+        notify_by_sms: form.elements.notify_by_sms.checked,
+        photo_url: photoUrl,
+      };
+      const updated = await api.updateMyStaffProfile(payload);
+      populateProfileForm(updated);
+      const fileField = el("staff-profile-photo-file");
+      if (fileField) fileField.value = "";
+      const title = el("staff-dashboard-title");
+      if (title) title.textContent = `${updated.name}'s dashboard`;
+      setProfileFeedback("Profile saved.", "success");
+    } catch (error) {
+      setProfileFeedback(error?.message || "Could not save your profile.", "error");
+    }
+  });
 
   el("staff-rule-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();

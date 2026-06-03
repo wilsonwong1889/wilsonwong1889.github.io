@@ -127,6 +127,71 @@ class StaffPortalTest(BaseAppTest):
         )
         self.assertEqual(resp.status_code, 404, resp.text)
 
+    def test_07_staff_edit_own_profile(self) -> None:
+        admin = self._admin_headers()
+        self._linked_staff(admin, "Editable Engineer", "edit@example.com")
+        headers = self._login("edit@example.com")
+
+        resp = self.client.put(
+            "/api/staff/me",
+            json={
+                "name": "Editable Engineer Renamed",
+                "role_title": "Senior Engineer",
+                "bio": "20 years behind the board.",
+                "skills": ["Pro Tools", "Mixing"],
+                "notify_by_sms": True,
+            },
+            headers=headers,
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        body = resp.json()
+        self.assertEqual(body["name"], "Editable Engineer Renamed")
+        self.assertEqual(body["role_title"], "Senior Engineer")
+        self.assertEqual(body["skills"], ["Pro Tools", "Mixing"])
+        self.assertTrue(body["notify_by_sms"])
+        # Admin-only fields untouched (rate set to 6000 by _linked_staff).
+        self.assertEqual(body["booking_rate_cents"], 6000)
+
+    def test_08_staff_cannot_edit_admin_only_fields(self) -> None:
+        admin = self._admin_headers()
+        staff_id = self._linked_staff(admin, "Locked Engineer", "locked@example.com")
+        headers = self._login("locked@example.com")
+
+        for forbidden in [
+            {"booking_rate_cents": 1},
+            {"schedule_published": False},
+            {"linked_user_email": "someone-else@example.com"},
+            {"active": False},
+            {"booking_requires_approval": False},
+        ]:
+            resp = self.client.put("/api/staff/me", json={"name": "Locked Engineer", **forbidden}, headers=headers)
+            self.assertEqual(resp.status_code, 422, f"{forbidden} -> {resp.status_code}: {resp.text}")
+
+        # Confirm nothing changed via admin read.
+        current = next(p for p in self.client.get("/api/admin/staff", headers=admin).json() if p["id"] == staff_id)
+        self.assertEqual(current["booking_rate_cents"], 6000)
+        self.assertTrue(current["schedule_published"])
+        self.assertTrue(current["active"])
+
+    def test_09_staff_upload_own_photo(self) -> None:
+        import io
+
+        from PIL import Image
+
+        admin = self._admin_headers()
+        self._linked_staff(admin, "Photo Engineer", "photo@example.com")
+        headers = self._login("photo@example.com")
+
+        buf = io.BytesIO()
+        Image.new("RGB", (8, 8), (120, 80, 200)).save(buf, format="PNG")
+        resp = self.client.post(
+            "/api/staff/me/photo",
+            files={"photo": ("me.png", buf.getvalue(), "image/png")},
+            headers=headers,
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertTrue(resp.json()["photo_url"].startswith("/assets/media/staff/"))
+
     def test_06_admin_aggregate_schedule(self) -> None:
         from datetime import datetime, timedelta, timezone
 
