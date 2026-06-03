@@ -24,14 +24,35 @@ async function request(path, options = {}) {
     : await response.text();
 
   if (!response.ok) {
-    const detail =
-      typeof data === "object" && data !== null && "detail" in data
-        ? data.detail
-        : "Request failed";
-    throw new Error(detail);
+    throw new Error(extractErrorMessage(data));
   }
 
   return data;
+}
+
+// Turn a FastAPI error body into a human-readable string. `detail` may be a
+// plain string (HTTPException), a list of validation errors (422), or absent.
+function extractErrorMessage(data) {
+  const detail =
+    typeof data === "object" && data !== null && "detail" in data
+      ? data.detail
+      : data;
+
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (item && typeof item === "object" ? item.msg : item))
+      .filter(Boolean);
+    if (messages.length) {
+      return messages.join("; ");
+    }
+  }
+  if (detail && typeof detail === "object" && typeof detail.msg === "string") {
+    return detail.msg;
+  }
+  return "Request failed";
 }
 
 export const api = {
