@@ -19,19 +19,22 @@ class FifthHourFreeUnitTest(BaseAppTest):
         self.assertEqual(billable_room_minutes(300), 240)
 
     def test_incentive_applies_to_room_time_only(self) -> None:
-        from app.services.booking_service import calculate_booking_total_cents, calculate_price_cents
-        from app.staffing import staff_add_on_total_cents
+        from app.services.booking_service import (
+            calculate_booking_total_cents,
+            calculate_price_cents,
+            staff_room_addon_total_cents,
+        )
 
         # Room-only: a 5h booking at $100/hr is billed as 4 room hours.
         self.assertEqual(calculate_booking_total_cents(10000, 300, []), 40000)
 
-        # With a staff add-on, the room is still discounted to 4h and the staff
-        # add-on is charged in full (independent of the free hour).
+        # With a staff add-on, the room is still discounted to 4h while each staff
+        # member is charged a flat $25/hr over the full 5h (no free-hour credit).
         assignments = [{"id": "eng-1", "name": "Engineer", "add_on_price_cents": 5000}]
-        self.assertEqual(staff_add_on_total_cents(assignments), 5000)
+        self.assertEqual(staff_room_addon_total_cents(assignments, 300), 12500)
         total = calculate_booking_total_cents(10000, 300, assignments)
-        self.assertEqual(total, calculate_price_cents(10000, 240) + 5000)
-        self.assertEqual(total, 45000)
+        self.assertEqual(total, calculate_price_cents(10000, 240) + 12500)
+        self.assertEqual(total, 52500)
 
 
 class FifthHourFreeBookingTest(BaseAppTest):

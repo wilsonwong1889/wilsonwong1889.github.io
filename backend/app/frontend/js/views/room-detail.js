@@ -36,14 +36,14 @@ function formatCategoryLabel(room) {
 
 function getReviewTrustCopy(summary) {
   if (!summary || !summary.review_count) {
-    return ["Reviews pending", "Free cancellation up to 24h before", "Plan to arrive 10-15 min early"];
+    return ["Reviews pending", "Deposits are non-refundable", "Plan to arrive 10-15 min early"];
   }
 
   const averageLabel =
     typeof summary.average_rating === "number" ? summary.average_rating.toFixed(1) : summary.average_rating;
   return [
     `${summary.review_count} review${summary.review_count === 1 ? "" : "s"} · ${averageLabel}/5 average`,
-    "Free cancellation up to 24h before",
+    "Deposits are non-refundable",
     "Plan to arrive 10-15 min early",
   ];
 }
@@ -147,7 +147,7 @@ function renderRoomStaffList(room) {
                   <span>${escapeHtml(role.description || "Available as an optional add-on for this room.")}</span>
                 </div>
               </div>
-              <strong class="staff-option-price">${formatCurrency(role.add_on_price_cents)} add-on</strong>
+              <strong class="staff-option-price">$25/hr add-on</strong>
               <div class="staff-option-copy">
                 ${renderTagGroup("Skills", role.skills || [])}
                 ${renderTagGroup("Talents", role.talents || [])}

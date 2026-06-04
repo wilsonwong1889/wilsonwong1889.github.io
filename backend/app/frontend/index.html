@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>BIPOC Digital Media &amp; Creative Innovation Hub</title>
-    <link rel="stylesheet" href="/assets/styles/app.css?v=20260520c" />
+    <link rel="stylesheet" href="/assets/styles/app.css?v=20260604m" />
   </head>
   <body data-page="home">
     <div class="site-frame site-frame-home">
@@ -47,6 +47,7 @@
               <div id="header-user-menu" class="header-user-menu hidden" role="menu" aria-label="Account menu">
                 <a id="header-profile-link" class="header-user-menu-item is-primary" href="/account" role="menuitem">My Profile</a>
                 <a id="header-bookings-link" class="header-user-menu-item" href="/bookings" role="menuitem">My Bookings</a>
+                <a id="header-staff-link" class="header-user-menu-item hidden" href="/staff-dashboard" role="menuitem">Staff dashboard</a>
                 <a id="header-admin-link" class="header-user-menu-item hidden" href="/admin" role="menuitem">Admin</a>
                 <button id="header-logout-button" class="header-user-menu-item header-user-menu-signout" type="button" role="menuitem">Sign Out</button>
               </div>
@@ -57,10 +58,10 @@
       <header class="site-header site-header-simple site-header-public">
         <div class="site-header-brand-row">
           <div class="header-brand-block">
-            <img class="header-am-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" />
+            <a class="header-logo-link header-am-logo-link" href="https://www.instagram.com/artsmarvels/" target="_blank" rel="noreferrer" aria-label="Open Arts Marvels on Instagram"><img class="header-am-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" /></a>
           </div>
           <a class="header-hub-title" href="/">BIPOC Digital Media &amp; Creative Innovation Hub</a>
-          <img class="header-bipoc-side-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" />
+          <a class="header-logo-link header-bipoc-logo-link" href="https://bipocfoundation.org/" target="_blank" rel="noreferrer" aria-label="Open BIPOC Foundation website"><img class="header-bipoc-side-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" /></a>
           <button id="mobile-nav-toggle" class="mobile-nav-toggle" type="button" aria-label="Toggle navigation" aria-expanded="false" aria-controls="site-nav">
             <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="6" x2="19" y2="6"/><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="16" x2="19" y2="16"/></svg>
           </button>
@@ -113,15 +114,14 @@
               </div>
               <div class="home-hero-overlay home-hero-overlay-primary"></div>
               <div class="home-collab-badge home-collab-badge-left" aria-label="Arts Marvels">
-                <img class="home-collab-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" />
-                <a class="home-collab-learn" data-am-learn-more href="https://www.instagram.com/artsmarvels/" target="_blank" rel="noreferrer">Learn more</a>
+                <a class="home-collab-logo-link" data-am-learn-more href="https://www.instagram.com/artsmarvels/" target="_blank" rel="noreferrer" aria-label="Open Arts Marvels on Instagram">
+                  <img class="home-collab-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" />
+                </a>
               </div>
               <div class="home-collab-badge home-collab-badge-right" aria-label="BIPOC Foundation">
-                <span class="home-collab-partner">
-                  <strong class="home-collab-bipoc">bipoc</strong>
-                  <span class="home-collab-foundation">foundation</span>
-                </span>
-                <a class="home-collab-learn" href="https://bipocfoundation.org" target="_blank" rel="noreferrer">Learn more</a>
+                <a class="home-collab-logo-link" href="https://bipocfoundation.org/" target="_blank" rel="noreferrer" aria-label="Open BIPOC Foundation website">
+                  <img class="home-collab-logo home-collab-bipoc-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" />
+                </a>
               </div>
               <div class="home-hero-stage">
                 <div class="home-carousel-controls">
@@ -164,7 +164,7 @@
             <a class="ghost-button ghost-link" href="/faq">Read Help</a>
             <!-- Surfaced on mobile so the partner "Learn more" links stay reachable when the carousel badges shrink. -->
             <a class="ghost-button ghost-link home-partner-learn" data-am-learn-more href="https://www.instagram.com/artsmarvels/" target="_blank" rel="noreferrer">About Arts Marvels</a>
-            <a class="ghost-button ghost-link home-partner-learn" href="https://bipocfoundation.org" target="_blank" rel="noreferrer">About BIPOC Foundation</a>
+            <a class="ghost-button ghost-link home-partner-learn" href="https://bipocfoundation.org/" target="_blank" rel="noreferrer">About BIPOC Foundation</a>
           </div>
         </section>
 
@@ -177,7 +177,10 @@
             </p>
             <div class="home-initiative-lockup">
               <span class="home-initiative-label">This initiative is in partnership with</span>
-              <img class="home-initiative-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" />
+              <a class="home-initiative-logo-link" href="https://bipocfoundation.org/" target="_blank" rel="noreferrer" aria-label="Open BIPOC Foundation website">
+                <img class="home-initiative-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" />
+              </a>
+              <a class="ghost-button ghost-link home-initiative-learn" href="https://bipocfoundation.org/" target="_blank" rel="noreferrer">Learn more</a>
             </div>
           </div>
           <div class="panel-header">
@@ -186,14 +189,20 @@
           </div>
           <div class="home-collab-grid">
             <div class="home-collab-org-card">
-              <img src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" class="home-collab-org-logo" />
+              <a class="home-collab-org-logo-link" data-am-learn-more href="https://www.instagram.com/artsmarvels/" target="_blank" rel="noreferrer" aria-label="Open Arts Marvels on Instagram">
+                <img src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" class="home-collab-org-logo" />
+              </a>
               <span class="role-pill">Creative Operations</span>
               <p>Arts Marvels leads the creative direction, production expertise, and day-to-day studio operations — bringing professional media production to the community.</p>
+              <a class="ghost-button ghost-link home-collab-card-link" data-am-learn-more href="https://www.instagram.com/artsmarvels/" target="_blank" rel="noreferrer">Learn more</a>
             </div>
             <div class="home-collab-org-card">
-              <img src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" class="home-collab-org-logo" />
+              <a class="home-collab-org-logo-link" href="https://bipocfoundation.org/" target="_blank" rel="noreferrer" aria-label="Open BIPOC Foundation website">
+                <img src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" class="home-collab-org-logo" />
+              </a>
               <span class="role-pill">Community &amp; Funding</span>
               <p>BIPOC Foundation provides the space, funding, and community mission — making professional creative infrastructure accessible to BIPOC communities in Western Canada.</p>
+              <a class="ghost-button ghost-link home-collab-card-link" href="https://bipocfoundation.org/" target="_blank" rel="noreferrer">Learn more</a>
             </div>
           </div>
           <p class="home-collab-tagline">Professional tools. Community access. One space.</p>
@@ -314,9 +323,9 @@
         <div class="studio-footer-grid">
           <div class="studio-footer-brand">
             <div class="studio-footer-collab-lockup">
-              <img class="studio-footer-collab-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" />
+              <a class="studio-footer-logo-link" href="https://www.instagram.com/artsmarvels/" target="_blank" rel="noreferrer" aria-label="Open Arts Marvels on Instagram"><img class="studio-footer-collab-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" /></a>
               <span class="studio-footer-collab-x">×</span>
-              <img class="studio-footer-collab-logo studio-footer-bipoc-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" />
+              <a class="studio-footer-logo-link" href="https://bipocfoundation.org/" target="_blank" rel="noreferrer" aria-label="Open BIPOC Foundation website"><img class="studio-footer-collab-logo studio-footer-bipoc-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" /></a>
             </div>
             <p class="studio-footer-collab-label">BIPOC Digital Media & Creative Innovation Hub</p>
             <p>A community-first creative studio in Lethbridge, powered by Arts Marvels and supported by BIPOC Foundation.</p>

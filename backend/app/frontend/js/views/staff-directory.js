@@ -120,8 +120,9 @@ function getStaffRateCents(profile) {
 }
 
 function getStaffRateLabel(profile) {
-  const rate = getStaffRateCents(profile);
-  return rate ? `${formatCurrency(rate)} / hr` : "Rate on request";
+  // Booking a staff member on their own is free — it is sent as a request and
+  // confirmed at no charge. (Staff added to a room booking are charged there.)
+  return "Free · request to book";
 }
 
 function getStaffRating(profile) {
@@ -387,8 +388,8 @@ function getStaffPromoInputValue() {
 }
 
 function getEstimatedStaffTotal(profile, durationMinutes = getSelectedDurationMinutes()) {
-  const rateCents = profile ? getStaffRateCents(profile) : 0;
-  return Math.round((rateCents * durationMinutes) / 60);
+  // Direct staff bookings are free requests — no charge.
+  return 0;
 }
 
 function getStaffPromoSelectionKey(profile, durationMinutes, amountCents) {
@@ -886,11 +887,11 @@ function renderSummary(profile) {
     durationNode.textContent = formatDuration(durationMinutes);
   }
   if (totalNode) {
-    totalNode.textContent = formatCurrency(checkoutTotal);
+    totalNode.textContent = "Free";
   }
   if (submitButton) {
     submitButton.disabled = !formReady;
-    submitButton.textContent = formReady ? `Continue to checkout ${formatCurrency(checkoutTotal)}` : "Continue to checkout";
+    submitButton.textContent = formReady ? "Send booking request" : "Send booking request";
   }
 }
 

@@ -9,13 +9,14 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, or_
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.core.security import create_access_token, hash_password
-from app.models.booking import AuditLog, Booking, BookingSlot, NotificationLog, Refund, Review
+from app.models.booking import AuditLog, Booking, BookingSlot, BookingStaffAssignment, NotificationLog, Refund, Review
 from app.models.room import Room
+from app.models.staff_booking import StaffBooking
 from app.models.staff_profile import StaffProfile
 from app.models.user import User
 from app.roles import user_has_admin_access
@@ -45,6 +46,9 @@ from app.services.reservation_service import ReservationHold, create_hold, relea
 
 # Wednesday=2, Thursday=3, Friday=4, Saturday=5 (Python weekday() values)
 BOOKING_OPEN_WEEKDAYS = frozenset({2, 3, 4, 5})
+ACTIVE_BOOKING_STATUSES = ("PendingPayment", "Paid", "Completed")
+ACTIVE_STAFF_BOOKING_STATUSES = ("Requested", "AcceptedPendingPayment", "PendingPayment", "Paid", "Completed")
+BOOKABLE_ROOM_STATUS = "available"
 
 AMBIGUOUS_CHARACTERS = {"0", "1", "I", "O"}
 BOOKING_CODE_ALPHABET = "".join(
@@ -74,6 +78,14 @@ class StaffSelectionError(Exception):
 
 class StaffAvailabilityError(Exception):
     pass
+
+
+BOOKING_CONFLICT_PG_CODES = {"23P01", "40P01", "40001"}
+
+
+def is_database_booking_conflict(exc: Exception) -> bool:
+    pgcode = getattr(getattr(exc, "orig", None), "pgcode", None)
+    return isinstance(exc, IntegrityError) or pgcode in BOOKING_CONFLICT_PG_CODES
 
 
 def get_business_timezone() -> ZoneInfo:
@@ -156,6 +168,18 @@ def billable_room_minutes(duration_minutes: int) -> int:
     return duration_minutes - free_room_minutes(duration_minutes)
 
 
+def staff_room_addon_per_staff_cents(duration_minutes: int) -> int:
+    """A staff member added to a room booking costs a flat $25/hour each
+    (settings.STAFF_ROOM_ADDON_HOURLY_CENTS), unaffected by the 5th-hour-free
+    room credit."""
+    return calculate_price_cents(settings.STAFF_ROOM_ADDON_HOURLY_CENTS, duration_minutes)
+
+
+def staff_room_addon_total_cents(staff_assignments: list[dict], duration_minutes: int) -> int:
+    count = len(normalize_staff_roles(staff_assignments))
+    return count * staff_room_addon_per_staff_cents(duration_minutes)
+
+
 def calculate_booking_total_cents(
     hourly_rate_cents: int,
     duration_minutes: int,
@@ -163,7 +187,7 @@ def calculate_booking_total_cents(
 ) -> int:
     return calculate_price_cents(
         hourly_rate_cents, billable_room_minutes(duration_minutes)
-    ) + staff_add_on_total_cents(staff_assignments)
+    ) + staff_room_addon_total_cents(staff_assignments, duration_minutes)
 
 
 def calculate_tax_cents(subtotal_cents: int) -> int:
@@ -333,11 +357,28 @@ def ensure_staff_assignments_available(
     if not selected_ids:
         return
 
+    assignment_guards = (
+        db.query(BookingStaffAssignment)
+        .filter(BookingStaffAssignment.staff_key.in_(selected_ids))
+        .filter(BookingStaffAssignment.start_time < end_time)
+        .filter(BookingStaffAssignment.end_time > start_time)
+    )
+    if exclude_booking_id:
+        assignment_guards = assignment_guards.filter(BookingStaffAssignment.booking_id != exclude_booking_id)
+
+    conflicts = {
+        guard.staff_key: guard.staff_name or guard.staff_key
+        for guard in assignment_guards.all()
+    }
+    if conflicts:
+        names = ", ".join(sorted(conflicts.values()))
+        raise StaffAvailabilityError(f"Selected staff already booked for this time: {names}")
+
     overlapping_bookings = (
         db.query(Booking)
         .filter(Booking.start_time < end_time)
         .filter(Booking.end_time > start_time)
-        .filter(Booking.status.in_(("PendingPayment", "Paid", "Completed")))
+        .filter(Booking.status.in_(ACTIVE_BOOKING_STATUSES))
     )
     if exclude_booking_id:
         overlapping_bookings = overlapping_bookings.filter(Booking.id != exclude_booking_id)
@@ -355,6 +396,30 @@ def ensure_staff_assignments_available(
         raise StaffAvailabilityError(f"Selected staff already booked for this time: {names}")
 
 
+def sync_booking_staff_assignment_guards(db: Session, booking: Booking) -> None:
+    db.query(BookingStaffAssignment).filter(BookingStaffAssignment.booking_id == booking.id).delete()
+    if booking.status not in ACTIVE_BOOKING_STATUSES:
+        return
+
+    guards = []
+    for assignment in normalize_staff_roles(booking.staff_assignments):
+        staff_key = str(assignment.get("id") or "").strip()
+        if not staff_key:
+            continue
+        guards.append(
+            BookingStaffAssignment(
+                booking_id=booking.id,
+                room_id=booking.room_id,
+                staff_key=staff_key,
+                staff_name=assignment.get("name") or staff_key,
+                start_time=booking.start_time,
+                end_time=booking.end_time,
+            )
+        )
+    if guards:
+        db.add_all(guards)
+
+
 def generate_payment_intent_stub() -> str:
     return f"pi_stub_{uuid4().hex[:18]}"
 
@@ -363,10 +428,36 @@ def build_reservation_slot_keys(room_id, slot_starts: list[datetime]) -> list[st
     return [f"room:{room_id}:slot:{slot_start.isoformat()}" for slot_start in slot_starts]
 
 
+def ensure_room_slots_available(
+    db: Session,
+    room_id,
+    slot_starts: list[datetime],
+    *,
+    exclude_booking_id=None,
+) -> None:
+    if not slot_starts:
+        return
+    query = (
+        db.query(BookingSlot)
+        .filter(BookingSlot.room_id == room_id)
+        .filter(BookingSlot.slot_start.in_(slot_starts))
+    )
+    if exclude_booking_id:
+        query = query.filter(BookingSlot.booking_id != exclude_booking_id)
+    if query.first():
+        raise BookingConflictError("Selected time is no longer available")
+
+
+def is_room_bookable(room: Room) -> bool:
+    return bool(room.active) and not bool(room.coming_soon) and (room.status or BOOKABLE_ROOM_STATUS) == BOOKABLE_ROOM_STATUS
+
+
 def get_room_or_404(db: Session, room_id, include_inactive: bool = False) -> Room:
     room = db.query(Room).filter(Room.id == room_id).first()
-    if not room or (not room.active and not include_inactive):
+    if not room:
         raise ValueError("Room not found")
+    if not include_inactive and not is_room_bookable(room):
+        raise ValueError("Room is not available for booking")
     return room
 
 
@@ -468,21 +559,35 @@ def ensure_single_booking_per_day(
     new_duration_minutes: int = 60,
     *,
     exclude_booking_id=None,
+    exclude_staff_booking_id=None,
 ) -> None:
     business_timezone = get_business_timezone()
     local_booking_date = booking_start.astimezone(business_timezone).date()
     utc_start, utc_end = get_day_bounds(local_booking_date)
 
-    query = (
+    room_minutes_query = (
         db.query(func.coalesce(func.sum(Booking.duration_minutes), 0))
         .filter(Booking.user_id == user.id)
         .filter(Booking.start_time >= utc_start)
         .filter(Booking.start_time < utc_end)
-        .filter(Booking.status.in_(("PendingPayment", "Paid", "Completed")))
+        .filter(Booking.status.in_(ACTIVE_BOOKING_STATUSES))
     )
     if exclude_booking_id:
-        query = query.filter(Booking.id != exclude_booking_id)
-    existing_minutes = query.scalar() or 0
+        room_minutes_query = room_minutes_query.filter(Booking.id != exclude_booking_id)
+    room_minutes = room_minutes_query.scalar() or 0
+
+    staff_minutes_query = (
+        db.query(func.coalesce(func.sum(StaffBooking.duration_minutes), 0))
+        .filter(StaffBooking.user_id == user.id)
+        .filter(StaffBooking.start_time >= utc_start)
+        .filter(StaffBooking.start_time < utc_end)
+        .filter(StaffBooking.status.in_(ACTIVE_STAFF_BOOKING_STATUSES))
+    )
+    if exclude_staff_booking_id:
+        staff_minutes_query = staff_minutes_query.filter(StaffBooking.id != exclude_staff_booking_id)
+    staff_minutes = staff_minutes_query.scalar() or 0
+
+    existing_minutes = room_minutes + staff_minutes
 
     if existing_minutes + new_duration_minutes > DAILY_HOUR_LIMIT * 60:
         hours_used = existing_minutes // 60
@@ -575,6 +680,11 @@ def _create_booking_record(
     except ValueError as exc:
         raise StaffSelectionError(str(exc)) from exc
     ensure_staff_assignments_available(db, staff_assignments, normalized_start, end_time)
+    # Each staff member added to a room costs a flat $25/hour. Stamp the snapshot
+    # so the stored assignment and every price display reflect the real charge.
+    addon_per_staff_cents = staff_room_addon_per_staff_cents(duration_minutes)
+    for assignment in staff_assignments:
+        assignment["add_on_price_cents"] = addon_per_staff_cents
     original_price_cents = calculate_booking_total_cents(
         room.hourly_rate_cents,
         duration_minutes,
@@ -618,15 +728,6 @@ def _create_booking_record(
     try:
         db.add(booking)
         db.flush()
-        if status == "PendingPayment":
-            payment_intent = create_payment_intent(
-                amount_cents=booking.price_cents,
-                currency=booking.currency,
-                booking_id=str(booking.id),
-                user_email=user.email,
-            )
-            booking.payment_intent_id = payment_intent.intent_id
-            booking.payment_client_secret = payment_intent.client_secret
         db.add_all(
             [
                 BookingSlot(
@@ -637,9 +738,22 @@ def _create_booking_record(
                 for slot_start in slot_starts
             ]
         )
+        sync_booking_staff_assignment_guards(db, booking)
+        db.flush()
+        if status == "PendingPayment":
+            payment_intent = create_payment_intent(
+                amount_cents=booking.price_cents,
+                currency=booking.currency,
+                booking_id=str(booking.id),
+                user_email=user.email,
+            )
+            booking.payment_intent_id = payment_intent.intent_id
+            booking.payment_client_secret = payment_intent.client_secret
         db.commit()
-    except IntegrityError as exc:
+    except (IntegrityError, OperationalError) as exc:
         db.rollback()
+        if not is_database_booking_conflict(exc):
+            raise
         raise BookingConflictError("Selected time is no longer available") from exc
     except PaymentBackendError:
         db.rollback()
@@ -687,6 +801,7 @@ def create_reservation_hold(db: Session, room_id, start_time: datetime, duration
     end_time = normalized_start + timedelta(minutes=duration_minutes)
     validate_booking_window(normalized_start, end_time)
     slot_starts = build_slot_starts(normalized_start, duration_minutes)
+    ensure_room_slots_available(db, room.id, slot_starts)
     return create_hold(build_reservation_slot_keys(room_id, slot_starts))
 
 
@@ -715,7 +830,16 @@ def get_monthly_availability_summary(db: Session, month: str) -> dict:
     now = datetime.now(timezone.utc)
     business_tz = get_business_timezone()
 
-    active_room_ids = [r[0] for r in db.query(Room.id).filter(Room.active == True).all()]
+    active_room_ids = [
+        r[0]
+        for r in (
+            db.query(Room.id)
+            .filter(Room.active.is_(True))
+            .filter(Room.coming_soon.is_(False))
+            .filter(Room.status == BOOKABLE_ROOM_STATUS)
+            .all()
+        )
+    ]
     total_rooms = len(active_room_ids)
 
     # Slots per room per day: one per bookable hour (only on-the-hour starts count)
@@ -902,6 +1026,7 @@ def create_manual_booking(db: Session, admin: User, payload: ManualBookingCreate
 
 def release_booking_slots(db: Session, booking_id) -> None:
     db.query(BookingSlot).filter(BookingSlot.booking_id == booking_id).delete()
+    db.query(BookingStaffAssignment).filter(BookingStaffAssignment.booking_id == booking_id).delete()
 
 
 def create_notification_log(
@@ -1009,18 +1134,26 @@ def reschedule_booking(
         raise ValueError("This payment window expired. Create a new booking instead.")
 
     room = get_room_or_404(db, booking.room_id, include_inactive=True)
+    if not is_room_bookable(room):
+        raise ValueError("Room is not available for booking")
     normalized_start = normalize_booking_start(payload.start_time)
     if normalized_start == booking.start_time:
         raise ValueError("Choose a different start time to reschedule")
     ensure_booking_start_not_in_past(normalized_start)
 
-    ensure_single_booking_per_day(
-        db,
-        actor,
-        normalized_start,
-        booking.duration_minutes,
-        exclude_booking_id=booking.id,
-    )
+    limit_user = actor
+    if booking.user_id and booking.user_id != actor.id:
+        owner = db.query(User).filter(User.id == booking.user_id).first()
+        if owner:
+            limit_user = owner
+    if not user_has_admin_access(limit_user):
+        ensure_single_booking_per_day(
+            db,
+            limit_user,
+            normalized_start,
+            booking.duration_minutes,
+            exclude_booking_id=booking.id,
+        )
     end_time = normalized_start + timedelta(minutes=booking.duration_minutes)
     validate_booking_window(normalized_start, end_time)
     ensure_room_duration_allowed(room, booking.duration_minutes)
@@ -1047,6 +1180,7 @@ def reschedule_booking(
                 for slot_start in slot_starts
             ]
         )
+        sync_booking_staff_assignment_guards(db, booking)
         create_audit_log(
             db,
             actor_id=actor.id,
@@ -1073,8 +1207,10 @@ def reschedule_booking(
             },
         )
         db.commit()
-    except IntegrityError as exc:
+    except (IntegrityError, OperationalError) as exc:
         db.rollback()
+        if not is_database_booking_conflict(exc):
+            raise
         raise BookingConflictError("Selected time is no longer available") from exc
 
     db.refresh(booking)
@@ -1112,17 +1248,23 @@ def process_refund(db: Session, booking_id: str, admin: User, payload: RefundCre
         stripe_refund_id=stripe_refund_id,
         reason=payload.reason,
     )
-    booking.status = "Refunded"
-    booking.cancelled_at = booking.cancelled_at or datetime.now(timezone.utc)
-    booking.cancellation_reason = booking.cancellation_reason or payload.reason
-    release_booking_slots(db, booking.id)
+    full_refund = booking.status == "Cancelled" or payload.amount_cents == booking.price_cents
+    if full_refund:
+        booking.status = "Refunded"
+        booking.cancelled_at = booking.cancelled_at or datetime.now(timezone.utc)
+        booking.cancellation_reason = booking.cancellation_reason or payload.reason
+        release_booking_slots(db, booking.id)
     db.add(refund)
     create_audit_log(
         db,
         actor_id=admin.id,
         booking_id=booking.id,
         action="refund_processed",
-        details={"amount_cents": payload.amount_cents, "reason": payload.reason},
+        details={
+            "amount_cents": payload.amount_cents,
+            "reason": payload.reason,
+            "full_refund": full_refund,
+        },
     )
     notification_details = {
         "amount_cents": payload.amount_cents,
@@ -1948,14 +2090,29 @@ def handle_payment_webhook_event(db: Session, event: dict) -> dict:
         return {"received": True, "booking_id": str(booking.id), "status": booking.status}
 
     if event_type == "charge.refunded":
-        booking.status = "Refunded"
-        release_booking_slots(db, booking.id)
+        amount_refunded = data_object.get("amount_refunded")
+        charge_amount = data_object.get("amount")
+        full_refund = (
+            booking.status == "Cancelled"
+            or amount_refunded is None
+            or charge_amount is None
+            or int(amount_refunded) >= int(charge_amount)
+            or int(amount_refunded) >= int(booking.price_cents or 0)
+        )
+        if full_refund:
+            booking.status = "Refunded"
+            release_booking_slots(db, booking.id)
         create_audit_log(
             db,
             actor_id=None,
             booking_id=booking.id,
             action="charge_refunded",
-            details={"payment_intent_id": payment_intent_id},
+            details={
+                "payment_intent_id": payment_intent_id,
+                "amount_refunded": amount_refunded,
+                "charge_amount": charge_amount,
+                "full_refund": full_refund,
+            },
         )
         db.commit()
         return {"received": True, "booking_id": str(booking.id), "status": booking.status}

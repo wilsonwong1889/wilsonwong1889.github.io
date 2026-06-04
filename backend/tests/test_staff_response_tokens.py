@@ -37,7 +37,7 @@ class StaffResponseTokenTest(BaseAppTest):
         admin = self._admin_headers()
         staff = self.client.post(
             "/api/admin/staff",
-            json={"name": f"Tok Engineer {email}", "booking_rate_cents": 6000, "active": True},
+            json={"name": f"Tok Engineer {email}", "booking_rate_cents": 6000, "active": True, "schedule_published": True},
             headers=admin,
         ).json()
         start = self._future_time(day=1, hour=hour).isoformat()

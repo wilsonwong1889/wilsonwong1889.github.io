@@ -19,6 +19,7 @@ from app.routers import (
     intake,
     rooms,
     staff,
+    staff_application,
     staff_availability,
     staff_bookings,
     staff_portal,
@@ -47,6 +48,7 @@ FRONTEND_PAGES = {
     "/room": "room.html",
     "/reserve": "reserve.html",
     "/staff": "staff.html",
+    "/staff-dashboard": "staff-dashboard.html",
     "/bookings": "bookings.html",
     "/booking": "booking.html",
     "/payment-success": "payment-success.html",
@@ -93,6 +95,7 @@ app.include_router(staff_bookings.router)
 app.include_router(intake.router)
 app.include_router(staff_availability.router)
 app.include_router(staff_portal.router)
+app.include_router(staff_application.router)
 app.include_router(admin.router)
 app.include_router(webhooks.router)
 
@@ -148,6 +151,7 @@ def public_config():
         "supabase_fully_ready": supabase_status["supabase_fully_ready"],
         "app_base_url": settings.APP_BASE_URL,
         "default_currency": settings.DEFAULT_CURRENCY,
+        "staff_room_addon_hourly_cents": settings.STAFF_ROOM_ADDON_HOURLY_CENTS,
     }
 
 

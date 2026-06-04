@@ -34,8 +34,6 @@ class UserOut(BaseModel):
     city: Optional[str] = None
     opt_in_email: bool
     opt_in_sms: bool
-    two_factor_enabled: bool = False
-    two_factor_method: Optional[str] = None
     is_admin: bool
     role: str = "Customer"
     user_category: str = "general_public"
@@ -58,8 +56,6 @@ class AdminUserAccountOut(BaseModel):
     city: Optional[str] = None
     opt_in_email: bool
     opt_in_sms: bool
-    two_factor_enabled: bool = False
-    two_factor_method: Optional[str] = None
     is_admin: bool
     role: str = "Customer"
     booking_count: int = 0
@@ -80,8 +76,6 @@ class UserUpdate(BaseModel):
     emergency_contact: Optional[str] = None
     visible_minority: Optional[str] = None
     city: Optional[str] = None
-    two_factor_enabled: Optional[bool] = None
-    two_factor_method: Optional[str] = None
 
 
 class UserPasswordUpdate(BaseModel):
@@ -124,22 +118,10 @@ class AdminUserRoleUpdate(BaseModel):
 class Token(BaseModel):
     access_token: Optional[str] = None
     token_type: str = "bearer"
-    two_factor_required: bool = False
-    two_factor_token: Optional[str] = None
-    two_factor_method: Optional[str] = None
 
 
 class GoogleAuthExchangeIn(BaseModel):
     access_token: str = Field(min_length=1)
-
-
-class TwoFactorVerifyIn(BaseModel):
-    two_factor_token: str
-    code: str = Field(min_length=6, max_length=6)
-
-
-class TwoFactorResendIn(BaseModel):
-    two_factor_token: str
 
 
 class PasswordResetRequestIn(BaseModel):

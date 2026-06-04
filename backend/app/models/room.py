@@ -1,10 +1,16 @@
 import uuid
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, func
+from sqlalchemy import CheckConstraint, Column, String, Integer, Boolean, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.database import Base
 
 class Room(Base):
     __tablename__ = "rooms"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('available','in_progress','tbc')",
+            name="room_status_check",
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)

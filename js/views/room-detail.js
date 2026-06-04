@@ -36,14 +36,14 @@ function formatCategoryLabel(room) {
 
 function getReviewTrustCopy(summary) {
   if (!summary || !summary.review_count) {
-    return ["Reviews pending", "Free cancellation up to 24h before", "Plan to arrive 10-15 min early"];
+    return ["Reviews pending", "Deposits are non-refundable", "Plan to arrive 10-15 min early"];
   }
 
   const averageLabel =
     typeof summary.average_rating === "number" ? summary.average_rating.toFixed(1) : summary.average_rating;
   return [
     `${summary.review_count} review${summary.review_count === 1 ? "" : "s"} · ${averageLabel}/5 average`,
-    "Free cancellation up to 24h before",
+    "Deposits are non-refundable",
     "Plan to arrive 10-15 min early",
   ];
 }

@@ -23,6 +23,7 @@ import { initRoomBookingView, renderRoomBookingView } from "./views/room-booking
 import { initRoomDetailView, renderRoomDetailView } from "./views/room-detail.js";
 import { initRoomsView, renderRoomsView } from "./views/rooms.js";
 import { initStaffDirectoryView, renderStaffDirectoryView } from "./views/staff-directory.js";
+import { initStaffDashboardView, renderStaffDashboardView } from "./views/staff-dashboard.js";
 import { renderStatus } from "./views/status.js";
 
 const PAGE_DATA_REQUIREMENTS = {
@@ -37,6 +38,7 @@ const PAGE_DATA_REQUIREMENTS = {
   room: { rooms: false, bookings: false, admin: false, selectedRoom: true, selectedBooking: false },
   reserve: { rooms: false, bookings: false, admin: false, selectedRoom: true, selectedBooking: false },
   staff: { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: false, publicStaff: true },
+  "staff-dashboard": { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: false },
   bookings: { rooms: true, bookings: true, admin: false, selectedRoom: false, selectedBooking: false },
   booking: { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: true },
   "payment-success": { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: true },
@@ -184,6 +186,7 @@ function renderApp(currentState) {
   renderRoomDetailView(currentState);
   renderRoomsView(currentState);
   renderStaffDirectoryView(currentState);
+  renderStaffDashboardView(currentState);
 }
 
 function initRevealAnimations() {
@@ -238,6 +241,7 @@ function resetScopedData() {
       duration: 60,
       matchingRoomIds: [],
       hasSearched: false,
+      mode: "exact",
     };
     patch.showInactiveRooms = false;
   }
@@ -315,8 +319,22 @@ async function refreshBookings(message) {
       bookings: bookings.map((booking) => normalizeBookingRecord(booking)),
       message: message || "Bookings loaded.",
     });
+    void refreshActionRequiredCount();
   } catch (error) {
     setState({ message: error.message });
+  }
+}
+
+async function refreshActionRequiredCount() {
+  if (!state.token) {
+    setState({ actionRequiredCount: 0 });
+    return;
+  }
+  try {
+    const result = await api.getActionRequiredCount();
+    setState({ actionRequiredCount: Number(result?.needs_confirmation || 0) });
+  } catch (error) {
+    /* badge is best-effort — ignore fetch failures */
   }
 }
 
@@ -708,7 +726,7 @@ async function refreshSession(message) {
   resetScopedData();
 
   if (!state.token) {
-    setState({ currentUser: null, message: message || "Signed out." });
+    setState({ currentUser: null, actionRequiredCount: 0, message: message || "Signed out." });
     await loadPageData("Public view loaded.");
     return;
   }
@@ -716,6 +734,7 @@ async function refreshSession(message) {
   try {
     const currentUser = await api.getMe();
     setState({ currentUser, message: message || "Session restored." });
+    void refreshActionRequiredCount();
     await loadPageData("Session ready.");
   } catch (error) {
     persistToken(null);
@@ -798,6 +817,7 @@ initRoomBookingView();
 initRoomDetailView();
 initRoomsView({ refreshRooms });
 initStaffDirectoryView();
+initStaffDashboardView();
 
 renderApp(state);
 resetScopedData();

@@ -48,6 +48,8 @@ let reserveSubmitInFlight = false;
 let reserveHold = null; // { token, room_id, start_time, duration_minutes, expires_at }
 let reserveHoldRefreshTimer = null;
 let reserveHoldRefreshToken = 0;
+let preferredStartFromUrl = "";
+let preferredDurationFromUrl = null;
 
 function getReserveGuestFields() {
   return document.getElementById("reserve-guest-fields");
@@ -106,6 +108,33 @@ function firstOfMonth(value) {
   const date = new Date(`${value}T00:00:00`);
   date.setDate(1);
   return date.toISOString().slice(0, 10);
+}
+
+function getReserveUrlSelection() {
+  const params = new URLSearchParams(window.location.search);
+  const rawStart = params.get("start") || params.get("time") || "";
+  const startDate = rawStart.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] || "";
+  const rawDate = params.get("date") || startDate;
+  const rawDuration = Number(params.get("duration") || 0);
+  return {
+    date: rawDate ? clampBookingDate(rawDate) : "",
+    start: rawStart,
+    duration: Number.isFinite(rawDuration) && rawDuration >= MIN_DURATION_MINUTES
+      ? Math.min(rawDuration, MAX_DURATION_MINUTES)
+      : null,
+  };
+}
+
+function startMatchesPreference(startTime, preferredStart) {
+  if (!preferredStart) {
+    return false;
+  }
+  if (String(startTime) === String(preferredStart)) {
+    return true;
+  }
+  const preferredTime = String(preferredStart).match(/T(\d{2}:\d{2})/)?.[1] || String(preferredStart).slice(0, 5);
+  const startTimeOnly = String(startTime).match(/T(\d{2}:\d{2})/)?.[1] || "";
+  return Boolean(preferredTime && startTimeOnly && preferredTime === startTimeOnly);
 }
 
 function formatCurrency(cents) {
@@ -371,7 +400,7 @@ function syncReserveDurationToSelectedStart(room = state.selectedRoom) {
     return false;
   }
 
-  const previousValue = getSelectedDurationMinutes();
+  const previousValue = preferredDurationFromUrl || getSelectedDurationMinutes();
   const allowedDurations = getAllowedDurationsForStart(selectedStart);
   elements.reserveDurationSelect.disabled = !allowedDurations.length;
   elements.reserveDurationSelect.innerHTML = allowedDurations
@@ -380,6 +409,7 @@ function syncReserveDurationToSelectedStart(room = state.selectedRoom) {
 
   if (!allowedDurations.length) {
     elements.reserveDurationSelect.value = "";
+    preferredDurationFromUrl = null;
     return false;
   }
 
@@ -387,6 +417,7 @@ function syncReserveDurationToSelectedStart(room = state.selectedRoom) {
     ? previousValue
     : allowedDurations.filter((duration) => duration <= previousValue).pop() || allowedDurations[0];
   elements.reserveDurationSelect.value = String(nextValue);
+  preferredDurationFromUrl = null;
 
   const changed = nextValue !== previousValue;
   if (changed) {
@@ -565,7 +596,8 @@ async function loadDayAvailability(roomId, date) {
 
     dayAvailability = availability;
     const starts = availability.available_start_times || [];
-    selectedStart = starts[0] || "";
+    selectedStart = starts.find((startTime) => startMatchesPreference(startTime, preferredStartFromUrl)) || starts[0] || "";
+    preferredStartFromUrl = "";
     syncReserveDurationToSelectedStart(state.selectedRoom);
     clearReservePromoState("");
     setState({ message: "Day availability loaded." });
@@ -581,6 +613,9 @@ async function loadDayAvailability(roomId, date) {
     if (requestToken === dayAvailabilityRequestToken) {
       loadingDay = false;
       renderRoomBookingView(state);
+      if (selectedStart) {
+        void refreshReserveHold();
+      }
     }
   }
 }
@@ -778,7 +813,7 @@ function renderStaffOptions(currentState) {
             ${renderTagGroup("Skills", role.skills || [])}
             ${renderTagGroup("Talents", role.talents || [])}
           </div>
-          <strong class="staff-option-price">${formatCurrency(role.add_on_price_cents)}</strong>
+          <strong class="staff-option-price">$25/hr</strong>
         </label>
       `,
     )
@@ -1060,6 +1095,8 @@ async function refreshReserveHold() {
 async function selectDate(roomId, date) {
   selectedDate = clampBookingDate(date);
   selectedStart = "";
+  preferredStartFromUrl = "";
+  preferredDurationFromUrl = null;
   dayAvailability = null;
   clearReservePromoState("");
   clearReserveHold();
@@ -1121,6 +1158,7 @@ export function initRoomBookingView() {
     renderSubmitButton(state);
     renderReserveStepStatus(state);
     updateDurationDisplay();
+    void refreshReserveHold();
   });
 
   elements.reserveDurationIncrease?.addEventListener("click", () => {
@@ -1140,6 +1178,7 @@ export function initRoomBookingView() {
     renderSubmitButton(state);
     renderReserveStepStatus(state);
     updateDurationDisplay();
+    void refreshReserveHold();
   });
 
   elements.reserveSlotList?.addEventListener("click", (event) => {
@@ -1156,6 +1195,7 @@ export function initRoomBookingView() {
     renderSubmitButton(state);
     renderReserveStepStatus(state);
     updateDurationDisplay();
+    void refreshReserveHold();
   });
 
   elements.reserveMonthGrid.addEventListener("click", async (event) => {
@@ -1416,12 +1456,15 @@ export function renderRoomBookingView(currentState) {
   }
 
   if (String(room.id) !== lastRoomId) {
+    const urlSelection = getReserveUrlSelection();
     lastRoomId = String(room.id);
-    selectedDate = todayString();
+    selectedDate = urlSelection.date || todayString();
     displayedMonth = firstOfMonth(selectedDate);
     dayAvailability = null;
     monthAvailability = {};
     selectedStart = "";
+    preferredStartFromUrl = urlSelection.start || "";
+    preferredDurationFromUrl = urlSelection.duration;
     selectedStaffIds = new Set();
     clearReservePromoState("");
     if (elements.reserveDateInput) {

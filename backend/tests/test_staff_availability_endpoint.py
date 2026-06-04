@@ -31,7 +31,7 @@ class StaffAvailabilityEndpointTest(BaseAppTest):
     def _staff_id(self, headers) -> str:
         resp = self.client.post(
             "/api/admin/staff",
-            json={"name": "Scheduled Engineer", "booking_rate_cents": 5000, "active": True},
+            json={"name": "Scheduled Engineer", "booking_rate_cents": 5000, "active": True, "schedule_published": True},
             headers=headers,
         )
         self.assertEqual(resp.status_code, 201, resp.text)

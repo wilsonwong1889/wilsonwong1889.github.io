@@ -39,6 +39,7 @@ class StaffTest(BaseAppTest):
                 booking_rate_cents=6500,
                 service_types=["Podcast support", "Consultation"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(promo_code)
@@ -92,13 +93,11 @@ class StaffTest(BaseAppTest):
         self.assertTrue(payload["access_token"])
         self.assertEqual(payload["booking"]["status"], "Requested")
         self.assertEqual(payload["booking"]["service_type"], "Podcast support")
-        staff_rate, promo_pct = 6500, 60
-        expected_original = self._staff_price(staff_rate, 60)
-        expected_discount = expected_original * promo_pct // 100
-        self.assertEqual(payload["booking"]["original_price_cents"], expected_original)
-        self.assertEqual(payload["booking"]["discount_cents"], expected_discount)
-        self.assertEqual(payload["booking"]["price_cents"], expected_original - expected_discount)
-        self.assertEqual(payload["booking"]["promo_code"], "SUMMER60")
+        # Direct staff bookings are free requests — no price, no promo applied.
+        self.assertEqual(payload["booking"]["original_price_cents"], 0)
+        self.assertEqual(payload["booking"]["discount_cents"], 0)
+        self.assertEqual(payload["booking"]["price_cents"], 0)
+        self.assertIsNone(payload["booking"]["promo_code"])
         self.assertEqual(payload["booking"]["staff_profile"]["name"], "Podcast Engineer")
 
         # Request-first flow: staff accepts before the customer can pay.
@@ -126,8 +125,9 @@ class StaffTest(BaseAppTest):
             headers=guest_headers,
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["payment_intent_id"])
-        self.assertTrue(resp.json()["payment_client_secret"])
+        # Free booking: payment session reports no charge instead of a Stripe intent.
+        self.assertEqual(resp.json()["payment_backend"], "free")
+        self.assertIsNone(resp.json()["payment_intent_id"])
 
         resp = self.client.put(
             f"/api/staff-bookings/{payload['booking']['id']}/contact",
@@ -175,6 +175,7 @@ class StaffTest(BaseAppTest):
                 booking_rate_cents=7000,
                 service_types=["Producer session"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(profile)

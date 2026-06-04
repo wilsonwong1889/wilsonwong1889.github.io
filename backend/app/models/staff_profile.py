@@ -2,6 +2,7 @@ import uuid
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -20,6 +21,12 @@ class StaffProfile(Base):
         nullable=True,
         index=True,
     )
+    user = relationship("User")
+
+    @property
+    def linked_user_email(self):
+        return self.user.email if self.user else None
+
     role_title = Column(String)
     # Where booking-request notifications go (falls back to the linked account).
     notification_email = Column(String)
@@ -40,11 +47,19 @@ class StaffProfile(Base):
     # Additional headshot image URLs beyond the primary photo_url avatar.
     headshot_urls = Column(JSONB, default=list)
     portfolio_url = Column(String)
+    # Free-form list of equipment/gear the engineer works with.
+    gear = Column(String)
+    # Self-service application workflow: NULL for admin-created profiles,
+    # "submitted" while awaiting admin review, "approved" once granted staff.
+    application_status = Column(String)
     add_on_price_cents = Column(Integer, nullable=False, default=0)
     booking_rate_cents = Column(Integer, nullable=False, default=0)
     equipment_rental_cost_cents = Column(Integer, nullable=False, default=0)
     service_types = Column(JSONB, default=list)
     booking_enabled = Column(Boolean, nullable=False, default=True)
+    # When true, the admin has published this staff member's schedule so the
+    # public can see availability and request to book them.
+    schedule_published = Column(Boolean, nullable=False, default=False)
     active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -290,6 +290,9 @@ function inferBookingCategory(booking) {
 }
 
 function getBookingPrimaryKicker(booking) {
+  if (booking.status === "AcceptedPendingPayment" && (booking.price_cents || 0) <= 0) {
+    return "Confirm your booking";
+  }
   if (booking.status === "PendingPayment") {
     return "Secure checkout";
   }
@@ -304,6 +307,9 @@ function getBookingPrimaryKicker(booking) {
 
 function getBookingPrimaryTitle(booking) {
   const kind = getBookingKind(booking);
+  if (booking.status === "AcceptedPendingPayment" && (booking.price_cents || 0) <= 0) {
+    return "Your request was accepted — confirm to book";
+  }
   if (booking.status === "PendingPayment") {
     return kind === "staff" ? "Complete your staff booking" : "Complete your booking";
   }
@@ -1183,6 +1189,17 @@ export function initBookingDetailView(actions) {
         return;
       }
 
+      if (action === "confirm-free-staff") {
+        setState({ message: "Confirming your booking..." });
+        const booking = await api.confirmFreeStaffBooking(button.dataset.bookingId);
+        clearPaymentElement();
+        setState({ selectedBooking: booking, message: "Booking confirmed." });
+        if (actions?.reloadBookingDetail) {
+          await actions.reloadBookingDetail("Booking confirmed.");
+        }
+        return;
+      }
+
       if (action === "load-payment") {
         setState({ message: "Loading payment session..." });
         const booking =
@@ -1445,6 +1462,10 @@ export function renderBookingDetailView(state) {
 
   const isAdmin = Boolean(state.currentUser?.is_admin);
   const bookingKindForActions = getBookingKind(booking);
+  const canConfirmFreeStaff =
+    bookingKindForActions === "staff" &&
+    booking.status === "AcceptedPendingPayment" &&
+    (booking.price_cents || 0) <= 0;
   const canCancel = booking.status === "PendingPayment" || booking.status === "Paid";
   const canPay = booking.status === "PendingPayment";
   const canAddToCalendar = ["Paid", "Completed"].includes(booking.status);
@@ -1453,6 +1474,7 @@ export function renderBookingDetailView(state) {
   const canAdminRefund = isAdmin && bookingKindForActions !== "staff" && booking.price_cents > 0 && ["Paid", "Completed", "Cancelled"].includes(booking.status);
   if (elements.bookingDetailActions) {
     elements.bookingDetailActions.innerHTML = `
+      ${canConfirmFreeStaff ? `<button class="primary-button" type="button" data-booking-detail-action="confirm-free-staff" data-booking-id="${booking.id}">Confirm booking (free)</button>` : ""}
       ${canAddToCalendar ? `<button class="ghost-button" type="button" data-booking-detail-action="download-calendar" data-booking-id="${booking.id}">Add to calendar</button>` : ""}
       ${canDownloadReceipt ? `<button class="ghost-button" type="button" data-booking-detail-action="download-receipt" data-booking-id="${booking.id}">Download receipt PDF</button>` : ""}
       ${canAdminCheckIn ? `<button class="ghost-button" type="button" data-booking-detail-action="check-in" data-booking-id="${booking.id}">Mark guest arrived</button>` : ""}

@@ -34,7 +34,7 @@ class StaffNotificationTaskTest(BaseAppTest):
 
     def _make_booking(self, customer_email, **staff_overrides) -> str:
         admin = self._admin_headers()
-        staff_payload = {"name": f"Notify Engineer {customer_email}", "booking_rate_cents": 6000, "active": True}
+        staff_payload = {"name": f"Notify Engineer {customer_email}", "booking_rate_cents": 6000, "active": True, "schedule_published": True}
         staff_payload.update(staff_overrides)
         staff = self.client.post("/api/admin/staff", json=staff_payload, headers=admin).json()
         start = self._future_time(day=1, hour=10).isoformat()

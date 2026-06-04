@@ -1126,6 +1126,46 @@ function renderAdminIntakes(currentState) {
     : '<div class="empty-state">No submissions match these filters yet.</div>';
 }
 
+function formatScheduleMinutes(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+function renderAdminStaffSchedule(rows) {
+  const list = document.getElementById("admin-schedule-list");
+  if (!list) return;
+  if (!rows || !rows.length) {
+    list.innerHTML = '<div class="empty-state">No active staff for this date.</div>';
+    return;
+  }
+  list.innerHTML = rows
+    .map((row) => {
+      const windows = (row.windows || [])
+        .map((w) => `<span class="pill">${formatScheduleMinutes(w.start_minute)}–${formatScheduleMinutes(w.end_minute)}</span>`)
+        .join(" ");
+      return `
+        <div class="admin-schedule-row">
+          <strong>${escapeHtml(row.name)}</strong>
+          <div class="admin-schedule-windows">${windows || '<span class="empty-state">Not available</span>'}</div>
+        </div>`;
+    })
+    .join("");
+}
+
+async function loadAdminStaffSchedule() {
+  const dateInput = document.getElementById("admin-schedule-date");
+  if (!dateInput) return;
+  if (!dateInput.value) {
+    dateInput.value = new Date().toISOString().slice(0, 10);
+  }
+  try {
+    renderAdminStaffSchedule(await api.getAdminStaffSchedule(dateInput.value));
+  } catch (error) {
+    setState({ message: error.message });
+  }
+}
+
 function formatActivityAction(action) {
   return action.replaceAll("_", " ");
 }
@@ -1179,8 +1219,25 @@ function setStaffPhotoPreview(photoUrl, name = "Staff member") {
   elements.adminStaffPhotoPreview.classList.toggle("empty-state", !photoUrl);
 }
 
+function setStaffFeedback(message, kind) {
+  const box = elements.adminStaffFeedback;
+  if (!box) {
+    return;
+  }
+  if (!message) {
+    box.textContent = "";
+    box.classList.add("hidden");
+    box.classList.remove("is-error", "is-success");
+    return;
+  }
+  box.textContent = message;
+  box.classList.remove("hidden", "is-error", "is-success");
+  box.classList.add(kind === "error" ? "is-error" : "is-success");
+}
+
 function resetStaffProfileForm() {
   editingStaffProfileId = null;
+  setStaffFeedback(null);
   elements.adminStaffProfileForm?.reset();
   if (elements.adminStaffProfileId) {
     elements.adminStaffProfileId.value = "";
@@ -1210,6 +1267,7 @@ function populateStaffProfileForm(profile) {
   elements.adminStaffProfileForm.elements.talents.value = (profile.talents || []).join(", ");
   elements.adminStaffProfileForm.elements.services.value = (profile.services || []).join(", ");
   elements.adminStaffProfileForm.elements.bio.value = profile.bio || "";
+  elements.adminStaffProfileForm.elements.gear.value = profile.gear || "";
   elements.adminStaffProfileForm.elements.portfolio_url.value = profile.portfolio_url || "";
   elements.adminStaffProfileForm.elements.headshot_urls.value = (profile.headshot_urls || []).join("\n");
   elements.adminStaffProfileForm.elements.add_on_price_cents.value = profile.add_on_price_cents || 0;
@@ -1220,7 +1278,8 @@ function populateStaffProfileForm(profile) {
   elements.adminStaffProfileForm.elements.notify_by_email.checked = profile.notify_by_email !== false;
   elements.adminStaffProfileForm.elements.notify_by_sms.checked = Boolean(profile.notify_by_sms);
   elements.adminStaffProfileForm.elements.booking_requires_approval.checked = profile.booking_requires_approval !== false;
-  elements.adminStaffProfileForm.elements.linked_user_email.value = "";
+  elements.adminStaffProfileForm.elements.linked_user_email.value = profile.linked_user_email || "";
+  elements.adminStaffProfileForm.elements.schedule_published.checked = Boolean(profile.schedule_published);
   elements.adminStaffProfileForm.elements.active.checked = Boolean(profile.active);
   if (elements.adminStaffProfileId) {
     elements.adminStaffProfileId.value = profile.id;
@@ -2042,6 +2101,7 @@ function renderStaffCatalogCard(profile) {
       <div class="room-meta">
         <span class="pill">${formatMoney(profile.add_on_price_cents)}</span>
         <span class="pill ${profile.active ? "" : "muted"}">${profile.active ? "Active" : "Inactive"}</span>
+        ${profile.linked_user_email ? `<span class="pill">Linked ${escapeHtml(profile.linked_user_email)}</span>` : ""}
       </div>
       ${renderStaffTagRow("Skills", profile.skills || [])}
       ${renderStaffTagRow("Talents", profile.talents || [])}
@@ -2052,6 +2112,50 @@ function renderStaffCatalogCard(profile) {
       </div>
     </article>
   `;
+}
+
+function renderStaffApplicationCard(profile) {
+  return `
+    <article class="staff-profile-card">
+      <div class="staff-profile-card-top">
+        ${renderStaffImage(profile.photo_url, profile.name, "staff-profile-image")}
+        <div class="staff-option-copy">
+          <strong>${escapeHtml(profile.name)}</strong>
+          <span>${escapeHtml(profile.role_title || profile.description || "Studio engineer applicant")}</span>
+        </div>
+      </div>
+      <div class="room-meta">
+        ${profile.linked_user_email ? `<span class="pill">${escapeHtml(profile.linked_user_email)}</span>` : ""}
+        <span class="pill">Submitted</span>
+      </div>
+      ${profile.bio ? `<p class="panel-copy">${escapeHtml(profile.bio)}</p>` : ""}
+      ${renderStaffTagRow("Skills", profile.skills || [])}
+      ${renderStaffTagRow("Talents", profile.talents || [])}
+      ${profile.gear ? `<p class="panel-copy"><strong>Gear:</strong> ${escapeHtml(profile.gear)}</p>` : ""}
+      ${profile.portfolio_url ? `<p class="panel-copy"><a href="${escapeAttribute(profile.portfolio_url)}" target="_blank" rel="noreferrer">View portfolio ↗</a></p>` : ""}
+      <div class="room-actions">
+        <button class="primary-button" type="button" data-admin-action="approve-staff-application" data-staff-profile-id="${escapeAttribute(profile.id)}" data-staff-profile-name="${escapeAttribute(profile.name)}">Approve &amp; grant staff role</button>
+      </div>
+    </article>
+  `;
+}
+
+async function loadStaffApplications() {
+  if (!elements.adminStaffApplicationsList) return;
+  let applications = [];
+  try {
+    applications = await api.adminListStaffApplications();
+  } catch (error) {
+    return;
+  }
+  elements.adminStaffApplicationsList.innerHTML = applications.length
+    ? applications.map(renderStaffApplicationCard).join("")
+    : '<div class="empty-state">No pending studio engineer applications.</div>';
+  if (elements.adminStaffApplicationsBadge) {
+    const count = applications.length;
+    elements.adminStaffApplicationsBadge.textContent = count ? String(count) : "";
+    elements.adminStaffApplicationsBadge.classList.toggle("hidden", count === 0);
+  }
 }
 
 function renderRoomStaffAssignmentCard(room, staffProfiles) {
@@ -2440,6 +2544,8 @@ export function initAdminView(actions) {
     event.preventDefault();
     const form = elements.adminStaffProfileForm;
     const file = elements.adminStaffPhotoFile?.files?.[0];
+    const isEditing = Boolean(editingStaffProfileId);
+    setStaffFeedback(null);
 
     try {
       setState({ message: editingStaffProfileId ? "Updating staff profile..." : "Creating staff profile..." });
@@ -2459,6 +2565,7 @@ export function initAdminView(actions) {
         photo_url: photoUrl,
         headshot_urls: parseListInput(form.elements.headshot_urls.value),
         portfolio_url: form.elements.portfolio_url.value.trim() || null,
+        gear: form.elements.gear.value.trim() || null,
         add_on_price_cents: Number(form.elements.add_on_price_cents.value || 0),
         equipment_rental_cost_cents: Number(form.elements.equipment_rental_cost_cents.value || 0),
         role_title: form.elements.role_title.value.trim() || null,
@@ -2468,19 +2575,32 @@ export function initAdminView(actions) {
         notify_by_sms: form.elements.notify_by_sms.checked,
         booking_requires_approval: form.elements.booking_requires_approval.checked,
         linked_user_email: form.elements.linked_user_email.value.trim() || null,
+        schedule_published: form.elements.schedule_published.checked,
         active: form.elements.active.checked,
       };
 
+      let savedProfile;
       if (editingStaffProfileId) {
-        await api.adminUpdateStaffProfile(editingStaffProfileId, payload);
+        savedProfile = await api.adminUpdateStaffProfile(editingStaffProfileId, payload);
       } else {
-        await api.adminCreateStaffProfile(payload);
+        savedProfile = await api.adminCreateStaffProfile(payload);
       }
 
       resetStaffProfileForm();
       setActiveAdminSubpage("staff", "editor");
+      const profileName = savedProfile?.name || payload.name;
+      const linkNote = payload.linked_user_email
+        ? savedProfile?.user_id
+          ? ` and linked to ${payload.linked_user_email} (Staff access granted).`
+          : ` (account link to ${payload.linked_user_email} could not be confirmed).`
+        : ".";
+      setStaffFeedback(
+        `${isEditing ? "Updated" : "Created"} staff profile “${profileName}”${linkNote}`,
+        "success",
+      );
       await actions.refreshAll("Staff profile saved.");
     } catch (error) {
+      setStaffFeedback(error?.message || "Could not save the staff profile.", "error");
       setState({ message: error.message });
     }
   });
@@ -2652,6 +2772,30 @@ export function initAdminView(actions) {
     }
   });
 
+  elements.adminStaffApplicationsList?.addEventListener("click", async (event) => {
+    const button = event.target.closest('[data-admin-action="approve-staff-application"]');
+    if (!button) {
+      return;
+    }
+    const name = button.dataset.staffProfileName || "this applicant";
+    if (!window.confirm(`Approve ${name}? This grants them the Staff role and an active profile.`)) {
+      return;
+    }
+    try {
+      setState({ message: `Approving ${name}...` });
+      await api.adminApproveStaffApplication(button.dataset.staffProfileId);
+      await loadStaffApplications();
+      await actions.refreshAll(`${name} approved — they now have studio engineer access.`);
+    } catch (error) {
+      setState({ message: error.message });
+    }
+  });
+
+  document.getElementById("admin-tab-staff")?.addEventListener("click", () => {
+    void loadStaffApplications();
+  });
+  void loadStaffApplications();
+
   getAdminPromoList()?.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-admin-action]");
     if (!button) {
@@ -2713,6 +2857,10 @@ export function initAdminView(actions) {
       setState({ message: error.message });
     }
   });
+
+  document.getElementById("admin-schedule-date")?.addEventListener("change", () => loadAdminStaffSchedule());
+  document.getElementById("admin-schedule-refresh")?.addEventListener("click", () => loadAdminStaffSchedule());
+  document.getElementById("admin-tab-schedule")?.addEventListener("click", () => loadAdminStaffSchedule());
 
   document.getElementById("admin-monthly-codes-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();

@@ -234,13 +234,14 @@ class NewFeaturesSmokeTest(unittest.TestCase):
         })
         resp = self.client.post("/api/auth/login", data={"username": email, "password": "WrongPass99!"})
         self.assertEqual(resp.status_code, 401, resp.text)
-        self.assertIn("wrong password", resp.json().get("detail", "").lower())
+        self.assertEqual(resp.json().get("detail"), "Invalid email or password.")
 
-    def test_03_login_unknown_email_returns_404(self) -> None:
+    def test_03_login_unknown_email_returns_generic_401(self) -> None:
         resp = self.client.post("/api/auth/login", data={
             "username": "nobody-at-all@example.com", "password": "AnyPass1!",
         })
-        self.assertEqual(resp.status_code, 404, resp.text)
+        self.assertEqual(resp.status_code, 401, resp.text)
+        self.assertEqual(resp.json().get("detail"), "Invalid email or password.")
 
     def test_04_duplicate_signup_returns_error(self) -> None:
         email = f"dup-{uuid4().hex[:6]}@example.com"
@@ -542,9 +543,9 @@ class NewFeaturesSmokeTest(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 201, resp.text)
         b = resp.json()
-        # subtotal = room (10000) + staff (3000) = 13000; tax = floor(13000*0.05) = 650
-        self.assertEqual(b.get("tax_cents"), floor(13000 * 0.05))
-        self.assertEqual(b.get("price_cents"), 13000 + floor(13000 * 0.05))
+        # subtotal = room (10000) + one staff at flat $25/hr for 1h (2500) = 12500
+        self.assertEqual(b.get("tax_cents"), floor(12500 * 0.05))
+        self.assertEqual(b.get("price_cents"), 12500 + floor(12500 * 0.05))
 
     # ── Booking intake note ───────────────────────────────────────────────────
 
@@ -662,8 +663,8 @@ class NewFeaturesSmokeTest(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("applyLoginError", resp.text)
         self.assertIn("applySignupError", resp.text)
-        self.assertIn("wrong password", resp.text.lower())
-        self.assertIn("couldn't find an account", resp.text.lower())
+        self.assertIn("invalid email or password", resp.text.lower())
+        self.assertIn("forgot password", resp.text.lower())
 
     def test_82_profile_js_has_about_you_fields(self) -> None:
         resp = self.client.get("/assets/js/views/profile.js")

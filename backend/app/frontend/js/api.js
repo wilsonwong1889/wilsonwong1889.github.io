@@ -24,14 +24,35 @@ async function request(path, options = {}) {
     : await response.text();
 
   if (!response.ok) {
-    const detail =
-      typeof data === "object" && data !== null && "detail" in data
-        ? data.detail
-        : "Request failed";
-    throw new Error(detail);
+    throw new Error(extractErrorMessage(data));
   }
 
   return data;
+}
+
+// Turn a FastAPI error body into a human-readable string. `detail` may be a
+// plain string (HTTPException), a list of validation errors (422), or absent.
+function extractErrorMessage(data) {
+  const detail =
+    typeof data === "object" && data !== null && "detail" in data
+      ? data.detail
+      : data;
+
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (item && typeof item === "object" ? item.msg : item))
+      .filter(Boolean);
+    if (messages.length) {
+      return messages.join("; ");
+    }
+  }
+  if (detail && typeof detail === "object" && typeof detail.msg === "string") {
+    return detail.msg;
+  }
+  return "Request failed";
 }
 
 export const api = {
@@ -60,18 +81,6 @@ export const api = {
     return request("/api/auth/google/exchange", {
       method: "POST",
       body: JSON.stringify({ access_token: accessToken }),
-    });
-  },
-  verifyTwoFactor(payload) {
-    return request("/api/auth/verify-2fa", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  },
-  resendTwoFactor(twoFactorToken) {
-    return request("/api/auth/resend-2fa", {
-      method: "POST",
-      body: JSON.stringify({ two_factor_token: twoFactorToken }),
     });
   },
   getMe() {
@@ -121,6 +130,9 @@ export const api = {
   },
   getBookingsFeed() {
     return request("/api/bookings/feed").catch(() => request("/api/bookings"));
+  },
+  getActionRequiredCount() {
+    return request("/api/bookings/action-required");
   },
   getBooking(bookingId) {
     return request(`/api/bookings/${bookingId}`);
@@ -229,6 +241,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+  confirmFreeStaffBooking(bookingId) {
+    return request(`/api/staff-bookings/${bookingId}/confirm`, { method: "POST" });
   },
   rescheduleStaffBooking(bookingId, payload) {
     return request(`/api/staff-bookings/${bookingId}/reschedule`, {
@@ -437,6 +452,85 @@ export const api = {
     return request(`/api/admin/intakes/${intakeId}`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
+    });
+  },
+  getAdminStaffSchedule(date) {
+    return request(`/api/admin/staff/schedule?date=${encodeURIComponent(date)}`);
+  },
+  getMyStaffProfile() {
+    return request("/api/staff/me");
+  },
+  getMyAvailabilityRules() {
+    return request("/api/staff/me/availability/rules");
+  },
+  createMyAvailabilityRule(payload) {
+    return request("/api/staff/me/availability/rules", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  deleteMyAvailabilityRule(ruleId) {
+    return request(`/api/staff/me/availability/rules/${ruleId}`, { method: "DELETE" });
+  },
+  getMyAvailabilityExceptions() {
+    return request("/api/staff/me/availability/exceptions");
+  },
+  createMyAvailabilityException(payload) {
+    return request("/api/staff/me/availability/exceptions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  deleteMyAvailabilityException(exceptionId) {
+    return request(`/api/staff/me/availability/exceptions/${exceptionId}`, { method: "DELETE" });
+  },
+  updateMyStaffProfile(payload) {
+    return request("/api/staff/me", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+  uploadMyStaffPhoto(file) {
+    const formData = new FormData();
+    formData.append("photo", file);
+    return request("/api/staff/me/photo", {
+      method: "POST",
+      body: formData,
+    });
+  },
+  getMyStaffApplication() {
+    return request("/api/staff/application");
+  },
+  submitMyStaffApplication(payload) {
+    return request("/api/staff/application", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+  uploadMyApplicationPhoto(file) {
+    const formData = new FormData();
+    formData.append("photo", file);
+    return request("/api/staff/application/photo", {
+      method: "POST",
+      body: formData,
+    });
+  },
+  adminListStaffApplications() {
+    return request("/api/admin/staff/applications");
+  },
+  adminApproveStaffApplication(staffProfileId) {
+    return request(`/api/admin/staff/${staffProfileId}/approve`, { method: "POST" });
+  },
+  getMyBookingRequests() {
+    return request("/api/staff/me/booking-requests");
+  },
+  acceptMyBookingRequest(bookingId) {
+    return request(`/api/staff/me/booking-requests/${bookingId}/accept`, { method: "POST" });
+  },
+  declineMyBookingRequest(bookingId, reason) {
+    return request(`/api/staff/me/booking-requests/${bookingId}/decline`, {
+      method: "POST",
+      body: JSON.stringify({ reason: reason || null }),
     });
   },
 };

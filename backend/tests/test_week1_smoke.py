@@ -57,7 +57,16 @@ class AppSmokeTest(unittest.TestCase):
 
         from app.database import Base, SessionLocal, engine
         from app.main import app
-        from app.models.booking import AuditLog, Booking, BookingSlot, NotificationLog, Refund, Review
+        from app.models.booking import (
+            AuditLog,
+            Booking,
+            BookingSlot,
+            BookingStaffAssignment,
+            NotificationLog,
+            Refund,
+            Review,
+            WebhookEventLog,
+        )
         from app.models.promo_code import PromoCode
         from app.models.room import Room
         from app.models.staff_booking import StaffBooking
@@ -71,9 +80,11 @@ class AppSmokeTest(unittest.TestCase):
         cls.AuditLog = AuditLog
         cls.Booking = Booking
         cls.BookingSlot = BookingSlot
+        cls.BookingStaffAssignment = BookingStaffAssignment
         cls.NotificationLog = NotificationLog
         cls.Refund = Refund
         cls.Review = Review
+        cls.WebhookEventLog = WebhookEventLog
         cls.PromoCode = PromoCode
         cls.Room = Room
         cls.StaffBooking = StaffBooking
@@ -83,6 +94,8 @@ class AppSmokeTest(unittest.TestCase):
         cls.ensure_promo_codes = staticmethod(ensure_promo_codes)
         cls.ensure_rooms = staticmethod(ensure_rooms)
 
+        with cls.engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
         cls.Base.metadata.create_all(bind=cls.engine)
 
         from fastapi.testclient import TestClient
@@ -100,9 +113,11 @@ class AppSmokeTest(unittest.TestCase):
             for model in (
                 self.AuditLog,
                 self.NotificationLog,
+                self.WebhookEventLog,
                 self.Refund,
                 self.Review,
                 self.PromoCode,
+                self.BookingStaffAssignment,
                 self.BookingSlot,
                 self.Booking,
                 self.StaffBooking,
@@ -264,8 +279,8 @@ class AppSmokeTest(unittest.TestCase):
 
         account_page = self.client.get("/account")
         self.assertIn("Delete profile", account_page.text)
-        self.assertIn("Require two-factor verification at login", account_page.text)
-        self.assertIn("login-2fa-form", account_page.text)
+        self.assertNotIn("Require two-factor verification at login", account_page.text)
+        self.assertNotIn("login-2fa-form", account_page.text)
         self.assertIn("forgot-password-form", account_page.text)
         self.assertIn("reset-password-form", account_page.text)
         self.assertIn("Forgot password?", account_page.text)
@@ -433,7 +448,8 @@ class AppSmokeTest(unittest.TestCase):
         self.assertIn("elements.roomsSearchButton?.addEventListener", response.text)
         self.assertIn("searchRoomsByAvailability", response.text)
         self.assertIn("function escapeHtml(value)", response.text)
-        self.assertIn('href="/reserve?id=${safeRoomId}"', response.text)
+        # Room cards link to the reserve flow via the buildRoomReserveUrl helper.
+        self.assertIn("buildRoomReserveUrl(", response.text)
 
         signup_payload = {
             "email": "user@example.com",
@@ -631,35 +647,23 @@ class AppSmokeTest(unittest.TestCase):
         response = self.client.get(f"/api/rooms/{room_id}", headers=admin_headers)
         self.assertEqual(response.status_code, 404, response.text)
 
-    def test_15_two_factor_login_flow(self) -> None:
+    def test_15_login_clears_legacy_challenge_flags(self) -> None:
         signup_payload = {
-            "email": "twofactor@example.com",
+            "email": "legacy-auth-flags@example.com",
             "password": "Password123!",
-            "full_name": "Two Factor User",
+            "full_name": "Legacy Auth User",
             "phone": "5552223333",
         }
         response = self.client.post("/api/auth/signup", json=signup_payload)
         self.assertEqual(response.status_code, 201, response.text)
 
-        response = self.client.post(
-            "/api/auth/login",
-            data={"username": signup_payload["email"], "password": signup_payload["password"]},
-        )
-        self.assertEqual(response.status_code, 200, response.text)
-        user_headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
-
-        response = self.client.put(
-            "/api/users/me",
-            headers=user_headers,
-            json={
-                "two_factor_enabled": True,
-                "two_factor_method": "email",
-                "opt_in_email": True,
-            },
-        )
-        self.assertEqual(response.status_code, 200, response.text)
-        self.assertTrue(response.json()["two_factor_enabled"])
-        self.assertEqual(response.json()["two_factor_method"], "email")
+        with self.SessionLocal() as db:
+            user = db.query(self.User).filter(self.User.email == signup_payload["email"]).one()
+            user.two_factor_enabled = True
+            user.two_factor_method = "sms"
+            user.two_factor_code_hash = "stale-code"
+            user.two_factor_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+            db.commit()
 
         response = self.client.post(
             "/api/auth/login",
@@ -667,43 +671,16 @@ class AppSmokeTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200, response.text)
         login_payload = response.json()
-        self.assertTrue(login_payload["two_factor_required"])
-        self.assertEqual(login_payload["two_factor_method"], "email")
-        self.assertIsNotNone(login_payload["two_factor_token"])
-        self.assertIsNone(login_payload["access_token"])
+        self.assertTrue(login_payload["access_token"])
+        self.assertNotIn("two_factor_required", login_payload)
+        self.assertNotIn("two_factor_token", login_payload)
 
         with self.SessionLocal() as db:
-            notification = (
-                db.query(self.NotificationLog)
-                .filter(self.NotificationLog.type == "login_verification_email_worker")
-                .order_by(self.NotificationLog.created_at.desc())
-                .first()
-            )
-
-        self.assertIsNotNone(notification)
-        delivery_message = json.loads(notification.details["delivery"]["message"])
-        code_search = re.search(r"\b(\d{6})\b", delivery_message["body"])
-        code_match = code_search.group(1) if code_search else None
-        self.assertIsNotNone(code_match)
-
-        response = self.client.post(
-            "/api/auth/verify-2fa",
-            json={
-                "two_factor_token": login_payload["two_factor_token"],
-                "code": "000000",
-            },
-        )
-        self.assertEqual(response.status_code, 401, response.text)
-
-        response = self.client.post(
-            "/api/auth/verify-2fa",
-            json={
-                "two_factor_token": login_payload["two_factor_token"],
-                "code": code_match,
-            },
-        )
-        self.assertEqual(response.status_code, 200, response.text)
-        self.assertTrue(response.json()["access_token"])
+            user = db.query(self.User).filter(self.User.email == signup_payload["email"]).one()
+            self.assertFalse(user.two_factor_enabled)
+            self.assertEqual(user.two_factor_method, "email")
+            self.assertIsNone(user.two_factor_code_hash)
+            self.assertIsNone(user.two_factor_code_expires_at)
 
     def test_16_login_feedback_and_password_reset_flow(self) -> None:
         signup_payload = {
@@ -726,15 +703,15 @@ class AppSmokeTest(unittest.TestCase):
             "/api/auth/login",
             data={"username": "missing@example.com", "password": signup_payload["password"]},
         )
-        self.assertEqual(response.status_code, 404, response.text)
-        self.assertEqual(response.json()["detail"], "We couldn't find an account with that email.")
+        self.assertEqual(response.status_code, 401, response.text)
+        self.assertEqual(response.json()["detail"], "Invalid email or password.")
 
         response = self.client.post(
             "/api/auth/login",
             data={"username": signup_payload["email"], "password": "WrongPassword123!"},
         )
         self.assertEqual(response.status_code, 401, response.text)
-        self.assertEqual(response.json()["detail"], "Wrong password. Try again or reset it.")
+        self.assertEqual(response.json()["detail"], "Invalid email or password.")
 
         response = self.client.post(
             "/api/auth/forgot-password",
@@ -771,7 +748,7 @@ class AppSmokeTest(unittest.TestCase):
             data={"username": signup_payload["email"], "password": signup_payload["password"]},
         )
         self.assertEqual(response.status_code, 401, response.text)
-        self.assertEqual(response.json()["detail"], "Wrong password. Try again or reset it.")
+        self.assertEqual(response.json()["detail"], "Invalid email or password.")
 
         response = self.client.post(
             "/api/auth/login",
@@ -1110,6 +1087,7 @@ class AppSmokeTest(unittest.TestCase):
                 booking_rate_cents=6500,
                 service_types=["Podcast support", "Consultation"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(promo_code)
@@ -1167,13 +1145,11 @@ class AppSmokeTest(unittest.TestCase):
         self.assertTrue(payload["access_token"])
         self.assertEqual(payload["booking"]["status"], "Requested")
         self.assertEqual(payload["booking"]["service_type"], "Podcast support")
-        staff_rate, promo_pct = 6500, 60
-        expected_original = self._staff_price(staff_rate, 60)
-        expected_discount = expected_original * promo_pct // 100
-        self.assertEqual(payload["booking"]["original_price_cents"], expected_original)
-        self.assertEqual(payload["booking"]["discount_cents"], expected_discount)
-        self.assertEqual(payload["booking"]["price_cents"], expected_original - expected_discount)
-        self.assertEqual(payload["booking"]["promo_code"], "SUMMER60")
+        # Direct staff bookings are free requests — no price, no promo applied.
+        self.assertEqual(payload["booking"]["original_price_cents"], 0)
+        self.assertEqual(payload["booking"]["discount_cents"], 0)
+        self.assertEqual(payload["booking"]["price_cents"], 0)
+        self.assertIsNone(payload["booking"]["promo_code"])
         self.assertEqual(payload["booking"]["staff_profile"]["name"], "Podcast Engineer")
 
         # Request-first flow: the staff member accepts before the customer can pay.
@@ -1204,8 +1180,9 @@ class AppSmokeTest(unittest.TestCase):
             headers=guest_headers,
         )
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertTrue(response.json()["payment_intent_id"])
-        self.assertTrue(response.json()["payment_client_secret"])
+        # Free booking: payment session reports no charge instead of a Stripe intent.
+        self.assertEqual(response.json()["payment_backend"], "free")
+        self.assertIsNone(response.json()["payment_intent_id"])
 
         response = self.client.put(
             f"/api/staff-bookings/{payload['booking']['id']}/contact",
@@ -1253,6 +1230,7 @@ class AppSmokeTest(unittest.TestCase):
                 booking_rate_cents=7000,
                 service_types=["Producer session"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(profile)
@@ -1574,6 +1552,7 @@ class AppSmokeTest(unittest.TestCase):
                 add_on_price_cents=0,
                 service_types=["Recording"],
                 booking_enabled=True,
+                schedule_published=True,
                 active=True,
             )
             db.add(profile)
@@ -2393,15 +2372,19 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         booking = response.json()
 
-        # Customers can no longer reschedule — admin-only now.
+        # Customers can reschedule their own active bookings.
         response = self.client.post(
             f"/api/bookings/{booking['id']}/reschedule",
             headers=user_headers,
             json={
-                "start_time": self._future_time(day=20, hour=12, minute=0).isoformat(),
+                "start_time": self._future_time(day=20, hour=11, minute=0).isoformat(),
             },
         )
-        self.assertEqual(response.status_code, 403, response.text)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(
+            datetime.fromisoformat(response.json()["start_time"].replace("Z", "+00:00")),
+            self._future_time(day=20, hour=11).astimezone(timezone.utc),
+        )
 
         response = self.client.post(
             "/api/auth/signup",

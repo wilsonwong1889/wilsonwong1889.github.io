@@ -3,7 +3,7 @@ responds to their own booking requests in-app (no email/SMS required)."""
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_staff_user
@@ -11,7 +11,7 @@ from app.database import get_db
 from app.models.staff_booking import StaffBooking
 from app.models.staff_profile import StaffProfile
 from app.models.user import User
-from app.schemas.staff import StaffProfileOut
+from app.schemas.staff import StaffPhotoUploadOut, StaffProfileOut, StaffSelfProfileUpdate
 from app.schemas.staff_availability import (
     StaffAvailabilityExceptionCreate,
     StaffAvailabilityExceptionOut,
@@ -28,7 +28,12 @@ from app.services.staff_booking_service import (
     decline_staff_booking,
     list_staff_bookings_for_profile,
 )
-from app.services.staff_service import get_staff_profile_for_user
+from app.services.staff_service import (
+    StaffPhotoError,
+    get_staff_profile_for_user,
+    save_staff_photo,
+    update_own_staff_profile,
+)
 
 router = APIRouter(prefix="/api/staff/me", tags=["Staff Portal"])
 
@@ -46,6 +51,32 @@ def require_my_profile(
 @router.get("", response_model=StaffProfileOut)
 def get_my_staff_profile(profile: StaffProfile = Depends(require_my_profile)):
     return profile
+
+
+@router.put("", response_model=StaffProfileOut)
+def update_my_staff_profile(
+    payload: StaffSelfProfileUpdate,
+    db: Session = Depends(get_db),
+    profile: StaffProfile = Depends(require_my_profile),
+):
+    """Staff edit their own profile. Pricing, publish-to-public, account link,
+    active/approval status and assignments stay admin-only (not in the schema)."""
+    try:
+        return update_own_staff_profile(db, profile, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/photo", response_model=StaffPhotoUploadOut)
+async def upload_my_staff_photo(
+    photo: UploadFile = File(...),
+    _: StaffProfile = Depends(require_my_profile),
+):
+    try:
+        photo_url = save_staff_photo(await photo.read(), photo.filename)
+    except StaffPhotoError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"photo_url": photo_url}
 
 
 # ── My weekly schedule ───────────────────────────────────────────────────────

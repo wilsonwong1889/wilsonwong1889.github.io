@@ -49,6 +49,8 @@ class BookingPaymentE2ETest(unittest.TestCase):
         cls.Room = Room
         cls.ensure_admin_user = staticmethod(ensure_admin_user)
 
+        with cls.engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
         cls.Base.metadata.create_all(bind=cls.engine)
 
         from fastapi.testclient import TestClient
@@ -196,7 +198,8 @@ class BookingPaymentE2ETest(unittest.TestCase):
         self.assertEqual(booking_response.status_code, 201, booking_response.text)
         booking = booking_response.json()
         self.assertEqual(booking["status"], "PendingPayment")
-        self.assertEqual(booking["price_cents"], 14175)
+        # Room (10000) + one staff at the flat $25/hr add-on (2500 for 1h) + 5% tax.
+        self.assertEqual(booking["price_cents"], 13125)
         self.assertEqual(len(booking["staff_assignments"]), 1)
         self.assertEqual(booking["staff_assignments"][0]["name"], "Sound Engineer")
         self.assertIsNotNone(booking["payment_expires_at"])

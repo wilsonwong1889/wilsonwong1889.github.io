@@ -9,7 +9,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -33,6 +33,7 @@ from app.services.booking_service import (
     create_notification_log,
     ensure_booking_start_not_in_past,
     ensure_single_booking_per_day,
+    is_database_booking_conflict,
     is_booking_date_before_today,
 )
 from app.services.payment_service import (
@@ -261,6 +262,16 @@ def _availability_windows_for_staff_date(
         available_windows_for_date,
         has_availability_rules,
     )
+
+    # Unpublished schedules aren't bookable by the public — the staff member is
+    # still listed, but shows no available times until an admin publishes.
+    published = (
+        db.query(StaffProfile.schedule_published)
+        .filter(StaffProfile.id == staff_profile_id)
+        .scalar()
+    )
+    if not published:
+        return []
 
     open_hour, close_hour = get_booking_window_hours()
     if has_availability_rules(db, staff_profile_id):
@@ -535,10 +546,12 @@ def _create_staff_booking_record(
     validate_booking_window(normalized_start, end_time)
     ensure_staff_window_is_available(db, profile.id, normalized_start, end_time)
     if enforce_daily_limit:
-        ensure_single_booking_per_day(db, user, normalized_start)
+        ensure_single_booking_per_day(db, user, normalized_start, duration_minutes)
     ensure_staff_is_available(db, profile.id, normalized_start, end_time)
-    original_price_cents = calculate_price_cents(get_staff_booking_rate_cents(profile), duration_minutes)
-    promo_result = apply_promo_code_to_amount(db, promo_code, original_price_cents, user)
+    # Booking a staff member on their own is free — there is no set price. It is
+    # a request sent to the staff dashboard; the staff member accepts and the
+    # customer completes a $0 confirmation. (Staff added to a room booking are
+    # still charged as a room add-on — see booking_service.)
 
     booking = StaffBooking(
         user_id=user.id,
@@ -547,10 +560,10 @@ def _create_staff_booking_record(
         start_time=normalized_start,
         end_time=end_time,
         duration_minutes=duration_minutes,
-        original_price_cents=original_price_cents,
-        discount_cents=promo_result["discount_cents"],
-        promo_code=promo_result["promo_code"].code if promo_result["promo_code"] else None,
-        price_cents=promo_result["final_amount_cents"],
+        original_price_cents=0,
+        discount_cents=0,
+        promo_code=None,
+        price_cents=0,
         currency=settings.DEFAULT_CURRENCY,
         # Request-first: the booking starts as a request and is only charged
         # once the staff member accepts (see accept_staff_booking).
@@ -565,8 +578,10 @@ def _create_staff_booking_record(
     try:
         db.add(booking)
         db.commit()
-    except IntegrityError as exc:
+    except (IntegrityError, OperationalError) as exc:
         db.rollback()
+        if not is_database_booking_conflict(exc):
+            raise
         raise StaffBookingConflictError("Selected time is no longer available") from exc
 
     db.refresh(booking)
@@ -653,20 +668,27 @@ def accept_staff_booking(db: Session, booking: StaffBooking, *, actor_id: UUID |
     if booking.status != "Requested":
         raise StaffBookingStateError("This booking request is no longer pending a response")
 
-    try:
-        payment_intent = create_payment_intent(
-            amount_cents=booking.price_cents,
-            currency=booking.currency,
-            booking_id=str(booking.id),
-            user_email=booking.user_email_snapshot or "",
-            metadata={"booking_type": "staff", "staff_booking_id": str(booking.id)},
-        )
-    except PaymentBackendError:
-        db.rollback()
-        raise
+    # A direct staff booking is free: skip Stripe entirely. The customer
+    # completes a $0 confirmation (confirm_free_staff_booking). Paid bookings
+    # (legacy / non-zero) still mint a payment intent.
+    if booking.price_cents <= 0:
+        booking.payment_intent_id = None
+        booking.payment_client_secret = None
+    else:
+        try:
+            payment_intent = create_payment_intent(
+                amount_cents=booking.price_cents,
+                currency=booking.currency,
+                booking_id=str(booking.id),
+                user_email=booking.user_email_snapshot or "",
+                metadata={"booking_type": "staff", "staff_booking_id": str(booking.id)},
+            )
+        except PaymentBackendError:
+            db.rollback()
+            raise
+        booking.payment_intent_id = payment_intent.intent_id
+        booking.payment_client_secret = payment_intent.client_secret
 
-    booking.payment_intent_id = payment_intent.intent_id
-    booking.payment_client_secret = payment_intent.client_secret
     booking.status = "AcceptedPendingPayment"
     booking.responded_at = datetime.now(timezone.utc)
     create_notification_log(
@@ -730,6 +752,18 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
     if expire_pending_staff_booking(db, booking):
         db.commit()
         raise PaymentSessionError("Payment window expired for this booking")
+    # Free direct staff booking: no Stripe, the customer confirms at $0.
+    if booking.price_cents <= 0:
+        attach_staff_profile_snapshot(db, booking)
+        return {
+            "booking_id": booking.id,
+            "payment_intent_id": None,
+            "payment_client_secret": None,
+            "payment_backend": "free",
+            "stripe_publishable_key": "",
+            "payment_expires_at": booking.payment_expires_at,
+            "payment_seconds_remaining": booking.payment_seconds_remaining,
+        }
     payment_session = get_payment_intent_session(
         payment_intent_id=booking.payment_intent_id,
         amount_cents=booking.price_cents,
@@ -756,6 +790,31 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
         "payment_expires_at": booking.payment_expires_at,
         "payment_seconds_remaining": booking.payment_seconds_remaining,
     }
+
+
+def confirm_free_staff_booking(db: Session, booking: StaffBooking) -> StaffBooking:
+    """Customer completes the $0 confirmation for an accepted free staff booking.
+    No Stripe — the booking is confirmed directly."""
+    expire_stale_pending_staff_bookings(db)
+    db.refresh(booking)
+    if booking.status not in PAYABLE_STATUSES:
+        raise StaffBookingStateError("This booking is not awaiting confirmation")
+    if booking.price_cents > 0:
+        raise StaffBookingStateError("This booking requires payment and cannot be confirmed for free")
+    if expire_pending_staff_booking(db, booking):
+        db.commit()
+        raise StaffBookingStateError("The confirmation window for this booking expired")
+    booking = mark_staff_booking_paid(db, booking, f"free_staff_{uuid4().hex[:20]}")
+    create_audit_log(
+        db,
+        actor_id=booking.user_id,
+        booking_id=None,
+        action="staff_booking_confirmed_free",
+        details={"staff_booking_id": str(booking.id)},
+    )
+    db.commit()
+    db.refresh(booking)
+    return attach_staff_profile_snapshot(db, booking)
 
 
 def waive_staff_booking_payment(db: Session, booking: StaffBooking, admin: User) -> StaffBooking:
@@ -816,6 +875,19 @@ def reschedule_staff_booking(
     end_time = normalized_start + timedelta(minutes=booking.duration_minutes)
     validate_booking_window(normalized_start, end_time)
     ensure_staff_window_is_available(db, booking.staff_profile_id, normalized_start, end_time)
+    limit_user = user
+    if booking.user_id and booking.user_id != user.id:
+        owner = db.query(User).filter(User.id == booking.user_id).first()
+        if owner:
+            limit_user = owner
+    if not user_has_admin_access(limit_user):
+        ensure_single_booking_per_day(
+            db,
+            limit_user,
+            normalized_start,
+            booking.duration_minutes,
+            exclude_staff_booking_id=booking.id,
+        )
     ensure_staff_is_available(
         db,
         booking.staff_profile_id,
@@ -823,19 +895,25 @@ def reschedule_staff_booking(
         end_time,
         exclude_staff_booking_id=booking.id,
     )
-    booking.start_time = normalized_start
-    booking.end_time = end_time
-    create_audit_log(
-        db,
-        actor_id=user.id,
-        booking_id=None,
-        action="staff_booking_rescheduled",
-        details={
-            "staff_booking_id": str(booking.id),
-            "new_start_time": normalized_start.isoformat(),
-        },
-    )
-    db.commit()
+    try:
+        booking.start_time = normalized_start
+        booking.end_time = end_time
+        create_audit_log(
+            db,
+            actor_id=user.id,
+            booking_id=None,
+            action="staff_booking_rescheduled",
+            details={
+                "staff_booking_id": str(booking.id),
+                "new_start_time": normalized_start.isoformat(),
+            },
+        )
+        db.commit()
+    except (IntegrityError, OperationalError) as exc:
+        db.rollback()
+        if not is_database_booking_conflict(exc):
+            raise
+        raise StaffBookingConflictError("Selected time is no longer available") from exc
     db.refresh(booking)
     return attach_staff_profile_snapshot(db, booking)
 
@@ -983,6 +1061,20 @@ def handle_staff_booking_payment_webhook_event(db: Session, event: dict) -> dict
     return {"received": True, "ignored": True}
 
 
+def count_staff_bookings_needing_confirmation(db: Session, user: User) -> int:
+    """Customer-facing count: accepted free staff requests still awaiting the
+    customer's $0 confirmation — used for the in-app 'action required' badge."""
+    return (
+        db.query(StaffBooking)
+        .filter(
+            StaffBooking.user_id == user.id,
+            StaffBooking.status.in_(PAYABLE_STATUSES),
+            StaffBooking.price_cents <= 0,
+        )
+        .count()
+    )
+
+
 def build_staff_booking_feed_item(booking: StaffBooking, *, profile: Optional[StaffProfile] = None) -> dict:
     profile = profile or getattr(booking, "staff_profile", None)
     title = (profile.name if profile else None) or booking.service_type or "Staff booking"
@@ -1034,5 +1126,7 @@ def build_staff_booking_feed_item(booking: StaffBooking, *, profile: Optional[St
         "awaiting_approval": booking.status == "Requested",
         "can_cancel": booking.status in ("Requested", "AcceptedPendingPayment", "PendingPayment", "Paid"),
         "can_pay": booking.status in PAYABLE_STATUSES,
+        # Accepted free request the customer still needs to confirm at $0.
+        "needs_confirmation": booking.status in PAYABLE_STATUSES and (booking.price_cents or 0) <= 0,
         "staff_profile": staff_profile_data,
     }

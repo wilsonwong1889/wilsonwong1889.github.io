@@ -45,8 +45,6 @@ function buildProfilePayload() {
     city: asText(form.get("city")),
     opt_in_email: form.get("opt_in_email") === "on",
     opt_in_sms: form.get("opt_in_sms") === "on",
-    two_factor_enabled: form.get("two_factor_enabled") === "on",
-    two_factor_method: asText(form.get("two_factor_method")) || "email",
   };
 }
 
@@ -99,8 +97,6 @@ function applySnapshot(snapshot) {
   elements.profileForm.city.value = snapshot.city || "";
   elements.profileForm.opt_in_email.checked = Boolean(snapshot.opt_in_email);
   elements.profileForm.opt_in_sms.checked = Boolean(snapshot.opt_in_sms);
-  elements.profileForm.two_factor_enabled.checked = Boolean(snapshot.two_factor_enabled);
-  elements.profileForm.two_factor_method.value = snapshot.two_factor_method || "email";
   renderAvatarPreview(snapshot.avatar_url || null, snapshot.full_name || snapshot.email || "Profile");
   applyingDraft = false;
 }
@@ -119,8 +115,6 @@ function profileFingerprint(user) {
     city: user.city,
     opt_in_email: user.opt_in_email,
     opt_in_sms: user.opt_in_sms,
-    two_factor_enabled: user.two_factor_enabled,
-    two_factor_method: user.two_factor_method,
     updated_at: user.updated_at,
   });
 }
@@ -282,8 +276,6 @@ function hydrateFromUser(user) {
     city: user.city,
     opt_in_email: user.opt_in_email,
     opt_in_sms: user.opt_in_sms,
-    two_factor_enabled: user.two_factor_enabled,
-    two_factor_method: user.two_factor_method,
   });
 }
 

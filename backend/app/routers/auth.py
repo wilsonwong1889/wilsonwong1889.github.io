@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from secrets import randbelow, token_urlsafe
+from secrets import token_urlsafe
 
 import httpx
 
@@ -21,8 +20,6 @@ from app.schemas.user import (
     PasswordResetConfirmIn,
     PasswordResetRequestIn,
     Token,
-    TwoFactorResendIn,
-    TwoFactorVerifyIn,
     UserCreate,
     UserOut,
 )
@@ -32,10 +29,8 @@ from app.services.booking_service import create_notification_log
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 auth_rate_limit = rate_limit_dependency("auth", settings.AUTH_RATE_LIMIT_MAX_REQUESTS)
 email_adapter = TypeAdapter(EmailStr)
-
-
-def _generate_two_factor_code() -> str:
-    return f"{randbelow(1_000_000):06d}"
+DUMMY_PASSWORD_HASH = hash_password(token_urlsafe(32))
+INVALID_CREDENTIALS_DETAIL = "Invalid email or password."
 
 
 def _validate_email_address(email: str) -> str:
@@ -46,94 +41,21 @@ def _validate_email_address(email: str) -> str:
     return str(normalized)
 
 
-def _normalize_two_factor_method(user: User) -> str:
-    method = (user.two_factor_method or "email").strip().lower()
-    if method not in {"email", "sms"}:
-        return "email"
-    if method == "sms" and not user.phone:
-        raise HTTPException(status_code=400, detail="Two-factor SMS requires a phone number on the account")
-    if method == "email" and not user.email:
-        raise HTTPException(status_code=400, detail="Two-factor email requires an email address on the account")
-    return method
-
-
-def _queue_two_factor_delivery(db: Session, user: User, method: str, code: str) -> None:
-    notification_type = f"login_verification_{method}"
-    create_notification_log(
-        db,
-        user_id=user.id,
-        booking_id=None,
-        notification_type=notification_type,
-        status="Queued",
-        details={
-            "queued_tasks": [f"send_login_verification_{method}"],
-            "expires_in_minutes": settings.TWO_FACTOR_CODE_EXPIRE_MINUTES,
-        },
-    )
-    db.commit()
-
-    from app.tasks import (
-        send_login_verification_email_task,
-        send_login_verification_sms_task,
-    )
-
-    if method == "sms":
-        send_login_verification_sms_task.delay(str(user.id), code)
-        return
-    send_login_verification_email_task.delay(str(user.id), code)
-
-
-def _create_two_factor_challenge(db: Session, user: User) -> Token:
-    method = _normalize_two_factor_method(user)
-    code = _generate_two_factor_code()
-    user.two_factor_method = method
-    user.two_factor_code_hash = hash_password(code)
-    user.two_factor_code_expires_at = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.TWO_FACTOR_CODE_EXPIRE_MINUTES
-    )
-    db.commit()
-    db.refresh(user)
-    _queue_two_factor_delivery(db, user, method, code)
-    challenge_token = create_access_token(
-        {"sub": str(user.id), "purpose": "login_2fa"},
-        expires_minutes=settings.TWO_FACTOR_CODE_EXPIRE_MINUTES,
-    )
-    return Token(
-        two_factor_required=True,
-        two_factor_token=challenge_token,
-        two_factor_method=method,
-    )
-
-
-def _verify_two_factor_token(db: Session, payload: TwoFactorVerifyIn) -> User:
-    try:
-        token_payload = decode_token(payload.two_factor_token)
-    except Exception as exc:  # pragma: no cover - jose raises multiple subclasses
-        raise HTTPException(status_code=401, detail="Two-factor session expired") from exc
-
-    if token_payload.get("purpose") != "login_2fa":
-        raise HTTPException(status_code=401, detail="Invalid two-factor session")
-
-    user = db.query(User).filter(User.id == token_payload.get("sub")).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    expires_at = user.two_factor_code_expires_at
-    if not user.two_factor_code_hash or not expires_at:
-        raise HTTPException(status_code=400, detail="No active two-factor code")
-    if expires_at <= datetime.now(timezone.utc):
+def _clear_legacy_login_challenge_state(user: User) -> bool:
+    changed = False
+    if user.two_factor_enabled:
+        user.two_factor_enabled = False
+        changed = True
+    if user.two_factor_method != "email":
+        user.two_factor_method = "email"
+        changed = True
+    if user.two_factor_code_hash:
         user.two_factor_code_hash = None
+        changed = True
+    if user.two_factor_code_expires_at:
         user.two_factor_code_expires_at = None
-        db.commit()
-        raise HTTPException(status_code=401, detail="Two-factor code expired")
-    if not verify_password(payload.code, user.two_factor_code_hash):
-        raise HTTPException(status_code=401, detail="Invalid verification code")
-
-    user.two_factor_code_hash = None
-    user.two_factor_code_expires_at = None
-    db.commit()
-    db.refresh(user)
-    return user
+        changed = True
+    return changed
 
 
 def _verify_password_reset_token(db: Session, reset_token: str) -> User:
@@ -250,6 +172,7 @@ def google_exchange(
         if phone and not user.phone:
             user.phone = phone
 
+    _clear_legacy_login_challenge_state(user)
     db.commit()
     db.refresh(user)
     return Token(access_token=create_access_token({"sub": str(user.id)}), token_type="bearer")
@@ -263,13 +186,13 @@ def login(
 ):
     email = _validate_email_address(form_data.username)
     user = db.query(User).filter(User.email == email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="We couldn't find an account with that email.")
-    if not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Wrong password. Try again or reset it.")
+    password_hash = user.password_hash if user else DUMMY_PASSWORD_HASH
+    if not verify_password(form_data.password, password_hash) or not user:
+        raise HTTPException(status_code=401, detail=INVALID_CREDENTIALS_DETAIL)
 
-    if user.two_factor_enabled:
-        return _create_two_factor_challenge(db, user)
+    if _clear_legacy_login_challenge_state(user):
+        db.commit()
+        db.refresh(user)
 
     token = create_access_token({"sub": str(user.id)})
     return Token(access_token=token, token_type="bearer")
@@ -322,41 +245,8 @@ def reset_password(
         raise HTTPException(status_code=400, detail="Choose a new password that is different from the current one.")
 
     user.password_hash = hash_password(payload.new_password)
-    user.two_factor_code_hash = None
-    user.two_factor_code_expires_at = None
+    _clear_legacy_login_challenge_state(user)
     db.commit()
-
-
-@router.post("/verify-2fa", response_model=Token)
-def verify_two_factor(
-    payload: TwoFactorVerifyIn,
-    db: Session = Depends(get_db),
-    _: None = Depends(auth_rate_limit),
-):
-    user = _verify_two_factor_token(db, payload)
-    token = create_access_token({"sub": str(user.id)})
-    return Token(access_token=token, token_type="bearer")
-
-
-@router.post("/resend-2fa", response_model=Token)
-def resend_two_factor(
-    payload: TwoFactorResendIn,
-    db: Session = Depends(get_db),
-    _: None = Depends(auth_rate_limit),
-):
-    try:
-        token_payload = decode_token(payload.two_factor_token)
-    except Exception as exc:  # pragma: no cover - jose raises multiple subclasses
-        raise HTTPException(status_code=401, detail="Two-factor session expired") from exc
-
-    if token_payload.get("purpose") != "login_2fa":
-        raise HTTPException(status_code=401, detail="Invalid two-factor session")
-
-    user = db.query(User).filter(User.id == token_payload.get("sub")).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return _create_two_factor_challenge(db, user)
 
 
 @router.get("/me", response_model=UserOut)

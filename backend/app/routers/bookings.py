@@ -5,10 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_admin_user, get_current_user, get_optional_current_user
+from app.core.dependencies import get_current_user, get_optional_current_user
 from app.core.rate_limit import rate_limit_dependency
 from app.database import get_db
-from app.models.booking import Booking
 from app.models.user import User
 from app.schemas.booking import (
     BookingAvailabilityOut,
@@ -55,7 +54,11 @@ from app.services.receipt_service import (
     build_booking_receipt_filename,
     build_booking_receipt_pdf,
 )
-from app.services.staff_booking_service import build_staff_booking_feed_item, list_staff_bookings_for_user
+from app.services.staff_booking_service import (
+    build_staff_booking_feed_item,
+    count_staff_bookings_needing_confirmation,
+    list_staff_bookings_for_user,
+)
 
 
 router = APIRouter(prefix="/api", tags=["Bookings"])
@@ -67,6 +70,7 @@ def room_availability(
     room_id: str,
     date_value: date = Query(alias="date"),
     db: Session = Depends(get_db),
+    _: None = Depends(booking_rate_limit),
 ):
     try:
         return get_room_availability(db, room_id, date_value)
@@ -78,6 +82,7 @@ def room_availability(
 def monthly_availability(
     month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
     db: Session = Depends(get_db),
+    _: None = Depends(booking_rate_limit),
 ):
     return get_monthly_availability_summary(db, month)
 
@@ -98,6 +103,8 @@ def create_reservation(
         )
     except PastBookingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except BookingConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -187,6 +194,16 @@ def list_my_bookings_feed(
         key=lambda item: item.get("start_time"),
         reverse=True,
     )
+
+
+@router.get("/bookings/action-required")
+def my_action_required(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Lightweight count of bookings needing the customer's action (accepted
+    free staff requests awaiting $0 confirmation) for the in-app alert badge."""
+    return {"needs_confirmation": count_staff_bookings_needing_confirmation(db, current_user)}
 
 
 @router.get("/bookings/{booking_id}", response_model=BookingOut)
@@ -295,18 +312,18 @@ def cancel_my_booking(
 
 
 @router.post("/bookings/{booking_id}/reschedule", response_model=BookingOut)
-def reschedule_booking_admin_only(
+def reschedule_my_booking(
     booking_id: str,
     payload: BookingRescheduleIn,
     db: Session = Depends(get_db),
-    admin: User = Depends(get_admin_user),
+    current_user: User = Depends(get_current_user),
     _: None = Depends(booking_rate_limit),
 ):
-    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    booking = get_booking_for_user(db, booking_id, current_user)
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     try:
-        return reschedule_booking(db, booking, admin, payload)
+        return reschedule_booking(db, booking, current_user, payload)
     except BookingConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
