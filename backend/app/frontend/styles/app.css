@@ -220,6 +220,22 @@ body[data-auth-pending="true"] .site-header .header-actions > * {
   color: #00263e;
 }
 
+.header-menu-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #d71920;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .header-user-menu-item.is-primary {
   background: linear-gradient(135deg, #d71920, #9f0f16);
   color: #ffffff;
@@ -8447,9 +8463,18 @@ body[data-page] .header-brand-block {
 }
 
 body[data-page] .header-am-logo {
-  height: 64px;
+  height: 144px;
   width: auto;
   object-fit: contain;
+}
+
+body[data-page="home"] .header-am-logo {
+  height: 144px;
+}
+
+body[data-page] .header-bipoc-side-logo,
+body[data-page="home"] .header-bipoc-side-logo {
+  height: 86px;
 }
 
 body[data-page] .header-powered-by {
@@ -11203,6 +11228,22 @@ button.avail-cal-day:focus-visible {
     padding: 10px 16px;
   }
 
+  body[data-page] .header-am-logo {
+    height: 64px;
+  }
+
+  body[data-page] .header-bipoc-side-logo {
+    height: 38px;
+  }
+
+  body[data-page="home"] .header-am-logo {
+    height: 96px;
+  }
+
+  body[data-page="home"] .header-bipoc-side-logo {
+    height: 57px;
+  }
+
   body[data-page] .header-hub-title {
     font-size: clamp(0.8rem, 3.5vw, 1rem);
     text-align: left;
@@ -11374,6 +11415,18 @@ button.avail-cal-day:focus-visible {
 @media (max-width: 480px) {
   body[data-page] .header-am-logo {
     height: 48px;
+  }
+
+  body[data-page] .header-bipoc-side-logo {
+    height: 38px;
+  }
+
+  body[data-page="home"] .header-am-logo {
+    height: 72px;
+  }
+
+  body[data-page="home"] .header-bipoc-side-logo {
+    height: 57px;
   }
 
   body[data-page] .header-bipoc-inline {

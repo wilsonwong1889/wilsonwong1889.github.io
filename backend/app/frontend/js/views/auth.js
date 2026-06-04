@@ -592,6 +592,11 @@ export function renderAuthView(state) {
 
   if (elements.headerBookingsLink) {
     elements.headerBookingsLink.href = "/bookings";
+    const actionCount = Number(state.actionRequiredCount || 0);
+    elements.headerBookingsLink.innerHTML =
+      state.currentUser && actionCount > 0
+        ? `My Bookings <span class="header-menu-badge" title="${actionCount} booking${actionCount === 1 ? "" : "s"} need your confirmation">${actionCount}</span>`
+        : "My Bookings";
   }
 
   if (elements.headerAdminLink) {

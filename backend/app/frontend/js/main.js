@@ -319,8 +319,22 @@ async function refreshBookings(message) {
       bookings: bookings.map((booking) => normalizeBookingRecord(booking)),
       message: message || "Bookings loaded.",
     });
+    void refreshActionRequiredCount();
   } catch (error) {
     setState({ message: error.message });
+  }
+}
+
+async function refreshActionRequiredCount() {
+  if (!state.token) {
+    setState({ actionRequiredCount: 0 });
+    return;
+  }
+  try {
+    const result = await api.getActionRequiredCount();
+    setState({ actionRequiredCount: Number(result?.needs_confirmation || 0) });
+  } catch (error) {
+    /* badge is best-effort — ignore fetch failures */
   }
 }
 
@@ -712,7 +726,7 @@ async function refreshSession(message) {
   resetScopedData();
 
   if (!state.token) {
-    setState({ currentUser: null, message: message || "Signed out." });
+    setState({ currentUser: null, actionRequiredCount: 0, message: message || "Signed out." });
     await loadPageData("Public view loaded.");
     return;
   }
@@ -720,6 +734,7 @@ async function refreshSession(message) {
   try {
     const currentUser = await api.getMe();
     setState({ currentUser, message: message || "Session restored." });
+    void refreshActionRequiredCount();
     await loadPageData("Session ready.");
   } catch (error) {
     persistToken(null);

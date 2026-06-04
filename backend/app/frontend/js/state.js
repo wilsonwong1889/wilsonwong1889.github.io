@@ -17,6 +17,7 @@ export const state = {
     mode: "exact",
   },
   bookings: [],
+  actionRequiredCount: 0,
   adminBookings: [],
   adminTodayRoster: null,
   adminAnalytics: null,

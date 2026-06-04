@@ -1061,6 +1061,20 @@ def handle_staff_booking_payment_webhook_event(db: Session, event: dict) -> dict
     return {"received": True, "ignored": True}
 
 
+def count_staff_bookings_needing_confirmation(db: Session, user: User) -> int:
+    """Customer-facing count: accepted free staff requests still awaiting the
+    customer's $0 confirmation — used for the in-app 'action required' badge."""
+    return (
+        db.query(StaffBooking)
+        .filter(
+            StaffBooking.user_id == user.id,
+            StaffBooking.status.in_(PAYABLE_STATUSES),
+            StaffBooking.price_cents <= 0,
+        )
+        .count()
+    )
+
+
 def build_staff_booking_feed_item(booking: StaffBooking, *, profile: Optional[StaffProfile] = None) -> dict:
     profile = profile or getattr(booking, "staff_profile", None)
     title = (profile.name if profile else None) or booking.service_type or "Staff booking"
@@ -1112,5 +1126,7 @@ def build_staff_booking_feed_item(booking: StaffBooking, *, profile: Optional[St
         "awaiting_approval": booking.status == "Requested",
         "can_cancel": booking.status in ("Requested", "AcceptedPendingPayment", "PendingPayment", "Paid"),
         "can_pay": booking.status in PAYABLE_STATUSES,
+        # Accepted free request the customer still needs to confirm at $0.
+        "needs_confirmation": booking.status in PAYABLE_STATUSES and (booking.price_cents or 0) <= 0,
         "staff_profile": staff_profile_data,
     }

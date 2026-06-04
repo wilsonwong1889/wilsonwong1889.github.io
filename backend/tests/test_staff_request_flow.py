@@ -98,6 +98,33 @@ class StaffRequestFlowTest(BaseAppTest):
         self.assertEqual(confirmed.status_code, 200, confirmed.text)
         self.assertEqual(confirmed.json()["status"], "Paid")
 
+    def test_02b_action_required_badge_and_feed_flag(self) -> None:
+        admin = self._admin_headers()
+        staff_id = self._staff_id(admin)
+        customer = self._customer_headers("c2b@example.com")
+        booking = self._book(staff_id, customer).json()
+
+        # Requested: not yet awaiting confirmation.
+        self.assertEqual(
+            self.client.get("/api/bookings/action-required", headers=customer).json()["needs_confirmation"], 0
+        )
+
+        self.client.post(f"/api/admin/staff-bookings/{booking['id']}/accept", headers=admin)
+
+        # Accepted free request -> counts toward the badge + feed flag is set.
+        self.assertEqual(
+            self.client.get("/api/bookings/action-required", headers=customer).json()["needs_confirmation"], 1
+        )
+        feed = self.client.get("/api/bookings/feed", headers=customer).json()
+        item = next(b for b in feed if b["id"] == booking["id"])
+        self.assertTrue(item["needs_confirmation"])
+
+        # After the customer confirms, the badge clears.
+        self.client.post(f"/api/staff-bookings/{booking['id']}/confirm", headers=customer)
+        self.assertEqual(
+            self.client.get("/api/bookings/action-required", headers=customer).json()["needs_confirmation"], 0
+        )
+
     def test_03_decline(self) -> None:
         admin = self._admin_headers()
         staff_id = self._staff_id(admin)

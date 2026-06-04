@@ -219,9 +219,28 @@ function getBookingsEmptyMessage(scope) {
     : `No past or cancelled ${kindPrefix}bookings yet.`;
 }
 
+function bookingNeedsConfirmation(booking) {
+  return (
+    Boolean(booking.needs_confirmation) ||
+    (booking.status === "AcceptedPendingPayment" && (booking.price_cents || 0) <= 0)
+  );
+}
+
 function getBookingStatusLabel(booking) {
   if (booking.status === "PendingPayment") {
     return "Pending payment";
+  }
+  if (booking.status === "Requested") {
+    return "Awaiting staff response";
+  }
+  if (booking.status === "AcceptedPendingPayment") {
+    return bookingNeedsConfirmation(booking) ? "Accepted — confirm to book" : "Accepted — payment due";
+  }
+  if (booking.status === "Declined") {
+    return "Declined by staff";
+  }
+  if (booking.status === "Expired") {
+    return "Request expired";
   }
   if (booking.status === "Paid") {
     return isBookingUpcoming(booking) ? "Confirmed" : "Paid";
@@ -249,7 +268,9 @@ function getBookingLifecycleTimeValue(booking) {
 }
 
 function isBookingUpcoming(booking) {
-  if (booking.status === "PendingPayment") {
+  // Active staff requests (awaiting staff response or the customer's free
+  // confirmation) are surfaced as upcoming so the customer can act on them.
+  if (["PendingPayment", "Requested", "AcceptedPendingPayment"].includes(booking.status)) {
     return true;
   }
   if (booking.status !== "Paid") {
@@ -271,7 +292,7 @@ function getUpcomingBookings(bookings) {
 
 function getHistoryBookings(bookings) {
   return bookings
-    .filter((booking) => !isBookingUpcoming(booking) && ["Paid", "Completed", "Cancelled", "Refunded"].includes(booking.status))
+    .filter((booking) => !isBookingUpcoming(booking) && ["Paid", "Completed", "Cancelled", "Refunded", "Declined", "Expired"].includes(booking.status))
     .sort((left, right) => getBookingLifecycleTimeValue(right) - getBookingLifecycleTimeValue(left));
 }
 
@@ -292,6 +313,9 @@ function renderBookingCollection(bookings, emptyMessage, { upcoming = false } = 
 
 function renderBookingCard(booking, { upcoming = false } = {}) {
   const pendingPayment = booking.status === "PendingPayment";
+  const needsConfirmation = bookingNeedsConfirmation(booking);
+  const isRequested = booking.status === "Requested";
+  const highlight = pendingPayment || needsConfirmation;
   const kind = getBookingKind(booking);
   const category = inferBookingCategory(booking);
   const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
@@ -301,10 +325,12 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
   const bookingStatusLabel = getBookingStatusLabel(booking);
   const bookingDateLabel = formatBookingDay(booking.start_time);
   const bookingTimeLabel = `${formatTimeOnly(booking.start_time)} · ${formatDuration(booking.duration_minutes)}`;
-  const bookingTotalLabel = formatCurrency(booking.price_cents);
+  const bookingTotalLabel = needsConfirmation || (kind === "staff" && (booking.price_cents || 0) <= 0)
+    ? "Free"
+    : formatCurrency(booking.price_cents);
   const actionLabel = pendingPayment ? "Finish payment" : upcoming ? "Manage booking" : "View details";
   const actionClass = pendingPayment ? "primary-button primary-link" : "ghost-button ghost-link";
-  const canCancel = upcoming && ["PendingPayment", "Paid"].includes(booking.status);
+  const canCancel = upcoming && ["PendingPayment", "Paid", "Requested", "AcceptedPendingPayment"].includes(booking.status);
   const detailHref = getBookingDetailHref(booking);
   const hasLiveCountdown = pendingPayment && booking.payment_expires_at;
   const supportCopy = pendingPayment
@@ -313,17 +339,25 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
       : kind === "staff"
         ? "Finish payment to keep the staff session reserved."
         : "Finish payment to keep the reservation"
-    : upcoming
-      ? "Deposits are non-refundable"
-      : booking.status === "Cancelled"
-        ? "Reservation cancelled"
-        : "Reservation history";
+    : needsConfirmation
+      ? `${bookingTitle} accepted your request — confirm to lock in your session.`
+      : isRequested
+        ? `Waiting for ${bookingTitle} to accept your request.`
+        : upcoming
+          ? "Deposits are non-refundable"
+          : booking.status === "Declined"
+            ? "Your request was declined."
+            : booking.status === "Expired"
+              ? "This request expired before it was accepted."
+              : booking.status === "Cancelled"
+                ? "Reservation cancelled"
+                : "Reservation history";
   const supportNoteAttrs = hasLiveCountdown
     ? ` data-payment-countdown="${escapeHtml(booking.payment_expires_at)}" data-booking-kind="${escapeHtml(kind)}"`
     : "";
 
   return `
-    <article class="booking-card ${pendingPayment ? "booking-card-pending" : "booking-card-secondary"}">
+    <article class="booking-card ${highlight ? "booking-card-pending" : "booking-card-secondary"}">
       <a class="booking-card-main" href="${escapeHtml(detailHref)}">
         <div class="booking-card-copy">
           <div class="booking-card-heading">
@@ -347,6 +381,7 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
           <span class="booking-card-status-note"${supportNoteAttrs}>${escapeHtml(supportCopy)}</span>
         </div>
         <div class="booking-card-actions">
+          ${needsConfirmation ? `<button class="primary-button" type="button" data-booking-action="confirm-free" data-booking-id="${escapeHtml(booking.id)}">Confirm booking (free)</button>` : ""}
           <a class="${actionClass}" href="${escapeHtml(detailHref)}">${escapeHtml(actionLabel)}</a>
           ${canCancel ? `<button class="ghost-button" type="button" data-booking-action="cancel" data-booking-id="${escapeHtml(booking.id)}">Cancel</button>` : ""}
         </div>
@@ -396,12 +431,29 @@ export function initBookingsView(actions) {
   startBookingsCountdownTimer(actions);
 
   elements.bookingHistoryPanel.addEventListener("click", async (event) => {
-    const button = event.target.closest("[data-booking-action='cancel']");
+    const button = event.target.closest("[data-booking-action]");
     if (!button) {
       return;
     }
+    const action = button.dataset.bookingAction;
+    const bookingId = button.dataset.bookingId;
 
-    const booking = state.bookings.find((item) => String(item.id) === String(button.dataset.bookingId));
+    if (action === "confirm-free") {
+      try {
+        setState({ message: "Confirming your booking..." });
+        await api.confirmFreeStaffBooking(bookingId);
+        await actions.refreshAvailabilityAndBookings("Booking confirmed.");
+      } catch (error) {
+        setState({ message: error.message });
+      }
+      return;
+    }
+
+    if (action !== "cancel") {
+      return;
+    }
+
+    const booking = state.bookings.find((item) => String(item.id) === String(bookingId));
     const bookingKind = getBookingKind(booking);
 
     try {
@@ -411,9 +463,9 @@ export function initBookingsView(actions) {
       }
       setState({ message: "Cancelling booking..." });
       if (bookingKind === "staff") {
-        await api.cancelStaffBooking(button.dataset.bookingId, { reason: "Cancelled by user" });
+        await api.cancelStaffBooking(bookingId, { reason: "Cancelled by user" });
       } else {
-        await api.cancelBooking(button.dataset.bookingId, { reason: "Cancelled by user" });
+        await api.cancelBooking(bookingId, { reason: "Cancelled by user" });
       }
       await actions.refreshAvailabilityAndBookings("Booking cancelled.");
     } catch (error) {

@@ -54,7 +54,11 @@ from app.services.receipt_service import (
     build_booking_receipt_filename,
     build_booking_receipt_pdf,
 )
-from app.services.staff_booking_service import build_staff_booking_feed_item, list_staff_bookings_for_user
+from app.services.staff_booking_service import (
+    build_staff_booking_feed_item,
+    count_staff_bookings_needing_confirmation,
+    list_staff_bookings_for_user,
+)
 
 
 router = APIRouter(prefix="/api", tags=["Bookings"])
@@ -190,6 +194,16 @@ def list_my_bookings_feed(
         key=lambda item: item.get("start_time"),
         reverse=True,
     )
+
+
+@router.get("/bookings/action-required")
+def my_action_required(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Lightweight count of bookings needing the customer's action (accepted
+    free staff requests awaiting $0 confirmation) for the in-app alert badge."""
+    return {"needs_confirmation": count_staff_bookings_needing_confirmation(db, current_user)}
 
 
 @router.get("/bookings/{booking_id}", response_model=BookingOut)

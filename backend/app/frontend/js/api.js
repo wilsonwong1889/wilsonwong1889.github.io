@@ -131,6 +131,9 @@ export const api = {
   getBookingsFeed() {
     return request("/api/bookings/feed").catch(() => request("/api/bookings"));
   },
+  getActionRequiredCount() {
+    return request("/api/bookings/action-required");
+  },
   getBooking(bookingId) {
     return request(`/api/bookings/${bookingId}`);
   },
