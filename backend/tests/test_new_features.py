@@ -543,9 +543,9 @@ class NewFeaturesSmokeTest(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 201, resp.text)
         b = resp.json()
-        # subtotal = room (10000) + staff (3000) = 13000; tax = floor(13000*0.05) = 650
-        self.assertEqual(b.get("tax_cents"), floor(13000 * 0.05))
-        self.assertEqual(b.get("price_cents"), 13000 + floor(13000 * 0.05))
+        # subtotal = room (10000) + one staff at flat $25/hr for 1h (2500) = 12500
+        self.assertEqual(b.get("tax_cents"), floor(12500 * 0.05))
+        self.assertEqual(b.get("price_cents"), 12500 + floor(12500 * 0.05))
 
     # ── Booking intake note ───────────────────────────────────────────────────
 

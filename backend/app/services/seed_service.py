@@ -134,68 +134,7 @@ DEFAULT_ROOM_SEEDS: tuple[dict, ...] = (
     },
 )
 
-DEFAULT_STAFF_PROFILE_SEEDS: tuple[dict, ...] = (
-    {
-        "name": "Jordan Lee",
-        "description": "Versatile sound engineer and music producer with a decade of experience in recording, mixing, and live production across genres.",
-        "skills": ["Sound Engineering", "Music Production", "Mixing & Mastering"],
-        "talents": ["Live Recording", "Vocal Production", "Beat Making"],
-        "service_types": ["Sound Engineer", "Music Producer"],
-        "booking_rate_cents": 7500,
-        "photo_url": "/assets/media/staff/05e8ac68bc274a04a5c2795433a5e4a6.jpg",
-        "active": True,
-    },
-    {
-        "name": "Priya Sharma",
-        "description": "Award-winning photographer specializing in portrait, editorial, and brand photography. Brings warmth and intentionality to every shoot.",
-        "skills": ["Portrait Photography", "Editorial Photography", "Lighting Design"],
-        "talents": ["Retouching", "Brand Storytelling", "Studio Lighting"],
-        "service_types": ["Photographer"],
-        "booking_rate_cents": 8500,
-        "photo_url": "/assets/media/staff/14f170a760ad41c6a228c04ca64f545d.jpg",
-        "active": True,
-    },
-    {
-        "name": "Marcus Webb",
-        "description": "Filmmaker and videographer focused on documentary, narrative, and social media content. Skilled with cinema cameras and post-production.",
-        "skills": ["Videography", "Film Directing", "Color Grading"],
-        "talents": ["Drone Operation", "Motion Graphics", "Interview Production"],
-        "service_types": ["Videographer / Filmer", "Creative Director"],
-        "booking_rate_cents": 9000,
-        "photo_url": "/assets/media/staff/2864e21b8bc54f1480fe1a7d1346aa38.jpg",
-        "active": True,
-    },
-    {
-        "name": "Amara Osei",
-        "description": "Podcast producer and audio storyteller helping creators build consistent, professional shows from concept to final episode.",
-        "skills": ["Podcast Production", "Audio Editing", "Show Development"],
-        "talents": ["Guest Coaching", "RSS & Distribution", "Sound Design"],
-        "service_types": ["Podcast Producer"],
-        "booking_rate_cents": 6500,
-        "photo_url": "/assets/media/staff/50ea9fe562724e939b0e3da828c6cb07.jpg",
-        "active": True,
-    },
-    {
-        "name": "Tasha Rivera",
-        "description": "Graphic designer and content creator crafting bold visual identities, social media assets, and digital campaigns for independent artists and brands.",
-        "skills": ["Graphic Design", "Brand Identity", "Social Media Content"],
-        "talents": ["Logo Design", "Typography", "Campaign Strategy"],
-        "service_types": ["Graphic Designer", "Content Creator"],
-        "booking_rate_cents": 6000,
-        "photo_url": "/assets/media/staff/976e0904078b457f94586eddf6447dd4.jpg",
-        "active": True,
-    },
-    {
-        "name": "Devon Clarke",
-        "description": "Lighting technician with expertise in studio, stage, and film setups. Helps teams achieve the exact look and feel their creative vision demands.",
-        "skills": ["Lighting Design", "Studio Setup", "Colour Temperature"],
-        "talents": ["LED Programming", "Photography Assist", "Video Lighting"],
-        "service_types": ["Lighting Technician"],
-        "booking_rate_cents": 5500,
-        "photo_url": "/assets/media/staff/c4750caebf464a9eb8cf982474c32a45.jpg",
-        "active": True,
-    },
-)
+DEFAULT_STAFF_PROFILE_SEEDS: tuple[dict, ...] = ()
 
 DEFAULT_PROMO_CODE_SEEDS: tuple[dict, ...] = (
     {

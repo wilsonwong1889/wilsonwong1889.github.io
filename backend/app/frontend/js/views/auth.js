@@ -7,10 +7,8 @@ import {
   signOutSupabase,
   startGoogleSignIn,
 } from "../supabase.js";
-import { persistToken, setState } from "../state.js";
+import { persistToken, setState, state } from "../state.js";
 
-let pendingTwoFactorToken = null;
-let pendingTwoFactorMethod = "email";
 let googleButtonBusy = false;
 let headerMenuOpen = false;
 let headerMenuBound = false;
@@ -122,7 +120,6 @@ function setAccountAuthCopy(mode) {
     signup: ["Create your account", "Join the Hub — save your details for faster bookings"],
     "forgot-password": ["Reset your password", "Enter your email and we'll send you a reset link"],
     "reset-password": ["Choose a new password", "Create a new password for your account"],
-    "two-factor": ["One more step", "Enter the verification code we sent to your sign-in method"],
   };
   const [nextTitle, nextCopy] = content[mode] || content.login;
   title.textContent = nextTitle;
@@ -171,12 +168,7 @@ function setAuthMode(mode, { preserveFeedback = false } = {}) {
   clearPasswordMatchFeedback(elements.signupPasswordMatchFeedback);
   clearPasswordMatchFeedback(elements.resetPasswordMatchFeedback);
 
-  const loginFamilyModes = new Set([
-    "login",
-    "two-factor",
-    "forgot-password",
-    "reset-password",
-  ]);
+  const loginFamilyModes = new Set(["login", "forgot-password", "reset-password"]);
   const activeTab = loginFamilyModes.has(mode) ? "login" : "signup";
 
   elements.authTabs.forEach((button) => {
@@ -184,16 +176,17 @@ function setAuthMode(mode, { preserveFeedback = false } = {}) {
   });
 
   toggleHidden(elements.loginForm, mode !== "login");
-  toggleHidden(elements.login2faForm, mode !== "two-factor");
   toggleHidden(elements.forgotPasswordForm, mode !== "forgot-password");
   toggleHidden(elements.resetPasswordForm, mode !== "reset-password");
   toggleHidden(elements.signupForm, mode !== "signup");
 }
 
 function activateTab(tab) {
-  pendingTwoFactorToken = null;
-  pendingTwoFactorMethod = "email";
   setAuthMode(tab === "signup" ? "signup" : "login");
+}
+
+function redirectHome() {
+  window.location.assign("/");
 }
 
 function setGoogleButtonsDisabled(isDisabled) {
@@ -226,7 +219,7 @@ async function handleGoogleSignIn() {
   }
 }
 
-async function finalizeGoogleSignIn(actions) {
+async function finalizeGoogleSignIn() {
   const supabaseReady = await hasSupabaseConfig();
   if (!supabaseReady || state.token) {
     return;
@@ -244,11 +237,12 @@ async function finalizeGoogleSignIn(actions) {
 
   try {
     const session = await api.loginWithGoogle(accessToken);
+    if (!session.access_token) {
+      throw new Error("Google sign-in did not return an access token.");
+    }
     persistToken(session.access_token);
-    clearTwoFactorStep();
-    await actions.refreshSession("Logged in with Google.");
     hideAuthFeedback();
-    window.history.replaceState({}, "", "/account");
+    redirectHome();
   } catch (error) {
     showAuthFeedback(error.message || "Google sign-in failed.", "error");
     setState({ message: error.message || "Google sign-in failed." });
@@ -256,24 +250,6 @@ async function finalizeGoogleSignIn(actions) {
     googleButtonBusy = false;
     setGoogleButtonsDisabled(false);
   }
-}
-
-function setTwoFactorStep(method) {
-  pendingTwoFactorMethod = method || "email";
-  setAuthMode("two-factor");
-  if (elements.login2faForm) {
-    elements.login2faForm.reset();
-  }
-  if (elements.login2faCopy) {
-    elements.login2faCopy.textContent = `Enter the 6-digit verification code sent by ${
-      pendingTwoFactorMethod === "sms" ? "SMS" : "email"
-    }.`;
-  }
-}
-
-function clearTwoFactorStep() {
-  pendingTwoFactorToken = null;
-  pendingTwoFactorMethod = "email";
 }
 
 async function requestJson(path, payload) {
@@ -363,7 +339,7 @@ export function initAuthView(actions) {
     toggleHidden(elements.googleAuthNote, !ready);
   });
 
-  finalizeGoogleSignIn(actions);
+  finalizeGoogleSignIn();
 
   elements.authTabs.forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.authTab));
@@ -398,27 +374,13 @@ export function initAuthView(actions) {
       try {
         setState({ message: "Logging in..." });
         const session = await api.login(form.get("email"), form.get("password"));
-        if (session.two_factor_required) {
-          pendingTwoFactorToken = session.two_factor_token;
-          setTwoFactorStep(session.two_factor_method);
-          showAuthFeedback(
-            `Verification code sent by ${
-              session.two_factor_method === "sms" ? "SMS" : "email"
-            }.`,
-            "success",
-          );
-          setState({
-            message: `Verification code sent by ${
-              session.two_factor_method === "sms" ? "SMS" : "email"
-            }.`,
-          });
-          return;
+        if (!session.access_token) {
+          throw new Error("Login did not return an access token.");
         }
         persistToken(session.access_token);
-        clearTwoFactorStep();
         hideAuthFeedback();
         elements.loginForm.reset();
-        await actions.refreshSession("Logged in successfully.");
+        redirectHome();
       } catch (error) {
         applyLoginError(error.message);
         setState({ message: error.message });
@@ -451,29 +413,14 @@ export function initAuthView(actions) {
         setState({ message: "Creating account..." });
         await api.signup(payload);
         const session = await api.login(payload.email, payload.password);
-        if (session.two_factor_required) {
-          pendingTwoFactorToken = session.two_factor_token;
-          setTwoFactorStep(session.two_factor_method);
-          showAuthFeedback(
-            `Account created. Verification code sent by ${
-              session.two_factor_method === "sms" ? "SMS" : "email"
-            }.`,
-            "success",
-          );
-          setState({
-            message: `Account created. Verification code sent by ${
-              session.two_factor_method === "sms" ? "SMS" : "email"
-            }.`,
-          });
-          return;
+        if (!session.access_token) {
+          throw new Error("Account was created, but login did not return an access token.");
         }
         persistToken(session.access_token);
-        clearTwoFactorStep();
         hideAuthFeedback();
         elements.signupForm.reset();
         clearPasswordMatchFeedback(elements.signupPasswordMatchFeedback);
-        await actions.refreshSession("Account created.");
-        activateTab("login");
+        redirectHome();
       } catch (error) {
         applySignupError(error.message);
         setState({ message: error.message });
@@ -482,7 +429,6 @@ export function initAuthView(actions) {
   }
 
   elements.forgotPasswordLink?.addEventListener("click", () => {
-    clearTwoFactorStep();
     setAuthMode("forgot-password");
     showAuthFeedback("Enter your email and we will send a reset link.", "neutral");
   });
@@ -565,70 +511,7 @@ export function initAuthView(actions) {
     }
   });
 
-  elements.login2faForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = new FormData(elements.login2faForm);
-
-    if (!pendingTwoFactorToken) {
-      const message = "Start login again to request a new verification code.";
-      showAuthFeedback(message, "error");
-      setState({ message });
-      activateTab("login");
-      return;
-    }
-
-    try {
-      setState({ message: "Verifying code..." });
-      const session = await requestJson("/api/auth/verify-2fa", {
-        two_factor_token: pendingTwoFactorToken,
-        code: String(form.get("code") || "").trim(),
-      });
-      persistToken(session.access_token);
-      clearTwoFactorStep();
-      hideAuthFeedback();
-      elements.loginForm?.reset();
-      await actions.refreshSession("Two-factor verification complete.");
-    } catch (error) {
-      showAuthFeedback(error.message, "error");
-      setState({ message: error.message });
-    }
-  });
-
-  elements.login2faResendButton?.addEventListener("click", async () => {
-    if (!pendingTwoFactorToken) {
-      const message = "Start login again to request a new verification code.";
-      showAuthFeedback(message, "error");
-      setState({ message });
-      activateTab("login");
-      return;
-    }
-
-    try {
-      setState({ message: "Sending a new verification code..." });
-      const session = await requestJson("/api/auth/resend-2fa", {
-        two_factor_token: pendingTwoFactorToken,
-      });
-      pendingTwoFactorToken = session.two_factor_token;
-      setTwoFactorStep(session.two_factor_method);
-      const message = `New verification code sent by ${
-        session.two_factor_method === "sms" ? "SMS" : "email"
-      }.`;
-      showAuthFeedback(message, "success");
-      setState({ message });
-    } catch (error) {
-      showAuthFeedback(error.message, "error");
-      setState({ message: error.message });
-    }
-  });
-
-  elements.login2faCancelButton?.addEventListener("click", () => {
-    clearTwoFactorStep();
-    setAuthMode("login");
-    setState({ message: "Two-factor sign-in cancelled." });
-  });
-
   const handleLogout = async () => {
-    clearTwoFactorStep();
     hideAuthFeedback();
     await signOutSupabase();
     persistToken(null);
@@ -647,7 +530,6 @@ export function renderAuthView(state) {
   const isSessionRestoring = Boolean(state.token && !state.currentUser);
   document.body?.setAttribute("data-auth-pending", isSessionRestoring ? "true" : "false");
   if (state.currentUser) {
-    clearTwoFactorStep();
     hideAuthFeedback();
   }
 

@@ -68,24 +68,35 @@ class StaffRequestFlowTest(BaseAppTest):
         self.assertIsNone(body["payment_client_secret"])
         self.assertIsNotNone(body["request_expires_at"])
 
-    def test_02_accept_enables_payment(self) -> None:
+    def test_02_accept_enables_free_confirmation(self) -> None:
         admin = self._admin_headers()
         staff_id = self._staff_id(admin)
         customer = self._customer_headers("c2@example.com")
         booking = self._book(staff_id, customer).json()
+        # Direct staff bookings are free requests.
+        self.assertEqual(booking["price_cents"], 0)
 
         accepted = self.client.post(
             f"/api/admin/staff-bookings/{booking['id']}/accept", headers=admin
         )
         self.assertEqual(accepted.status_code, 200, accepted.text)
         self.assertEqual(accepted.json()["status"], "AcceptedPendingPayment")
-        self.assertTrue(accepted.json()["payment_client_secret"])
+        # No Stripe intent — the booking is free.
+        self.assertIsNone(accepted.json()["payment_client_secret"])
 
         session = self.client.post(
             f"/api/staff-bookings/{booking['id']}/payment-session", headers=customer
         )
         self.assertEqual(session.status_code, 200, session.text)
-        self.assertTrue(session.json()["payment_intent_id"])
+        self.assertEqual(session.json()["payment_backend"], "free")
+        self.assertIsNone(session.json()["payment_intent_id"])
+
+        # Customer completes the free $0 confirmation.
+        confirmed = self.client.post(
+            f"/api/staff-bookings/{booking['id']}/confirm", headers=customer
+        )
+        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+        self.assertEqual(confirmed.json()["status"], "Paid")
 
     def test_03_decline(self) -> None:
         admin = self._admin_headers()
@@ -200,9 +211,16 @@ class StaffRequestFlowTest(BaseAppTest):
         admin = self._admin_headers()
         staff_id = self._staff_id(admin)
         booking = self._book(staff_id, self._customer_headers("c9@example.com")).json()
+        # Direct staff bookings are free; force a priced booking so the (still
+        # present) Stripe webhook + auto-refund path is exercised on accept.
+        with self.SessionLocal() as db:
+            row = db.query(StaffBooking).filter(StaffBooking.id == booking["id"]).first()
+            row.price_cents = 5000
+            db.commit()
         accepted = self.client.post(f"/api/admin/staff-bookings/{booking['id']}/accept", headers=admin)
         self.assertEqual(accepted.status_code, 200, accepted.text)
         payment_intent_id = accepted.json()["payment_intent_id"]
+        self.assertIsNotNone(payment_intent_id)
 
         with self.SessionLocal() as db:
             row = db.query(StaffBooking).filter(StaffBooking.id == booking["id"]).first()

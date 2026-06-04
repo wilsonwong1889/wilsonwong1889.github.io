@@ -149,6 +149,7 @@ def public_config():
         "supabase_fully_ready": supabase_status["supabase_fully_ready"],
         "app_base_url": settings.APP_BASE_URL,
         "default_currency": settings.DEFAULT_CURRENCY,
+        "staff_room_addon_hourly_cents": settings.STAFF_ROOM_ADDON_HOURLY_CENTS,
     }
 
 

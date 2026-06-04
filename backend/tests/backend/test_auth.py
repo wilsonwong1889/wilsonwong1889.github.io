@@ -2,12 +2,13 @@
 Backend tests — authentication.
 
 Covers: health/ready endpoints, user signup, login, profile update,
-password change, two-factor login, login error messages, password reset.
+password change, login error messages, password reset.
 """
 import json
 import re
 import sys
 import os
+from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from tests.base import BaseAppTest
@@ -94,69 +95,40 @@ class AuthTest(BaseAppTest):
         self.assertEqual(resp.status_code, 200)
         self.assertIsInstance(resp.json(), list)
 
-    def test_15_two_factor_login_flow(self) -> None:
+    def test_15_login_clears_legacy_challenge_flags(self) -> None:
         signup_payload = {
-            "email": "twofactor@example.com",
+            "email": "legacy-auth-flags@example.com",
             "password": "Password123!",
-            "full_name": "Two Factor User",
+            "full_name": "Legacy Auth User",
             "phone": "5552223333",
         }
         resp = self.client.post("/api/auth/signup", json=signup_payload)
         self.assertEqual(resp.status_code, 201)
 
-        resp = self.client.post(
-            "/api/auth/login",
-            data={"username": signup_payload["email"], "password": signup_payload["password"]},
-        )
-        self.assertEqual(resp.status_code, 200)
-        user_headers = {"Authorization": f"Bearer {resp.json()['access_token']}"}
-
-        resp = self.client.put(
-            "/api/users/me",
-            headers=user_headers,
-            json={"two_factor_enabled": True, "two_factor_method": "email", "opt_in_email": True},
-        )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["two_factor_enabled"])
-        self.assertEqual(resp.json()["two_factor_method"], "email")
+        with self.SessionLocal() as db:
+            user = db.query(self.User).filter(self.User.email == signup_payload["email"]).one()
+            user.two_factor_enabled = True
+            user.two_factor_method = "sms"
+            user.two_factor_code_hash = "stale-code"
+            user.two_factor_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+            db.commit()
 
         resp = self.client.post(
             "/api/auth/login",
             data={"username": signup_payload["email"], "password": signup_payload["password"]},
         )
         self.assertEqual(resp.status_code, 200)
-        login_payload = resp.json()
-        self.assertTrue(login_payload["two_factor_required"])
-        self.assertEqual(login_payload["two_factor_method"], "email")
-        self.assertIsNotNone(login_payload["two_factor_token"])
-        self.assertIsNone(login_payload["access_token"])
+        payload = resp.json()
+        self.assertTrue(payload["access_token"])
+        self.assertNotIn("two_factor_required", payload)
+        self.assertNotIn("two_factor_token", payload)
 
         with self.SessionLocal() as db:
-            notification = (
-                db.query(self.NotificationLog)
-                .filter(self.NotificationLog.type == "login_verification_email_worker")
-                .order_by(self.NotificationLog.created_at.desc())
-                .first()
-            )
-
-        self.assertIsNotNone(notification)
-        delivery_message = json.loads(notification.details["delivery"]["message"])
-        code_search = re.search(r"\b(\d{6})\b", delivery_message["body"])
-        code_match = code_search.group(1) if code_search else None
-        self.assertIsNotNone(code_match)
-
-        resp = self.client.post(
-            "/api/auth/verify-2fa",
-            json={"two_factor_token": login_payload["two_factor_token"], "code": "000000"},
-        )
-        self.assertEqual(resp.status_code, 401)
-
-        resp = self.client.post(
-            "/api/auth/verify-2fa",
-            json={"two_factor_token": login_payload["two_factor_token"], "code": code_match},
-        )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(resp.json()["access_token"])
+            user = db.query(self.User).filter(self.User.email == signup_payload["email"]).one()
+            self.assertFalse(user.two_factor_enabled)
+            self.assertEqual(user.two_factor_method, "email")
+            self.assertIsNone(user.two_factor_code_hash)
+            self.assertIsNone(user.two_factor_code_expires_at)
 
     def test_16_login_feedback_and_password_reset_flow(self) -> None:
         signup_payload = {

@@ -525,7 +525,8 @@ class AdminActionsTest(BaseAppTest):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.json()["price_cents"], self._room_price(5000, 60))
 
-        # Staff booking at $100/hr
+        # Booking a staff member on their own is free — a request, regardless of
+        # the configured rate (the rate no longer drives direct staff bookings).
         resp = self.client.post(
             "/api/staff-bookings",
             headers=member_headers,
@@ -536,9 +537,9 @@ class AdminActionsTest(BaseAppTest):
             },
         )
         self.assertEqual(resp.status_code, 201)
-        self.assertEqual(resp.json()["price_cents"], self._staff_price(10000, 60))
+        self.assertEqual(resp.json()["price_cents"], 0)
 
-        # Admin changes staff to $50/hr
+        # Admin can still change the rate field, but direct bookings stay free.
         resp = self.client.put(
             f"/api/admin/staff/{profile_id}",
             headers=admin_headers,
@@ -547,7 +548,6 @@ class AdminActionsTest(BaseAppTest):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["booking_rate_cents"], 5000)
 
-        # New staff booking reflects updated $50/hr rate
         resp = self.client.post(
             "/api/staff-bookings",
             headers=member_headers,
@@ -558,7 +558,7 @@ class AdminActionsTest(BaseAppTest):
             },
         )
         self.assertEqual(resp.status_code, 201)
-        self.assertEqual(resp.json()["price_cents"], self._staff_price(5000, 60))
+        self.assertEqual(resp.json()["price_cents"], 0)
 
     def test_36_admin_today_endpoint_returns_roster_and_counters(self) -> None:
         """GET /api/admin/today returns today's bookings (room + staff merged,

@@ -41,11 +41,11 @@
       <header class="site-header site-header-simple site-header-public">
         <div class="site-header-brand-row">
           <div class="header-brand-block">
-            <img class="header-am-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" />
+            <a class="header-logo-link header-am-logo-link" href="https://www.instagram.com/artsmarvels/" target="_blank" rel="noreferrer" aria-label="Open Arts Marvels on Instagram"><img class="header-am-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" /></a>
           </div>
           <a class="header-hub-title" href="/">BIPOC Digital Media &amp; Creative Innovation Hub</a>
           <div class="header-bipoc-action-block">
-            <img class="header-bipoc-side-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" />
+            <a class="header-logo-link header-bipoc-logo-link" href="https://bipocfoundation.org/" target="_blank" rel="noreferrer" aria-label="Open BIPOC Foundation website"><img class="header-bipoc-side-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" /></a>
             <div class="header-cta-block home-utility-actions">
               <a id="header-account-link" class="ghost-button ghost-link" href="/account">Log in</a>
               <a id="header-secondary-link" class="home-header-book-button" href="/rooms">Book Now</a>
@@ -177,21 +177,6 @@
             </div>
           </form>
 
-          <form id="login-2fa-form" class="stack-form account-auth-form hidden" data-auth-form="two-factor">
-            <p id="login-2fa-copy" class="form-note">
-              Enter the 6-digit verification code sent to your sign-in method.
-            </p>
-            <label>
-              <span>Verification code</span>
-              <input type="text" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required />
-            </label>
-            <div class="room-actions">
-              <button class="primary-button" type="submit">Verify code</button>
-              <button id="login-2fa-resend-button" class="ghost-button" type="button">Resend code</button>
-              <button id="login-2fa-cancel-button" class="ghost-button" type="button">Back</button>
-            </div>
-          </form>
-
           <form id="signup-form" class="stack-form account-auth-form hidden" data-auth-form="signup">
             <div id="google-auth-note" class="form-note hidden">
               Gmail sign-in creates your account automatically the first time.
@@ -234,7 +219,7 @@
 
         <section id="account-profile-panel" class="panel panel-wide hidden">
           <p class="panel-kicker">Profile</p>
-          <h2>Preferences and security</h2>
+          <h2>Preferences</h2>
           <p class="panel-copy">
             Your account saves in two layers: a local draft while you type, and a full account save whenever you are ready.
           </p>
@@ -244,18 +229,6 @@
           </div>
 
           <form id="profile-form" class="stack-form hidden profile-grid">
-            <div class="profile-savebar profile-span-2">
-              <div class="profile-savecopy">
-                <strong id="profile-save-state">Account details are ready.</strong>
-                <span id="profile-save-detail" class="status-detail">You can save now or continue later.</span>
-              </div>
-              <div class="profile-saveactions">
-                <button id="profile-restore-draft-button" class="ghost-button hidden" type="button">Restore draft</button>
-                <button id="profile-discard-draft-button" class="ghost-button hidden" type="button">Clear draft</button>
-                <button id="profile-save-button" class="primary-button" type="submit">Save profile</button>
-              </div>
-            </div>
-
             <fieldset class="profile-fieldset profile-span-2">
               <legend>Avatar</legend>
               <div class="profile-avatar-shell">
@@ -364,7 +337,7 @@
             </fieldset>
 
             <fieldset class="profile-fieldset profile-span-2">
-              <legend>Notifications and sign-in</legend>
+              <legend>Notifications</legend>
               <div class="profile-preferences">
                 <label class="checkbox-row">
                   <input type="checkbox" name="opt_in_email" />
@@ -374,20 +347,21 @@
                   <input type="checkbox" name="opt_in_sms" />
                   <span>SMS reminders</span>
                 </label>
-                <label class="checkbox-row">
-                  <input type="checkbox" name="two_factor_enabled" />
-                  <span>Require two-factor verification at login</span>
-                </label>
-                <label>
-                  <span>Two-factor method</span>
-                  <select name="two_factor_method">
-                    <option value="email">Email code</option>
-                    <option value="sms">SMS code</option>
-                  </select>
-                </label>
               </div>
-              <p class="form-note">Booking-created notices, account-created notices, and pre-session reminders can still send automatically. Two-factor adds a login code on top of your password.</p>
+              <p class="form-note">Booking-created notices, account-created notices, and pre-session reminders can still send automatically.</p>
             </fieldset>
+
+            <div class="profile-savebar profile-span-2">
+              <div class="profile-savecopy">
+                <strong id="profile-save-state">Account details are ready.</strong>
+                <span id="profile-save-detail" class="status-detail">You can save now or continue later.</span>
+              </div>
+              <div class="profile-saveactions">
+                <button id="profile-restore-draft-button" class="ghost-button hidden" type="button">Restore draft</button>
+                <button id="profile-discard-draft-button" class="ghost-button hidden" type="button">Clear draft</button>
+                <button id="profile-save-button" class="primary-button" type="submit">Save profile</button>
+              </div>
+            </div>
           </form>
 
           <section id="account-membership-section" class="profile-fieldset hidden">
@@ -448,9 +422,9 @@
         <div class="studio-footer-grid">
           <div class="studio-footer-brand">
             <div class="studio-footer-collab-lockup">
-              <img class="studio-footer-collab-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" />
+              <a class="studio-footer-logo-link" href="https://www.instagram.com/artsmarvels/" target="_blank" rel="noreferrer" aria-label="Open Arts Marvels on Instagram"><img class="studio-footer-collab-logo" src="/assets/media/arts-marvels-logo.png" alt="Arts Marvels" /></a>
               <span class="studio-footer-collab-x">×</span>
-              <img class="studio-footer-collab-logo studio-footer-bipoc-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" />
+              <a class="studio-footer-logo-link" href="https://bipocfoundation.org/" target="_blank" rel="noreferrer" aria-label="Open BIPOC Foundation website"><img class="studio-footer-collab-logo studio-footer-bipoc-logo" src="/assets/media/bipoc-foundation-logo.png" alt="BIPOC Foundation" /></a>
             </div>
             <p class="studio-footer-collab-label">BIPOC Digital Media & Creative Innovation Hub</p>
             <p>A community-first creative studio in Lethbridge, powered by Arts Marvels and supported by BIPOC Foundation.</p>

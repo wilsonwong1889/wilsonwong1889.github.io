@@ -168,6 +168,18 @@ def billable_room_minutes(duration_minutes: int) -> int:
     return duration_minutes - free_room_minutes(duration_minutes)
 
 
+def staff_room_addon_per_staff_cents(duration_minutes: int) -> int:
+    """A staff member added to a room booking costs a flat $25/hour each
+    (settings.STAFF_ROOM_ADDON_HOURLY_CENTS), unaffected by the 5th-hour-free
+    room credit."""
+    return calculate_price_cents(settings.STAFF_ROOM_ADDON_HOURLY_CENTS, duration_minutes)
+
+
+def staff_room_addon_total_cents(staff_assignments: list[dict], duration_minutes: int) -> int:
+    count = len(normalize_staff_roles(staff_assignments))
+    return count * staff_room_addon_per_staff_cents(duration_minutes)
+
+
 def calculate_booking_total_cents(
     hourly_rate_cents: int,
     duration_minutes: int,
@@ -175,7 +187,7 @@ def calculate_booking_total_cents(
 ) -> int:
     return calculate_price_cents(
         hourly_rate_cents, billable_room_minutes(duration_minutes)
-    ) + staff_add_on_total_cents(staff_assignments)
+    ) + staff_room_addon_total_cents(staff_assignments, duration_minutes)
 
 
 def calculate_tax_cents(subtotal_cents: int) -> int:
@@ -668,6 +680,11 @@ def _create_booking_record(
     except ValueError as exc:
         raise StaffSelectionError(str(exc)) from exc
     ensure_staff_assignments_available(db, staff_assignments, normalized_start, end_time)
+    # Each staff member added to a room costs a flat $25/hour. Stamp the snapshot
+    # so the stored assignment and every price display reflect the real charge.
+    addon_per_staff_cents = staff_room_addon_per_staff_cents(duration_minutes)
+    for assignment in staff_assignments:
+        assignment["add_on_price_cents"] = addon_per_staff_cents
     original_price_cents = calculate_booking_total_cents(
         room.hourly_rate_cents,
         duration_minutes,

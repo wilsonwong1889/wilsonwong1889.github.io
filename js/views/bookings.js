@@ -313,7 +313,7 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
         ? "Finish payment to keep the staff session reserved."
         : "Finish payment to keep the reservation"
     : upcoming
-      ? "No refunds within 24h"
+      ? "Deposits are non-refundable"
       : booking.status === "Cancelled"
         ? "Reservation cancelled"
         : "Reservation history";

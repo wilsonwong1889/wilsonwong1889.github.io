@@ -329,29 +329,6 @@ def intake_received_email(
     )
 
 
-def login_verification_email(*, to_email: str, full_name: Optional[str], code: str) -> dict:
-    greeting = full_name or to_email
-    body = _html_wrap(
-        f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">Your login code</h2>'
-        f'<p style="margin:0 0 20px;color:#444;font-size:15px;">Hi {greeting},</p>'
-        f'<div style="background:#f0f2f5;border-radius:8px;padding:20px 24px;text-align:center;margin:0 0 20px;">'
-        f'<span style="font-size:36px;font-weight:700;letter-spacing:0.15em;color:#00263E;">{code}</span>'
-        f'</div>'
-        f'<p style="margin:0;color:#888;font-size:13px;">This code expires in {settings.TWO_FACTOR_CODE_EXPIRE_MINUTES} minutes. '
-        f"If you didn't request this, you can safely ignore it.</p>"
-    )
-    return send_email(
-        to_email=to_email,
-        subject=f"Your BIPOC Foundation Hub login code: {code}",
-        plain_text_content=(
-            f"Hi {greeting},\n\n"
-            f"Your login code is: {code}\n"
-            f"Expires in {settings.TWO_FACTOR_CODE_EXPIRE_MINUTES} minutes.\n"
-        ),
-        html_content=body,
-    )
-
-
 def password_reset_email(*, to_email: str, full_name: Optional[str], reset_url: str) -> dict:
     greeting = full_name or to_email
     body = _html_wrap(
@@ -753,13 +730,6 @@ def account_created_sms(*, to_number: str) -> dict:
     return send_sms(
         to_number=to_number,
         body=f"Welcome to BIPOC Foundation Hub. Your account is ready — book a studio at {settings.APP_BASE_URL.rstrip('/')}/rooms",
-    )
-
-
-def login_verification_sms(*, to_number: str, code: str) -> dict:
-    return send_sms(
-        to_number=to_number,
-        body=f"Your BIPOC Foundation Hub login code: {code}. Expires in {settings.TWO_FACTOR_CODE_EXPIRE_MINUTES} min.",
     )
 
 

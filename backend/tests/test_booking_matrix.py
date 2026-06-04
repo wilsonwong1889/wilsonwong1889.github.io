@@ -486,7 +486,8 @@ class BookingServiceMatrixTest(unittest.TestCase):
                 staff_assignments=["sound-engineer"],
             )
 
-            self.assertEqual(booking.price_cents, 14175)
+            # Room time (10000) + one staff at flat $25/hr ($25 for 1h) = 12500, +5% tax.
+            self.assertEqual(booking.price_cents, 13125)
             self.assertEqual(booking.staff_assignments[0]["name"], "Sound Engineer")
             self.assertEqual(booking.staff_assignments[0]["photo_url"], "/assets/media/staff/sound.jpg")
             self.assertEqual(booking.user_full_name_snapshot, "Sound Client")
@@ -2044,8 +2045,21 @@ def _add_booking_service_helper_tests() -> None:
                 60,
                 [{"id": "engineer", "name": "Sound Engineer", "add_on_price_cents": 3500}],
             ),
-            8500,
+            # Room time (5000) + one staff at the flat $25/hr add-on (2500).
+            7500,
         )
+
+    def test_157b_room_staff_addon_is_flat_25_per_hour_per_staff(self) -> None:
+        from app.services.booking_service import staff_room_addon_total_cents
+
+        two_staff = [
+            {"id": "a", "name": "A", "add_on_price_cents": 9999},
+            {"id": "b", "name": "B", "add_on_price_cents": 1},
+        ]
+        # 2 staff × $25/hr × 2h = 10000, ignoring each profile's configured price.
+        self.assertEqual(staff_room_addon_total_cents(two_staff, 120), 10000)
+        # Room (5000/hr × 2h) + staff add-on (10000) = 20000.
+        self.assertEqual(self.calculate_booking_total_cents(5000, 120, two_staff), 20000)
 
     def test_158_get_room_max_booking_duration_clamps_low_values(self) -> None:
         with self.SessionLocal() as db:

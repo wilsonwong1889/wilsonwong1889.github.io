@@ -167,7 +167,8 @@ class JsAssetTest(BaseAppTest):
         self.assertIn("elements.roomsSearchButton?.addEventListener", resp.text)
         self.assertIn("searchRoomsByAvailability", resp.text)
         self.assertIn("function escapeHtml(value)", resp.text)
-        self.assertIn('href="/reserve?id=${safeRoomId}"', resp.text)
+        # Room cards link to the reserve flow via the buildRoomReserveUrl helper.
+        self.assertIn("buildRoomReserveUrl(", resp.text)
         # From test_41
         self.assertIn('} else if (!isAdminPage()) {', resp.text)
         self.assertNotIn('elements.roomForm.classList.toggle("hidden", !canManageRooms);', resp.text)

@@ -19,24 +19,6 @@ router = APIRouter(prefix="/api/users", tags=["Users"])
 AVATAR_MEDIA_DIR = Path(__file__).resolve().parents[1] / "frontend" / "media" / "avatars"
 
 
-def _validate_two_factor_settings(current_user: User, payload: UserUpdate) -> None:
-    data = payload.model_dump(exclude_unset=True)
-    enabled = data.get("two_factor_enabled", current_user.two_factor_enabled)
-    method = (data.get("two_factor_method", current_user.two_factor_method or "email") or "email").strip().lower()
-    phone = data.get("phone", current_user.phone)
-    email = current_user.email
-
-    if method not in {"email", "sms"}:
-        raise HTTPException(status_code=400, detail="Two-factor method must be email or sms")
-    if enabled and method == "sms" and not phone:
-        raise HTTPException(status_code=400, detail="Add a phone number before enabling SMS two-factor authentication")
-    if enabled and method == "email" and not email:
-        raise HTTPException(status_code=400, detail="Add an email address before enabling email two-factor authentication")
-    if enabled:
-        payload.two_factor_method = method
-    if data.get("two_factor_enabled") is False:
-        payload.two_factor_method = method
-
 @router.get("/me", response_model=UserOut)
 def get_profile(current_user: User = Depends(get_current_user)):
     return current_user
@@ -47,12 +29,8 @@ def update_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    _validate_two_factor_settings(current_user, payload)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(current_user, field, value)
-    if payload.two_factor_enabled is False:
-        current_user.two_factor_code_hash = None
-        current_user.two_factor_code_expires_at = None
     db.commit()
     db.refresh(current_user)
     from app.tasks import sync_suitedash_contact_task

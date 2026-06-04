@@ -57,8 +57,6 @@ def serialize_admin_account(user: User, booking_stats: Optional[dict] = None) ->
         "billing_address": user.billing_address,
         "opt_in_email": user.opt_in_email,
         "opt_in_sms": user.opt_in_sms,
-        "two_factor_enabled": user.two_factor_enabled,
-        "two_factor_method": user.two_factor_method,
         "is_admin": user.is_admin,
         "role": role,
         "booking_count": stats.get("booking_count", 0) or 0,

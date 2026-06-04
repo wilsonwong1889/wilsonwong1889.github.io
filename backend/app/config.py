@@ -63,7 +63,6 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: str = ""
     TWILIO_AUTH_TOKEN: str = Field(default="", repr=False)
     TWILIO_FROM_NUMBER: str = ""
-    TWO_FACTOR_CODE_EXPIRE_MINUTES: int = 10
     PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
     SUITEDASH_ENABLED: bool = False
     SUITEDASH_BASE_URL: str = "https://app.suitedash.com"
@@ -96,6 +95,8 @@ class Settings(BaseSettings):
     BOOKING_OPEN_HOUR: int = 12
     BOOKING_CLOSE_HOUR: int = 20
     HOURLY_RATE_CENTS: int = 5000
+    # Flat surcharge per staff member added to a room booking ($25/hour each).
+    STAFF_ROOM_ADDON_HOURLY_CENTS: int = 2500
     DEFAULT_CURRENCY: str = "CAD"
 
     # Feature flags for TBC features

@@ -41,25 +41,6 @@ TEST_CASE_CATALOG = [
         ],
     },
     {
-        "id": "two-factor-login-email-flow",
-        "title": "Two-factor login email flow",
-        "area": "Auth",
-        "health": "working",
-        "status": "Automated",
-        "summary": "Checks that optional two-factor login sends a verification code and blocks access until the code is verified.",
-        "source_file": "backend/tests/test_week1_smoke.py",
-        "source_test": "test_15_two_factor_login_flow",
-        "commands": [
-            "venv/bin/python -m unittest tests.test_week1_smoke.AppSmokeTest.test_15_two_factor_login_flow",
-        ],
-        "covered_paths": [
-            "/api/auth/login",
-            "/api/auth/verify-2fa",
-            "/api/users/me",
-            "/account",
-        ],
-    },
-    {
         "id": "customer-booking-flow-rules",
         "title": "Customer booking flow and business-hour rules",
         "area": "Bookings",

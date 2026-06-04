@@ -548,8 +548,10 @@ def _create_staff_booking_record(
     if enforce_daily_limit:
         ensure_single_booking_per_day(db, user, normalized_start, duration_minutes)
     ensure_staff_is_available(db, profile.id, normalized_start, end_time)
-    original_price_cents = calculate_price_cents(get_staff_booking_rate_cents(profile), duration_minutes)
-    promo_result = apply_promo_code_to_amount(db, promo_code, original_price_cents, user)
+    # Booking a staff member on their own is free — there is no set price. It is
+    # a request sent to the staff dashboard; the staff member accepts and the
+    # customer completes a $0 confirmation. (Staff added to a room booking are
+    # still charged as a room add-on — see booking_service.)
 
     booking = StaffBooking(
         user_id=user.id,
@@ -558,10 +560,10 @@ def _create_staff_booking_record(
         start_time=normalized_start,
         end_time=end_time,
         duration_minutes=duration_minutes,
-        original_price_cents=original_price_cents,
-        discount_cents=promo_result["discount_cents"],
-        promo_code=promo_result["promo_code"].code if promo_result["promo_code"] else None,
-        price_cents=promo_result["final_amount_cents"],
+        original_price_cents=0,
+        discount_cents=0,
+        promo_code=None,
+        price_cents=0,
         currency=settings.DEFAULT_CURRENCY,
         # Request-first: the booking starts as a request and is only charged
         # once the staff member accepts (see accept_staff_booking).
@@ -666,20 +668,27 @@ def accept_staff_booking(db: Session, booking: StaffBooking, *, actor_id: UUID |
     if booking.status != "Requested":
         raise StaffBookingStateError("This booking request is no longer pending a response")
 
-    try:
-        payment_intent = create_payment_intent(
-            amount_cents=booking.price_cents,
-            currency=booking.currency,
-            booking_id=str(booking.id),
-            user_email=booking.user_email_snapshot or "",
-            metadata={"booking_type": "staff", "staff_booking_id": str(booking.id)},
-        )
-    except PaymentBackendError:
-        db.rollback()
-        raise
+    # A direct staff booking is free: skip Stripe entirely. The customer
+    # completes a $0 confirmation (confirm_free_staff_booking). Paid bookings
+    # (legacy / non-zero) still mint a payment intent.
+    if booking.price_cents <= 0:
+        booking.payment_intent_id = None
+        booking.payment_client_secret = None
+    else:
+        try:
+            payment_intent = create_payment_intent(
+                amount_cents=booking.price_cents,
+                currency=booking.currency,
+                booking_id=str(booking.id),
+                user_email=booking.user_email_snapshot or "",
+                metadata={"booking_type": "staff", "staff_booking_id": str(booking.id)},
+            )
+        except PaymentBackendError:
+            db.rollback()
+            raise
+        booking.payment_intent_id = payment_intent.intent_id
+        booking.payment_client_secret = payment_intent.client_secret
 
-    booking.payment_intent_id = payment_intent.intent_id
-    booking.payment_client_secret = payment_intent.client_secret
     booking.status = "AcceptedPendingPayment"
     booking.responded_at = datetime.now(timezone.utc)
     create_notification_log(
@@ -743,6 +752,18 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
     if expire_pending_staff_booking(db, booking):
         db.commit()
         raise PaymentSessionError("Payment window expired for this booking")
+    # Free direct staff booking: no Stripe, the customer confirms at $0.
+    if booking.price_cents <= 0:
+        attach_staff_profile_snapshot(db, booking)
+        return {
+            "booking_id": booking.id,
+            "payment_intent_id": None,
+            "payment_client_secret": None,
+            "payment_backend": "free",
+            "stripe_publishable_key": "",
+            "payment_expires_at": booking.payment_expires_at,
+            "payment_seconds_remaining": booking.payment_seconds_remaining,
+        }
     payment_session = get_payment_intent_session(
         payment_intent_id=booking.payment_intent_id,
         amount_cents=booking.price_cents,
@@ -769,6 +790,31 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
         "payment_expires_at": booking.payment_expires_at,
         "payment_seconds_remaining": booking.payment_seconds_remaining,
     }
+
+
+def confirm_free_staff_booking(db: Session, booking: StaffBooking) -> StaffBooking:
+    """Customer completes the $0 confirmation for an accepted free staff booking.
+    No Stripe — the booking is confirmed directly."""
+    expire_stale_pending_staff_bookings(db)
+    db.refresh(booking)
+    if booking.status not in PAYABLE_STATUSES:
+        raise StaffBookingStateError("This booking is not awaiting confirmation")
+    if booking.price_cents > 0:
+        raise StaffBookingStateError("This booking requires payment and cannot be confirmed for free")
+    if expire_pending_staff_booking(db, booking):
+        db.commit()
+        raise StaffBookingStateError("The confirmation window for this booking expired")
+    booking = mark_staff_booking_paid(db, booking, f"free_staff_{uuid4().hex[:20]}")
+    create_audit_log(
+        db,
+        actor_id=booking.user_id,
+        booking_id=None,
+        action="staff_booking_confirmed_free",
+        details={"staff_booking_id": str(booking.id)},
+    )
+    db.commit()
+    db.refresh(booking)
+    return attach_staff_profile_snapshot(db, booking)
 
 
 def waive_staff_booking_payment(db: Session, booking: StaffBooking, admin: User) -> StaffBooking:

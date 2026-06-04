@@ -83,18 +83,6 @@ export const api = {
       body: JSON.stringify({ access_token: accessToken }),
     });
   },
-  verifyTwoFactor(payload) {
-    return request("/api/auth/verify-2fa", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-  },
-  resendTwoFactor(twoFactorToken) {
-    return request("/api/auth/resend-2fa", {
-      method: "POST",
-      body: JSON.stringify({ two_factor_token: twoFactorToken }),
-    });
-  },
   getMe() {
     return request("/api/auth/me");
   },
@@ -250,6 +238,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+  confirmFreeStaffBooking(bookingId) {
+    return request(`/api/staff-bookings/${bookingId}/confirm`, { method: "POST" });
   },
   rescheduleStaffBooking(bookingId, payload) {
     return request(`/api/staff-bookings/${bookingId}/reschedule`, {

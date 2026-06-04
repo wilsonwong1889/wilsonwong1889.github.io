@@ -14,6 +14,7 @@ export const state = {
     duration: 60,
     matchingRoomIds: [],
     hasSearched: false,
+    mode: "exact",
   },
   bookings: [],
   adminBookings: [],

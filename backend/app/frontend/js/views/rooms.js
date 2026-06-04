@@ -79,18 +79,21 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function formatPreviewTimes(availableStartTimes) {
-  return availableStartTimes.slice(0, 4).map((startTime) =>
-    new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(new Date(startTime)),
-  );
+function formatPreviewTime(startTime) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(startTime));
 }
 
 function extractStudioTime(startTime) {
   const match = String(startTime || "").match(/T(\d{2}:\d{2})/);
   return match ? match[1] : "";
+}
+
+function extractIsoDate(startTime, fallbackDate = "") {
+  const match = String(startTime || "").match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : fallbackDate;
 }
 
 function formatDuration(minutes) {
@@ -110,6 +113,35 @@ function formatSearchTimeLabel(value) {
   const date = new Date();
   date.setHours(h || 0, m || 0, 0, 0);
   return new Intl.DateTimeFormat("en-CA", { hour: "numeric", minute: "2-digit" }).format(date);
+}
+
+function currentSearchMode(search = state.roomAvailabilitySearch) {
+  return search?.mode || "exact";
+}
+
+function buildRoomReserveUrl(roomId, startTime, fallbackDate = "") {
+  const params = new URLSearchParams();
+  params.set("id", String(roomId));
+  if (startTime) {
+    params.set("date", extractIsoDate(startTime, fallbackDate));
+    params.set("start", String(startTime));
+  } else if (fallbackDate) {
+    params.set("date", fallbackDate);
+  }
+  const duration = Number(state.roomAvailabilitySearch?.duration || 60);
+  if (duration && duration !== 60) {
+    params.set("duration", String(duration));
+  }
+  return `/reserve?${params.toString()}`;
+}
+
+function scrollRoomsIntoView() {
+  window.requestAnimationFrame(() => {
+    const target = elements.roomsSearchSummary && !elements.roomsSearchSummary.classList.contains("hidden")
+      ? elements.roomsSearchSummary
+      : elements.roomsGrid;
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
 const STUDIO_CLOSED_WEEKDAYS = new Set([0, 1, 2]); // Sun, Mon, Tue
@@ -366,7 +398,7 @@ function renderCreateRoomStaffOptions(currentState) {
             <strong>${escapeHtml(profile.name)}</strong>
             <span>${escapeHtml(profile.description || "Optional staff support for this room.")}</span>
           </div>
-          <strong class="staff-option-price">${formatCurrency(profile.add_on_price_cents)}</strong>
+          <strong class="staff-option-price">$25/hr</strong>
         </label>
       `,
     )
@@ -417,13 +449,24 @@ function renderAvailabilityPreview(roomId) {
     `;
   }
 
-  const previewTimes = formatPreviewTimes(preview.available_start_times)
-    .map((label) => `<span class="pill">${escapeHtml(label)}</span>`)
+  const requiredDuration = Number(state.roomAvailabilitySearch?.duration || 60);
+  const availableStarts = preview.available_start_times.filter((startTime) =>
+    Number(preview.max_duration_minutes_by_start?.[startTime] || 0) >= requiredDuration,
+  );
+  const previewTimes = availableStarts
+    .map((startTime) => {
+      const label = formatPreviewTime(startTime);
+      return `
+        <a class="availability-time-button" href="${escapeHtml(buildRoomReserveUrl(roomId, startTime, preview.date))}">
+          ${escapeHtml(label)}
+        </a>
+      `;
+    })
     .join("");
   return `
     <div class="availability-preview">
-      <span class="availability-label">${preview.available_start_times.length} starts open on ${escapeHtml(preview.date)}</span>
-      <p>Times are shown in local studio time and update from the live availability feed.</p>
+      <span class="availability-label">${availableStarts.length} starts open on ${escapeHtml(preview.date)}</span>
+      <p>Pick a time below to start booking this room at that exact time.</p>
       <div class="preview-pill-row">${previewTimes}</div>
     </div>
   `;
@@ -557,7 +600,7 @@ function renderRoomCard(room, canManageRooms) {
         <div class="room-actions room-catalog-actions">
           ${
             room.active
-              ? `<a class="primary-button room-catalog-book-button" href="/reserve?id=${safeRoomId}">Book now</a>
+              ? `<a class="primary-button room-catalog-book-button" href="${escapeHtml(buildRoomReserveUrl(room.id, null, state.roomPreviewDate))}">Book now</a>
                  <a class="ghost-button room-catalog-details-button" href="/room?id=${safeRoomId}">View details</a>`
               : isComingSoon
                 ? `<span class="ghost-button room-catalog-coming-soon-label" aria-disabled="true">Coming Soon</span>
@@ -630,6 +673,7 @@ async function searchRoomsByAvailability() {
         duration,
         matchingRoomIds,
         hasSearched: true,
+        mode: "exact",
       },
       roomPreviewDate: searchDate,
       roomAvailabilityPreview: Object.fromEntries(availabilityRows),
@@ -637,6 +681,64 @@ async function searchRoomsByAvailability() {
         ? `Found ${matchingRoomIds.length} matching room${matchingRoomIds.length === 1 ? "" : "s"}.`
         : "No rooms matched that time.",
     });
+  } catch (error) {
+    setState({ message: error.message });
+  }
+}
+
+async function searchRoomsByDate(searchDate, { scrollToResults = false } = {}) {
+  const duration = Number(elements.roomsSearchDuration?.value || state.roomAvailabilitySearch.duration || 60);
+  if (!searchDate) {
+    setState({ message: "Choose a date to search for rooms." });
+    return;
+  }
+  if (isPastIsoDate(searchDate)) {
+    setState({ message: "That date has already passed. Pick a future date." });
+    return;
+  }
+  const weekday = getWeekdayForIsoDate(searchDate);
+  if (weekday !== null && STUDIO_CLOSED_WEEKDAYS.has(weekday)) {
+    setState({
+      message: `The studio is closed on ${CLOSED_WEEKDAY_NAMES[weekday]}. Pick a Wednesday through Saturday.`,
+    });
+    return;
+  }
+
+  try {
+    setState({ message: "Loading room openings for that day..." });
+    const availabilityRows = await Promise.all(
+      state.rooms
+        .filter((room) => room.active)
+        .map(async (room) => [room.id, await api.getAvailability(room.id, searchDate)]),
+    );
+    const matchingRoomIds = availabilityRows
+      .filter(([, availability]) =>
+        (availability.available_start_times || []).some(
+          (startTime) => Number(availability.max_duration_minutes_by_start?.[startTime] || 0) >= duration,
+        ),
+      )
+      .map(([roomId]) => String(roomId));
+
+    setState({
+      roomAvailabilitySearch: {
+        date: searchDate,
+        time: elements.roomsSearchTime?.value || state.roomAvailabilitySearch.time || "15:00",
+        duration,
+        matchingRoomIds,
+        hasSearched: true,
+        mode: "day",
+      },
+      roomPreviewDate: searchDate,
+      roomAvailabilityPreview: Object.fromEntries(availabilityRows),
+      message: matchingRoomIds.length
+        ? `Found ${matchingRoomIds.length} room${matchingRoomIds.length === 1 ? "" : "s"} with openings that day.`
+        : "No rooms have openings that day.",
+    });
+
+    if (scrollToResults) {
+      closeRoomsWhenBar();
+      scrollRoomsIntoView();
+    }
   } catch (error) {
     setState({ message: error.message });
   }
@@ -650,6 +752,7 @@ function clearRoomAvailabilitySearch() {
       duration: Number(elements.roomsSearchDuration?.value || 60),
       matchingRoomIds: [],
       hasSearched: false,
+      mode: "exact",
     },
     message: "Room search cleared.",
   });
@@ -701,7 +804,9 @@ function renderRoomsWhenToggleChip(currentState) {
     return;
   }
   chip.classList.remove("hidden");
-  chip.textContent = `${formatSearchDateLabel(search.date)} · ${formatSearchTimeLabel(search.time)} · ${formatDuration(search.duration)}`;
+  chip.textContent = currentSearchMode(search) === "day"
+    ? `${formatSearchDateLabel(search.date)} · all openings`
+    : `${formatSearchDateLabel(search.date)} · ${formatSearchTimeLabel(search.time)} · ${formatDuration(search.duration)}`;
   btn.classList.add("is-active");
 }
 
@@ -932,9 +1037,7 @@ function availCalRender() {
 
 function availCalPickDate(dateKey) {
   if (elements.roomsSearchDate) elements.roomsSearchDate.value = dateKey;
-  // Calendar click triggers a search; collapsed-by-default When bar stays
-  // closed — the active-filter chip on the toggle reflects the result.
-  searchRoomsByAvailability();
+  void searchRoomsByDate(dateKey, { scrollToResults: true });
 }
 
 function initAvailCal() {
@@ -1020,6 +1123,7 @@ export function initRoomsView(actions) {
   elements.roomsSearchButton?.addEventListener("click", async () => {
     await searchRoomsByAvailability();
     closeRoomsWhenBar();
+    scrollRoomsIntoView();
   });
   elements.roomsSearchClearButton?.addEventListener("click", () => {
     clearRoomAvailabilitySearch();
@@ -1286,16 +1390,25 @@ export function renderRoomsView(currentState) {
       const dateLabel = formatSearchDateLabel(search.date);
       const timeLabel = formatSearchTimeLabel(search.time);
       const durationLabel = formatDuration(search.duration);
+      const isDaySearch = currentSearchMode(search) === "day";
       elements.roomsSearchSummary.classList.remove("hidden");
       if (!visibleRooms.length) {
         elements.roomsSearchSummary.innerHTML = `
           <strong>No studios available</strong>
-          <span>No studios are open on ${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)} for ${escapeHtml(durationLabel)}.</span>
+          <span>${
+            isDaySearch
+              ? `No studios have openings on ${escapeHtml(dateLabel)} for ${escapeHtml(durationLabel)}.`
+              : `No studios are open on ${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)} for ${escapeHtml(durationLabel)}.`
+          }</span>
         `;
       } else {
         elements.roomsSearchSummary.innerHTML = `
           <strong>${visibleRooms.length} studio${visibleRooms.length === 1 ? "" : "s"} available</strong>
-          <span>On ${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)} for ${escapeHtml(durationLabel)}.</span>
+          <span>${
+            isDaySearch
+              ? `On ${escapeHtml(dateLabel)}. Pick a time button on a room card to start booking.`
+              : `On ${escapeHtml(dateLabel)} at ${escapeHtml(timeLabel)} for ${escapeHtml(durationLabel)}.`
+          }</span>
         `;
       }
     }

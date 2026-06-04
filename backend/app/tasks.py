@@ -33,8 +33,6 @@ from app.services.notification_service import (
     booking_reminder_email,
     booking_reminder_sms,
     booking_staff_notification_email,
-    login_verification_email,
-    login_verification_sms,
     password_reset_email,
     refund_processed_email,
     refund_processed_sms,
@@ -304,65 +302,6 @@ def send_account_created_sms_task(user_id: str):
         db.commit()
         record_task_run("send_account_created_sms")
         record_task_items("send_account_created_sms", "sent", 1)
-        return {"sent": True}
-    finally:
-        db.close()
-
-
-@task(name="app.tasks.send_login_verification_email")
-def send_login_verification_email_task(user_id: str, code: str):
-    db = SessionLocal()
-    try:
-        user = _get_user(db, user_id)
-        if not user or not user.email:
-            record_task_run("send_login_verification_email")
-            record_task_items("send_login_verification_email", "skipped", 1)
-            return {"sent": False}
-        delivery = login_verification_email(
-            to_email=user.email,
-            full_name=user.full_name,
-            code=code,
-        )
-        create_notification_log(
-            db,
-            user_id=user.id,
-            booking_id=None,
-            notification_type="login_verification_email_worker",
-            status="Sent",
-            details={"delivery": delivery},
-        )
-        db.commit()
-        record_task_run("send_login_verification_email")
-        record_task_items("send_login_verification_email", "sent", 1)
-        return {"sent": True}
-    finally:
-        db.close()
-
-
-@task(name="app.tasks.send_login_verification_sms")
-def send_login_verification_sms_task(user_id: str, code: str):
-    db = SessionLocal()
-    try:
-        user = _get_user(db, user_id)
-        if not user or not user.phone:
-            record_task_run("send_login_verification_sms")
-            record_task_items("send_login_verification_sms", "skipped", 1)
-            return {"sent": False}
-        delivery = login_verification_sms(
-            to_number=user.phone,
-            code=code,
-        )
-        create_notification_log(
-            db,
-            user_id=user.id,
-            booking_id=None,
-            notification_type="login_verification_sms_worker",
-            status="Sent",
-            details={"delivery": delivery},
-        )
-        db.commit()
-        record_task_run("send_login_verification_sms")
-        record_task_items("send_login_verification_sms", "sent", 1)
         return {"sent": True}
     finally:
         db.close()

@@ -241,6 +241,7 @@ function resetScopedData() {
       duration: 60,
       matchingRoomIds: [],
       hasSearched: false,
+      mode: "exact",
     };
     patch.showInactiveRooms = false;
   }
