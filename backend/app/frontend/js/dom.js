@@ -124,6 +124,8 @@ export const elements = {
   adminStaffPhotoUrl: document.getElementById("admin-staff-photo-url"),
   adminStaffCancelEdit: document.getElementById("admin-staff-cancel-edit"),
   adminStaffCatalogList: document.getElementById("admin-staff-catalog-list"),
+  adminStaffApplicationsList: document.getElementById("admin-staff-applications-list"),
+  adminStaffApplicationsBadge: document.getElementById("admin-staff-applications-badge"),
   adminRoomStaffList: document.getElementById("admin-room-staff-list"),
   roomForm: document.getElementById("room-form"),
   roomFormId: document.getElementById("room-form-id"),

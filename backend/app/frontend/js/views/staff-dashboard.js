@@ -3,6 +3,11 @@ import { CURRENT_PAGE } from "../config.js";
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+// "staff" = approved staff member (full portal); "applicant" = a logged-in user
+// who is building/awaiting approval on a studio-engineer application.
+let dashboardMode = "staff";
+let headshotUrls = [];
+
 function el(id) {
   return document.getElementById(id);
 }
@@ -66,6 +71,20 @@ function setProfilePhotoPreview(photoUrl) {
   }
 }
 
+function renderHeadshots() {
+  const list = el("staff-profile-headshots-list");
+  if (!list) return;
+  list.innerHTML = headshotUrls
+    .map(
+      (url, index) => `
+        <div class="staff-headshot-thumb">
+          <img src="${escapeHtml(url)}" alt="Headshot ${index + 1}" />
+          <button type="button" class="ghost-button" data-headshot-remove="${index}">Remove</button>
+        </div>`,
+    )
+    .join("");
+}
+
 function populateProfileForm(profile) {
   const form = el("staff-profile-form");
   if (!form) return;
@@ -77,6 +96,7 @@ function populateProfileForm(profile) {
   form.elements.talents.value = (profile.talents || []).join(", ");
   form.elements.services.value = (profile.services || []).join(", ");
   form.elements.service_types.value = (profile.service_types || []).join(", ");
+  form.elements.gear.value = profile.gear || "";
   form.elements.portfolio_url.value = profile.portfolio_url || "";
   form.elements.notification_email.value = profile.notification_email || "";
   form.elements.notification_phone.value = profile.notification_phone || "";
@@ -85,6 +105,50 @@ function populateProfileForm(profile) {
   const photoUrlField = el("staff-profile-photo-url");
   if (photoUrlField) photoUrlField.value = profile.photo_url || "";
   setProfilePhotoPreview(profile.photo_url);
+  headshotUrls = Array.isArray(profile.headshot_urls) ? [...profile.headshot_urls] : [];
+  renderHeadshots();
+}
+
+function setApplicationBanner(message, type) {
+  const node = el("staff-application-banner");
+  if (!node) return;
+  if (!message) {
+    node.textContent = "";
+    node.classList.add("hidden");
+    node.classList.remove("is-error", "is-success");
+    return;
+  }
+  node.textContent = message;
+  node.classList.remove("hidden", "is-error", "is-success");
+  if (type) node.classList.add(type === "error" ? "is-error" : "is-success");
+}
+
+function applyDashboardMode(profile) {
+  // Applicant mode: only the profile form is shown; schedule/requests are
+  // hidden until an admin approves and grants the staff role.
+  const approvedSections = el("staff-approved-sections");
+  const heading = el("staff-profile-heading");
+  const subhead = el("staff-profile-subhead");
+  const submitBtn = el("staff-profile-submit");
+  const isApplicant = dashboardMode === "applicant";
+  if (approvedSections) approvedSections.classList.toggle("hidden", isApplicant);
+  if (!isApplicant) {
+    setApplicationBanner(null);
+    if (heading) heading.textContent = "Profile & details";
+    if (subhead) subhead.textContent = "Edit how you appear to customers. Pricing, publishing your schedule, your account link, and studio assignments are managed by an admin.";
+    if (submitBtn) submitBtn.textContent = "Save profile";
+    return;
+  }
+  if (heading) heading.textContent = "Your studio engineer profile";
+  if (subhead) subhead.textContent = "Fill out your profile — headshots, portfolio, skills, and gear. Submit it and an admin will review and grant you studio engineer access.";
+  if (submitBtn) submitBtn.textContent = "Submit application";
+  const submitted = profile && profile.application_status === "submitted";
+  setApplicationBanner(
+    submitted
+      ? "Your application is submitted and under review. You can keep editing and re-submit until an admin approves it."
+      : "Create your studio engineer profile below, then submit it for admin review.",
+    submitted ? "success" : null,
+  );
 }
 
 async function renderRequests() {
@@ -180,16 +244,15 @@ function showGate() {
   el("staff-dashboard-body")?.classList.add("hidden");
 }
 
-async function loadDashboard() {
-  let profile;
-  try {
-    profile = await api.getMyStaffProfile();
-  } catch (error) {
-    showGate();
-    return;
-  }
+function showBody() {
   el("staff-dashboard-gate")?.classList.add("hidden");
   el("staff-dashboard-body")?.classList.remove("hidden");
+}
+
+async function loadStaffDashboard(profile) {
+  dashboardMode = "staff";
+  showBody();
+  applyDashboardMode(profile);
   const title = el("staff-dashboard-title");
   if (title) title.textContent = `${profile.name}'s dashboard`;
   const subtitle = el("staff-dashboard-subtitle");
@@ -202,18 +265,80 @@ async function loadDashboard() {
   await Promise.all([renderRequests(), renderRules(), renderExceptions()]);
 }
 
+function loadApplicantDashboard(profile) {
+  dashboardMode = "applicant";
+  showBody();
+  const title = el("staff-dashboard-title");
+  if (title) title.textContent = "Become a studio engineer";
+  const subtitle = el("staff-dashboard-subtitle");
+  if (subtitle) subtitle.textContent = "Build your profile and submit it for admin review.";
+  if (profile) {
+    populateProfileForm(profile);
+  } else {
+    headshotUrls = [];
+    renderHeadshots();
+  }
+  applyDashboardMode(profile);
+}
+
+async function loadDashboard() {
+  // Approved staff use the full portal; everyone else gets the applicant flow.
+  try {
+    const profile = await api.getMyStaffProfile();
+    await loadStaffDashboard(profile);
+    return;
+  } catch (error) {
+    /* not an approved staff member — fall through to applicant/gate */
+  }
+  try {
+    const application = await api.getMyStaffApplication();
+    loadApplicantDashboard(application.profile);
+  } catch (error) {
+    // Not logged in (or no access) — show the gate prompting login/signup.
+    showGate();
+  }
+}
+
 export function initStaffDashboardView() {
   if (CURRENT_PAGE !== "staff-dashboard") return;
+
+  el("staff-profile-headshots-file")?.addEventListener("change", async (event) => {
+    const input = event.currentTarget;
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    setProfileFeedback("Uploading headshots…");
+    try {
+      const upload = dashboardMode === "applicant" ? api.uploadMyApplicationPhoto : api.uploadMyStaffPhoto;
+      for (const file of files) {
+        const result = await upload(file);
+        if (result?.photo_url) headshotUrls.push(result.photo_url);
+      }
+      renderHeadshots();
+      setProfileFeedback("Headshots added — remember to save.", "success");
+    } catch (error) {
+      setProfileFeedback(error?.message || "Could not upload that headshot.", "error");
+    } finally {
+      input.value = "";
+    }
+  });
+
+  el("staff-profile-headshots-list")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-headshot-remove]");
+    if (!button) return;
+    headshotUrls.splice(Number(button.dataset.headshotRemove), 1);
+    renderHeadshots();
+  });
 
   el("staff-profile-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    const applicant = dashboardMode === "applicant";
     setProfileFeedback(null);
     try {
       let photoUrl = el("staff-profile-photo-url")?.value || null;
       const file = el("staff-profile-photo-file")?.files?.[0];
       if (file) {
-        const upload = await api.uploadMyStaffPhoto(file);
+        const upload = applicant ? await api.uploadMyApplicationPhoto(file) : await api.uploadMyStaffPhoto(file);
         photoUrl = upload.photo_url;
       }
       const payload = {
@@ -225,20 +350,28 @@ export function initStaffDashboardView() {
         talents: parseList(form.elements.talents.value),
         services: parseList(form.elements.services.value),
         service_types: parseList(form.elements.service_types.value),
+        gear: form.elements.gear.value.trim() || null,
         portfolio_url: form.elements.portfolio_url.value.trim() || null,
+        headshot_urls: headshotUrls,
         notification_email: form.elements.notification_email.value.trim() || null,
         notification_phone: form.elements.notification_phone.value.trim() || null,
         notify_by_email: form.elements.notify_by_email.checked,
         notify_by_sms: form.elements.notify_by_sms.checked,
         photo_url: photoUrl,
       };
-      const updated = await api.updateMyStaffProfile(payload);
-      populateProfileForm(updated);
       const fileField = el("staff-profile-photo-file");
       if (fileField) fileField.value = "";
-      const title = el("staff-dashboard-title");
-      if (title) title.textContent = `${updated.name}'s dashboard`;
-      setProfileFeedback("Profile saved.", "success");
+      if (applicant) {
+        const result = await api.submitMyStaffApplication(payload);
+        loadApplicantDashboard(result.profile);
+        setProfileFeedback("Application submitted — an admin will review it.", "success");
+      } else {
+        const updated = await api.updateMyStaffProfile(payload);
+        populateProfileForm(updated);
+        const title = el("staff-dashboard-title");
+        if (title) title.textContent = `${updated.name}'s dashboard`;
+        setProfileFeedback("Profile saved.", "success");
+      }
     } catch (error) {
       setProfileFeedback(error?.message || "Could not save your profile.", "error");
     }

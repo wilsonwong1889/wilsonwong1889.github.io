@@ -186,6 +186,13 @@ function activateTab(tab) {
 }
 
 function redirectHome() {
+  // Honour a same-site ?next= redirect (e.g. the "create your engineer profile"
+  // flow sends people to the staff dashboard after signing up).
+  const next = getSearchParam("next");
+  if (next && next.startsWith("/") && !next.startsWith("//")) {
+    window.location.assign(next);
+    return;
+  }
   window.location.assign("/");
 }
 

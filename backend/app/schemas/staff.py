@@ -30,6 +30,7 @@ class StaffProfileCreate(BaseModel):
     photo_url: Optional[str] = None
     headshot_urls: List[str] = Field(default_factory=list)
     portfolio_url: Optional[str] = Field(default=None, max_length=500)
+    gear: Optional[str] = Field(default=None, max_length=2000)
     add_on_price_cents: int = Field(default=0, ge=0)
     booking_rate_cents: int = Field(default=0, ge=0)
     equipment_rental_cost_cents: int = Field(default=0, ge=0)
@@ -62,6 +63,7 @@ class StaffProfileUpdate(BaseModel):
     photo_url: Optional[str] = None
     headshot_urls: Optional[List[str]] = None
     portfolio_url: Optional[str] = Field(default=None, max_length=500)
+    gear: Optional[str] = Field(default=None, max_length=2000)
     add_on_price_cents: Optional[int] = Field(default=None, ge=0)
     booking_rate_cents: Optional[int] = Field(default=None, ge=0)
     equipment_rental_cost_cents: Optional[int] = Field(default=None, ge=0)
@@ -99,6 +101,7 @@ class StaffSelfProfileUpdate(BaseModel):
     photo_url: Optional[str] = None
     headshot_urls: Optional[List[str]] = None
     portfolio_url: Optional[str] = Field(default=None, max_length=500)
+    gear: Optional[str] = Field(default=None, max_length=2000)
     service_types: Optional[List[str]] = None
     role_title: Optional[str] = Field(default=None, max_length=120)
     notification_email: Optional[str] = Field(default=None, max_length=120)
@@ -127,6 +130,7 @@ class StaffProfileOut(BaseModel):
     photo_url: Optional[str] = None
     headshot_urls: List[str] = Field(default_factory=list)
     portfolio_url: Optional[str] = None
+    gear: Optional[str] = None
     add_on_price_cents: int
     booking_rate_cents: int
     equipment_rental_cost_cents: int = 0
@@ -140,6 +144,7 @@ class StaffProfileOut(BaseModel):
     booking_requires_approval: bool = True
     booking_enabled: bool
     schedule_published: bool = False
+    application_status: Optional[str] = None
     active: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -154,6 +159,14 @@ class StaffProfileOut(BaseModel):
 
 class AdminStaffProfileOut(StaffProfileOut):
     linked_user_email: Optional[str] = None
+
+
+class StaffApplicationStateOut(BaseModel):
+    """What the staff dashboard needs to choose between applicant mode and the
+    full staff portal."""
+
+    is_staff: bool = False
+    profile: Optional[StaffProfileOut] = None
 
 
 class StaffPhotoUploadOut(BaseModel):

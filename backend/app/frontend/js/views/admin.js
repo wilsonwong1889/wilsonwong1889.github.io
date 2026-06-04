@@ -1267,6 +1267,7 @@ function populateStaffProfileForm(profile) {
   elements.adminStaffProfileForm.elements.talents.value = (profile.talents || []).join(", ");
   elements.adminStaffProfileForm.elements.services.value = (profile.services || []).join(", ");
   elements.adminStaffProfileForm.elements.bio.value = profile.bio || "";
+  elements.adminStaffProfileForm.elements.gear.value = profile.gear || "";
   elements.adminStaffProfileForm.elements.portfolio_url.value = profile.portfolio_url || "";
   elements.adminStaffProfileForm.elements.headshot_urls.value = (profile.headshot_urls || []).join("\n");
   elements.adminStaffProfileForm.elements.add_on_price_cents.value = profile.add_on_price_cents || 0;
@@ -2113,6 +2114,50 @@ function renderStaffCatalogCard(profile) {
   `;
 }
 
+function renderStaffApplicationCard(profile) {
+  return `
+    <article class="staff-profile-card">
+      <div class="staff-profile-card-top">
+        ${renderStaffImage(profile.photo_url, profile.name, "staff-profile-image")}
+        <div class="staff-option-copy">
+          <strong>${escapeHtml(profile.name)}</strong>
+          <span>${escapeHtml(profile.role_title || profile.description || "Studio engineer applicant")}</span>
+        </div>
+      </div>
+      <div class="room-meta">
+        ${profile.linked_user_email ? `<span class="pill">${escapeHtml(profile.linked_user_email)}</span>` : ""}
+        <span class="pill">Submitted</span>
+      </div>
+      ${profile.bio ? `<p class="panel-copy">${escapeHtml(profile.bio)}</p>` : ""}
+      ${renderStaffTagRow("Skills", profile.skills || [])}
+      ${renderStaffTagRow("Talents", profile.talents || [])}
+      ${profile.gear ? `<p class="panel-copy"><strong>Gear:</strong> ${escapeHtml(profile.gear)}</p>` : ""}
+      ${profile.portfolio_url ? `<p class="panel-copy"><a href="${escapeAttribute(profile.portfolio_url)}" target="_blank" rel="noreferrer">View portfolio ↗</a></p>` : ""}
+      <div class="room-actions">
+        <button class="primary-button" type="button" data-admin-action="approve-staff-application" data-staff-profile-id="${escapeAttribute(profile.id)}" data-staff-profile-name="${escapeAttribute(profile.name)}">Approve &amp; grant staff role</button>
+      </div>
+    </article>
+  `;
+}
+
+async function loadStaffApplications() {
+  if (!elements.adminStaffApplicationsList) return;
+  let applications = [];
+  try {
+    applications = await api.adminListStaffApplications();
+  } catch (error) {
+    return;
+  }
+  elements.adminStaffApplicationsList.innerHTML = applications.length
+    ? applications.map(renderStaffApplicationCard).join("")
+    : '<div class="empty-state">No pending studio engineer applications.</div>';
+  if (elements.adminStaffApplicationsBadge) {
+    const count = applications.length;
+    elements.adminStaffApplicationsBadge.textContent = count ? String(count) : "";
+    elements.adminStaffApplicationsBadge.classList.toggle("hidden", count === 0);
+  }
+}
+
 function renderRoomStaffAssignmentCard(room, staffProfiles) {
   const assignedIds = new Set((room.staff_roles || []).map((role) => role.id));
   const availableProfiles = (staffProfiles || []).filter((profile) => profile.active || assignedIds.has(profile.id));
@@ -2520,6 +2565,7 @@ export function initAdminView(actions) {
         photo_url: photoUrl,
         headshot_urls: parseListInput(form.elements.headshot_urls.value),
         portfolio_url: form.elements.portfolio_url.value.trim() || null,
+        gear: form.elements.gear.value.trim() || null,
         add_on_price_cents: Number(form.elements.add_on_price_cents.value || 0),
         equipment_rental_cost_cents: Number(form.elements.equipment_rental_cost_cents.value || 0),
         role_title: form.elements.role_title.value.trim() || null,
@@ -2725,6 +2771,30 @@ export function initAdminView(actions) {
       setState({ message: error.message });
     }
   });
+
+  elements.adminStaffApplicationsList?.addEventListener("click", async (event) => {
+    const button = event.target.closest('[data-admin-action="approve-staff-application"]');
+    if (!button) {
+      return;
+    }
+    const name = button.dataset.staffProfileName || "this applicant";
+    if (!window.confirm(`Approve ${name}? This grants them the Staff role and an active profile.`)) {
+      return;
+    }
+    try {
+      setState({ message: `Approving ${name}...` });
+      await api.adminApproveStaffApplication(button.dataset.staffProfileId);
+      await loadStaffApplications();
+      await actions.refreshAll(`${name} approved — they now have studio engineer access.`);
+    } catch (error) {
+      setState({ message: error.message });
+    }
+  });
+
+  document.getElementById("admin-tab-staff")?.addEventListener("click", () => {
+    void loadStaffApplications();
+  });
+  void loadStaffApplications();
 
   getAdminPromoList()?.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-admin-action]");

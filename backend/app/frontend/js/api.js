@@ -498,6 +498,29 @@ export const api = {
       body: formData,
     });
   },
+  getMyStaffApplication() {
+    return request("/api/staff/application");
+  },
+  submitMyStaffApplication(payload) {
+    return request("/api/staff/application", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+  uploadMyApplicationPhoto(file) {
+    const formData = new FormData();
+    formData.append("photo", file);
+    return request("/api/staff/application/photo", {
+      method: "POST",
+      body: formData,
+    });
+  },
+  adminListStaffApplications() {
+    return request("/api/admin/staff/applications");
+  },
+  adminApproveStaffApplication(staffProfileId) {
+    return request(`/api/admin/staff/${staffProfileId}/approve`, { method: "POST" });
+  },
   getMyBookingRequests() {
     return request("/api/staff/me/booking-requests");
   },

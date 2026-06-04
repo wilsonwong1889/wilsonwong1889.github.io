@@ -134,6 +134,70 @@ def get_staff_profile_for_user(db: Session, user: User) -> StaffProfile | None:
     return db.query(StaffProfile).filter(StaffProfile.user_id == user.id).first()
 
 
+# ── Self-service studio-engineer applications ─────────────────────────────────
+
+def submit_staff_application(db: Session, user: User, payload: StaffSelfProfileUpdate) -> StaffProfile:
+    """A logged-in user creates/updates their own studio-engineer application.
+    The profile is linked to their account but stays inactive/unpublished and
+    application_status="submitted" until an admin approves it."""
+    existing = get_staff_profile_for_user(db, user)
+    if existing and existing.application_status == "approved":
+        raise ValueError("Your profile is already approved — edit it from your dashboard instead.")
+
+    self_data = payload.model_dump(exclude_unset=True)
+    if existing is None:
+        name = _normalize_profile_name(
+            self_data.get("name") or user.full_name or (user.email or "").split("@")[0]
+        )
+        _ensure_unique_name(db, name)
+        existing = StaffProfile(
+            name=name,
+            user_id=user.id,
+            active=False,
+            booking_enabled=False,
+            schedule_published=False,
+            application_status="submitted",
+        )
+        db.add(existing)
+        db.commit()
+        db.refresh(existing)
+
+    # Apply the applicant-editable fields (same allow-list as staff self-edit).
+    update_own_staff_profile(db, existing, payload)
+    db.refresh(existing)
+    existing.application_status = "submitted"
+    existing.active = False
+    existing.booking_enabled = False
+    existing.schedule_published = False
+    db.commit()
+    db.refresh(existing)
+    return existing
+
+
+def approve_staff_application(db: Session, profile: StaffProfile) -> StaffProfile:
+    """Admin approves an application: grant the linked account the Staff role
+    and activate the profile (publishing stays a separate admin step)."""
+    if profile.user_id:
+        user = db.query(User).filter(User.id == profile.user_id).first()
+        if user and not user_has_admin_access(user):
+            user.role = USER_ROLE_STAFF
+    profile.application_status = "approved"
+    profile.active = True
+    profile.booking_enabled = True
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def list_pending_staff_applications(db: Session) -> list[StaffProfile]:
+    return (
+        db.query(StaffProfile)
+        .filter(StaffProfile.application_status == "submitted")
+        .order_by(StaffProfile.created_at.desc())
+        .all()
+    )
+
+
 def create_staff_profile(db: Session, payload: StaffProfileCreate) -> StaffProfile:
     name = _normalize_profile_name(payload.name)
     _ensure_unique_name(db, name)
@@ -147,6 +211,7 @@ def create_staff_profile(db: Session, payload: StaffProfileCreate) -> StaffProfi
         photo_url=payload.photo_url,
         headshot_urls=normalize_string_list(payload.headshot_urls),
         portfolio_url=payload.portfolio_url.strip() if payload.portfolio_url else None,
+        gear=payload.gear.strip() if payload.gear else None,
         add_on_price_cents=payload.add_on_price_cents,
         booking_rate_cents=payload.booking_rate_cents,
         equipment_rental_cost_cents=payload.equipment_rental_cost_cents,
@@ -194,6 +259,8 @@ def update_staff_profile(db: Session, profile_id: str, payload: StaffProfileUpda
         profile.headshot_urls = normalize_string_list(update_data["headshot_urls"])
     if "portfolio_url" in update_data:
         profile.portfolio_url = update_data["portfolio_url"].strip() if update_data["portfolio_url"] else None
+    if "gear" in update_data:
+        profile.gear = update_data["gear"].strip() if update_data["gear"] else None
     if "add_on_price_cents" in update_data and update_data["add_on_price_cents"] is not None:
         profile.add_on_price_cents = update_data["add_on_price_cents"]
     if "booking_rate_cents" in update_data and update_data["booking_rate_cents"] is not None:

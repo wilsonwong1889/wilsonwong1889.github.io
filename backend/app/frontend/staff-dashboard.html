@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Staff dashboard | BIPOC Hub</title>
-    <link rel="stylesheet" href="/assets/styles/app.css?v=20260520c" />
+    <link rel="stylesheet" href="/assets/styles/app.css?v=20260604m" />
   </head>
   <body data-page="staff-dashboard">
     <div class="site-frame">
@@ -77,16 +77,21 @@
 
         <section id="staff-dashboard-gate" class="panel panel-wide hidden">
           <div class="empty-state">
-            This area is for studio staff. <a href="/account">Log in</a> with your staff account, or ask an admin to link your account.
+            <p>Want to work out of the Hub as a studio engineer? Create an account and build your profile — an admin will review and grant you access.</p>
+            <div class="hero-actions">
+              <a class="primary-button" href="/account?mode=signup&amp;next=/staff-dashboard">Create your engineer profile</a>
+              <a class="ghost-button" href="/account?next=/staff-dashboard">Log in</a>
+            </div>
           </div>
         </section>
 
         <div id="staff-dashboard-body" class="hidden">
+          <div id="staff-application-banner" class="intake-feedback hidden" role="status" aria-live="polite"></div>
           <section class="panel panel-wide">
             <div class="panel-header">
               <p class="panel-kicker">Your profile</p>
-              <h2>Profile &amp; details</h2>
-              <p class="panel-copy">Edit how you appear to customers. Pricing, publishing your schedule, your account link, and studio assignments are managed by an admin.</p>
+              <h2 id="staff-profile-heading">Profile &amp; details</h2>
+              <p class="panel-copy" id="staff-profile-subhead">Edit how you appear to customers. Pricing, publishing your schedule, your account link, and studio assignments are managed by an admin.</p>
             </div>
             <form id="staff-profile-form" class="stack-form intake-form">
               <div class="intake-form-grid">
@@ -104,6 +109,7 @@
                 <label><span>Service types</span><textarea name="service_types" rows="2" placeholder="recording, podcast, video"></textarea></label>
               </div>
               <p class="field-help">Separate skills, talents, services, and service types with commas.</p>
+              <label><span>Gear &amp; equipment</span><textarea name="gear" rows="3" maxlength="2000" placeholder="Microphones, interfaces, cameras, software, instruments you work with…"></textarea></label>
               <label><span>Portfolio URL <span class="intake-optional">(optional)</span></span><input type="url" name="portfolio_url" maxlength="500" placeholder="https://" /></label>
               <div class="intake-form-grid">
                 <label><span>Notification email <span class="intake-optional">(optional)</span></span><input type="email" name="notification_email" maxlength="120" placeholder="Where booking requests are emailed" /></label>
@@ -115,11 +121,14 @@
               <input id="staff-profile-photo-url" type="hidden" name="photo_url" />
               <div id="staff-profile-photo-preview" class="staff-photo-preview empty-state">Upload a JPG photo to show on your public profile.</div>
               <p class="field-help">JPG, PNG, WebP, or HEIC. Maximum 20 MB.</p>
+              <label><span>Headshots <span class="intake-optional">(add more JPGs)</span></span><input id="staff-profile-headshots-file" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp" /></label>
+              <div id="staff-profile-headshots-list" class="staff-headshots-list"></div>
               <p id="staff-profile-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
-              <div class="hero-actions"><button class="primary-button" type="submit">Save profile</button></div>
+              <div class="hero-actions"><button class="primary-button" type="submit" id="staff-profile-submit">Save profile</button></div>
             </form>
           </section>
 
+          <div id="staff-approved-sections">
           <section class="panel panel-wide">
             <div class="panel-header">
               <p class="panel-kicker">Requests</p>
@@ -182,6 +191,7 @@
             </form>
             <div id="staff-exceptions-list" class="staff-exceptions-list"></div>
           </section>
+          </div>
         </div>
       </main>
 

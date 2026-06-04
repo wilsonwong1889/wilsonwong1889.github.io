@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Admin | BIPOC Hub</title>
-    <link rel="stylesheet" href="/assets/styles/app.css?v=20260520c" />
+    <link rel="stylesheet" href="/assets/styles/app.css?v=20260604m" />
   </head>
   <body data-page="admin">
     <div class="site-frame admin-site-frame">
@@ -566,6 +566,7 @@
                 <div class="auth-switcher admin-subpage-switcher" role="tablist" aria-label="Staff tools">
                   <button class="tab-button active" type="button" data-admin-subpage-button="staff" data-admin-subpage="editor">Profile editor</button>
                   <button class="tab-button" type="button" data-admin-subpage-button="staff" data-admin-subpage="catalog">Catalog</button>
+                  <button class="tab-button" type="button" data-admin-subpage-button="staff" data-admin-subpage="applications">Applications <span id="admin-staff-applications-badge" class="header-menu-badge hidden"></span></button>
                   <button class="tab-button" type="button" data-admin-subpage-button="staff" data-admin-subpage="assignments">Assignments</button>
                 </div>
                 <label class="inline-field admin-subpage-picker">
@@ -610,6 +611,10 @@
                   <label>
                     <span>Portfolio URL</span>
                     <input type="url" name="portfolio_url" placeholder="https://example.com/portfolio" />
+                  </label>
+                  <label>
+                    <span>Gear &amp; equipment</span>
+                    <textarea name="gear" rows="3" placeholder="Microphones, interfaces, cameras, software, instruments…"></textarea>
                   </label>
                   <label>
                     <span>Headshot URLs</span>
@@ -684,6 +689,15 @@
                   <p class="panel-copy">Create reusable staff profiles with pricing, skills, talents, and a JPG profile image.</p>
                 </div>
                 <div id="admin-staff-catalog-list" class="admin-staff-catalog-list admin-subpage-panel" data-admin-subpage-panel="staff" data-admin-subpage="catalog"></div>
+
+                <section class="admin-subpage-panel hidden" data-admin-subpage-panel="staff" data-admin-subpage="applications">
+                  <div class="panel-header">
+                    <p class="panel-kicker">Applications</p>
+                    <h3>Studio engineer applications</h3>
+                    <p class="panel-copy">People who created an account and submitted a profile. Approve to grant them the Staff role and a profile (publish their schedule separately when ready).</p>
+                  </div>
+                  <div id="admin-staff-applications-list" class="admin-staff-catalog-list"></div>
+                </section>
 
                 <section class="admin-subpage-panel hidden" data-admin-subpage-panel="staff" data-admin-subpage="assignments">
                   <div class="panel-header">

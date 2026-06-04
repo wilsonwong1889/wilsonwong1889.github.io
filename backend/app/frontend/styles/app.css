@@ -32,15 +32,27 @@
 html {
   scroll-behavior: smooth;
   scrollbar-gutter: stable;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100svh;
   font-family: "Inter", "Avenir Next", "Segoe UI", sans-serif;
   color: var(--ink);
   background: var(--bg);
   overflow-x: clip;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  max-width: 100%;
 }
 
 button,
@@ -11560,5 +11572,447 @@ button.avail-cal-day:focus-visible {
     width: calc(100% - 16px);
     padding-left: 18px;
     padding-right: 18px;
+  }
+}
+
+/* Final mobile polish for iOS and narrow phones. Keep desktop geometry above intact. */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  body[data-page] .home-top-utility {
+    overflow: visible;
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
+  body[data-page] .home-utility-inner {
+    width: min(calc(100% - 24px), 100%);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  body[data-page] .home-contact-list,
+  body[data-page] .home-contact-item,
+  body[data-page] .home-contact-item span {
+    min-width: 0;
+  }
+
+  body[data-page] .home-contact-item span {
+    overflow-wrap: anywhere;
+  }
+
+  body[data-page] .site-header.site-header-public {
+    min-height: auto;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  body[data-page] .site-header-brand-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "am title menu"
+      "bipoc bipoc bipoc";
+    column-gap: 10px;
+    row-gap: 8px;
+    align-items: center;
+    padding: 12px max(14px, env(safe-area-inset-right, 0px)) 10px max(14px, env(safe-area-inset-left, 0px));
+  }
+
+  body[data-page] .header-brand-block {
+    grid-area: am;
+    min-width: 0;
+  }
+
+  body[data-page] .header-hub-title {
+    grid-area: title;
+    min-width: 0;
+    max-width: 100%;
+    text-align: left;
+    line-height: 1.16;
+    overflow-wrap: anywhere;
+  }
+
+  body[data-page] .header-bipoc-logo-link {
+    grid-area: bipoc;
+    justify-self: center;
+    max-width: 100%;
+    min-height: 44px;
+    margin: 0;
+  }
+
+  body[data-page] .mobile-nav-toggle {
+    grid-area: menu;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
+  body[data-page] .header-logo-link {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  body[data-page] .header-am-logo,
+  body[data-page] .header-bipoc-side-logo {
+    max-width: 100%;
+  }
+
+  body[data-page] .site-header.site-header-public .site-nav {
+    width: calc(100% - 28px);
+    margin: 0 auto 12px;
+  }
+
+  .mobile-nav-cta {
+    flex-wrap: wrap;
+  }
+
+  .mobile-nav-cta a {
+    min-width: min(100%, 132px);
+  }
+
+  body:not([data-page="home"]):not([data-page="rooms"]):not([data-page="bookings"]) main,
+  body[data-page="rooms"] .rooms-catalog-shell,
+  body[data-page="bookings"] .booking-history-shell-primary,
+  .staff-hero-section,
+  .staff-catalog-section,
+  .staff-profile-shell {
+    width: min(calc(100% - 28px), 1400px);
+  }
+
+  .page-grid,
+  .page-grid-public,
+  .home-layout,
+  .home-layout > *,
+  .panel,
+  .hero-card,
+  .room-catalog-card,
+  .booking-card,
+  .booking-checkout-shell,
+  .booking-checkout-panel,
+  .booking-checkout-summary,
+  .reserve-studio-shell,
+  .reserve-booking-sidebar,
+  .profile-fieldset {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .panel,
+  .hero-card,
+  .room-catalog-content,
+  .booking-card-copy,
+  .booking-checkout-header-copy,
+  .reserve-studio-copy,
+  .profile-fieldset {
+    overflow-wrap: break-word;
+  }
+
+  body[data-page="home"] .home-carousel-slides-container,
+  body[data-page="rooms"] .home-carousel-slides-container {
+    height: clamp(500px, 70svh, 620px);
+    min-height: 500px;
+  }
+
+  @supports (height: 100dvh) {
+    body[data-page="home"] .home-carousel-slides-container,
+    body[data-page="rooms"] .home-carousel-slides-container {
+      height: clamp(500px, 70dvh, 620px);
+    }
+  }
+
+  body[data-page="home"] .home-carousel-controls,
+  body[data-page="rooms"] .home-carousel-controls {
+    padding: 0 10px 150px;
+  }
+
+  .home-collab-badge {
+    max-width: 42vw;
+  }
+
+  .home-collab-logo-link,
+  .home-collab-logo {
+    max-width: 100%;
+  }
+
+  .hero-actions,
+  .auth-inline-row,
+  .booking-contact-actions,
+  .booking-summary-primary-actions,
+  .booking-summary-secondary-actions,
+  .room-catalog-actions,
+  .staff-card-footer,
+  .staff-card-actions {
+    align-items: stretch;
+  }
+
+  .hero-actions .primary-button,
+  .hero-actions .ghost-button,
+  .hero-actions .ghost-link,
+  .auth-inline-row .primary-button,
+  .auth-inline-row .ghost-button,
+  .booking-contact-actions .primary-button,
+  .booking-contact-actions .ghost-button,
+  .room-catalog-actions .primary-button,
+  .room-catalog-actions .ghost-button,
+  .staff-card-actions button {
+    flex: 1 1 160px;
+  }
+
+  .rooms-when-toggle {
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .rooms-when-toggle-chip {
+    max-width: min(52vw, 220px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rooms-when-popover,
+  .rooms-search-input-shell,
+  .rooms-sort-shell,
+  .rooms-filter-panel,
+  .availability-preview,
+  .avail-cal-section,
+  body[data-page="rooms"] .rooms-catalog-shell {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  body[data-page="rooms"] .avail-cal-section,
+  body[data-page="rooms"] .rooms-catalog-shell {
+    width: calc(100vw - 28px);
+    max-width: min(1100px, calc(100vw - 28px));
+    margin-right: auto;
+    margin-left: auto;
+  }
+
+  .rooms-category-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .rooms-category-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rooms-category-chip {
+    flex: 0 0 auto;
+    min-height: 44px;
+  }
+
+  .room-catalog-title-row,
+  .room-catalog-meta-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .room-catalog-quick-action {
+    top: auto;
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .reserve-calendar-weekdays,
+  .reserve-calendar-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .reserve-calendar-weekdays span {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.68rem;
+    text-align: center;
+    text-overflow: clip;
+  }
+
+  .reserve-calendar-grid .calendar-cell {
+    min-height: 46px;
+    padding: 4px 2px;
+    border-radius: 8px;
+  }
+
+  .reserve-calendar-grid .calendar-cell strong {
+    font-size: 0.92rem;
+  }
+
+  .avail-cal-section {
+    width: min(calc(100% - 28px), 1100px);
+    padding: 0;
+  }
+
+  .avail-cal-weekdays span {
+    padding: 10px 0;
+    font-size: 0.68rem;
+    letter-spacing: 0;
+  }
+
+  .avail-cal-spacer,
+  .avail-cal-day {
+    min-height: 52px;
+  }
+
+  .avail-cal-day {
+    padding: 6px 2px;
+    text-align: center;
+  }
+
+  .profile-savebar {
+    align-items: stretch;
+  }
+
+  .profile-savecopy,
+  .profile-saveactions {
+    width: 100%;
+  }
+
+  .profile-saveactions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .profile-saveactions .primary-button,
+  .profile-saveactions .ghost-button,
+  .account-membership-cta,
+  .password-form .ghost-button,
+  .account-danger-zone .ghost-button {
+    width: 100%;
+  }
+
+  .studio-footer-inline-links {
+    flex-wrap: wrap;
+  }
+
+  body[data-page] .studio-footer,
+  body[data-page] .studio-footer.studio-footer-compact,
+  body[data-page] .site-acknowledgement {
+    padding-right: max(18px, env(safe-area-inset-right, 0px));
+    padding-left: max(18px, env(safe-area-inset-left, 0px));
+  }
+
+  body[data-page] .site-acknowledgement {
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .reserve-confirm-button {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 480px) {
+  body[data-page] .site-header-brand-row {
+    column-gap: 8px;
+    padding: 10px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
+  }
+
+  body[data-page] .header-hub-title {
+    font-size: clamp(0.76rem, 3.4vw, 0.92rem);
+  }
+
+  body[data-page] .header-bipoc-side-logo {
+    max-width: min(180px, calc(100vw - 40px));
+  }
+
+  body[data-page="home"] .header-bipoc-side-logo {
+    max-width: min(205px, calc(100vw - 40px));
+  }
+
+  body[data-page] .site-header.site-header-public .site-nav {
+    width: calc(100% - 20px);
+  }
+
+  .mobile-nav-cta {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  body[data-page="home"] .home-carousel-slides-container,
+  body[data-page="rooms"] .home-carousel-slides-container {
+    height: clamp(470px, 68svh, 560px);
+    min-height: 470px;
+  }
+
+  @supports (height: 100dvh) {
+    body[data-page="home"] .home-carousel-slides-container,
+    body[data-page="rooms"] .home-carousel-slides-container {
+      height: clamp(470px, 68dvh, 560px);
+    }
+  }
+
+  body[data-page="home"] .home-carousel-controls,
+  body[data-page="rooms"] .home-carousel-controls {
+    padding-bottom: 138px;
+  }
+
+  .home-collab-badge {
+    bottom: 82px;
+    max-width: 39vw;
+    padding: 7px 9px;
+  }
+
+  .rooms-when-actions,
+  .booking-history-actions,
+  .booking-card-actions,
+  .staff-card-footer,
+  .staff-card-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .room-catalog-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-history-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .booking-history-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .booking-history-tab {
+    flex: 0 0 auto;
+    min-width: max-content;
+  }
+
+  .booking-summary-price-line,
+  .booking-summary-total,
+  .reserve-price-line,
+  .reserve-price-total,
+  .summary-line,
+  .room-detail-booking-price-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .summary-line strong {
+    text-align: left;
+  }
+
+  .account-membership-rates,
+  .profile-avatar-shell,
+  .staff-profile-meta-row {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-avatar-preview {
+    width: min(132px, 100%);
   }
 }

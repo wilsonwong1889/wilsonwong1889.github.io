@@ -47,6 +47,11 @@ class StaffProfile(Base):
     # Additional headshot image URLs beyond the primary photo_url avatar.
     headshot_urls = Column(JSONB, default=list)
     portfolio_url = Column(String)
+    # Free-form list of equipment/gear the engineer works with.
+    gear = Column(String)
+    # Self-service application workflow: NULL for admin-created profiles,
+    # "submitted" while awaiting admin review, "approved" once granted staff.
+    application_status = Column(String)
     add_on_price_cents = Column(Integer, nullable=False, default=0)
     booking_rate_cents = Column(Integer, nullable=False, default=0)
     equipment_rental_cost_cents = Column(Integer, nullable=False, default=0)

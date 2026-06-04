@@ -74,8 +74,10 @@ from app.services.promo_code_service import (
 )
 from app.services.staff_service import (
     StaffPhotoError,
+    approve_staff_application,
     create_staff_profile,
     delete_staff_profile,
+    list_pending_staff_applications,
     list_staff_profiles,
     save_staff_photo,
     update_staff_profile,
@@ -234,6 +236,46 @@ def admin_list_staff_profiles(
     _: None = Depends(admin_rate_limit),
 ):
     return list_staff_profiles(db)
+
+
+@router.get("/staff/applications", response_model=List[AdminStaffProfileOut])
+def admin_list_staff_applications(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(admin_rate_limit),
+):
+    """Pending studio-engineer applications awaiting approval."""
+    result = []
+    for profile in list_pending_staff_applications(db):
+        out = AdminStaffProfileOut.model_validate(profile)
+        if profile.user_id:
+            applicant = db.query(User).filter(User.id == profile.user_id).first()
+            if applicant:
+                out.linked_user_email = applicant.email
+        result.append(out)
+    return result
+
+
+@router.post("/staff/{staff_profile_id}/approve", response_model=AdminStaffProfileOut)
+def admin_approve_staff_application(
+    staff_profile_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(admin_rate_limit),
+):
+    profile = db.query(StaffProfile).filter(StaffProfile.id == staff_profile_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Staff profile not found")
+    approve_staff_application(db, profile)
+    create_audit_log(
+        db,
+        actor_id=admin.id,
+        booking_id=None,
+        action="staff_application_approved",
+        details={"staff_profile_id": str(profile.id), "name": profile.name},
+    )
+    db.commit()
+    return profile
 
 
 @router.post("/staff", response_model=AdminStaffProfileOut, status_code=201)
