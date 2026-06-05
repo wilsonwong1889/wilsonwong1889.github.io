@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -20,6 +20,7 @@ from app.schemas.booking import (
     BookingOut,
     PaymentSessionOut,
     ReservationCreate,
+    ReservationExtend,
     ReservationOut,
 )
 from app.schemas.promo_code import PromoCodePreviewIn, PromoCodePreviewOut
@@ -69,11 +70,14 @@ booking_rate_limit = rate_limit_dependency("booking", settings.BOOKING_RATE_LIMI
 def room_availability(
     room_id: str,
     date_value: date = Query(alias="date"),
+    hold_token: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
     _: None = Depends(booking_rate_limit),
 ):
     try:
-        return get_room_availability(db, room_id, date_value)
+        # hold_token = the caller's own active hold, so their selected slot stays
+        # visible to them while still hidden from everyone else.
+        return get_room_availability(db, room_id, date_value, exclude_hold_token=hold_token)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -107,6 +111,21 @@ def create_reservation(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/bookings/reservations/extend", status_code=200)
+def extend_reservation(
+    payload: ReservationExtend,
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(booking_rate_limit),
+):
+    """Renew an existing hold the caller owns (keeps the same token, no release
+    gap). 409 if the hold already lapsed so the client re-acquires cleanly."""
+    from app.services.reservation_service import extend_hold
+
+    if not extend_hold(payload.slot_keys, payload.token):
+        raise HTTPException(status_code=409, detail="Hold has expired")
+    return {"token": payload.token, "slot_keys": payload.slot_keys}
 
 
 @router.delete("/bookings/reservations", status_code=204)

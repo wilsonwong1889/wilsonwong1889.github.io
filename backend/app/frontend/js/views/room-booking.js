@@ -589,7 +589,10 @@ async function loadDayAvailability(roomId, date) {
   selectedStart = "";
   renderRoomBookingView(state);
   try {
-    const availability = await api.getAvailability(roomId, date);
+    // Pass our own hold token so the slot we're holding stays visible to us
+    // (everyone else still sees it as taken).
+    const ownHoldToken = reserveHold && String(reserveHold.room_id) === String(roomId) ? reserveHold.token : null;
+    const availability = await api.getAvailability(roomId, date, ownHoldToken);
     if (requestToken !== dayAvailabilityRequestToken || String(lastRoomId) !== String(roomId) || selectedDate !== date) {
       return;
     }
@@ -1025,6 +1028,40 @@ function holdMatchesCurrentSelection() {
   );
 }
 
+function scheduleHoldRenew() {
+  // Renew before the 5-min TTL elapses so the customer keeps the slot if they
+  // linger on the form.
+  if (reserveHoldRefreshTimer) {
+    window.clearTimeout(reserveHoldRefreshTimer);
+  }
+  reserveHoldRefreshTimer = window.setTimeout(extendReserveHold, 4 * 60 * 1000);
+}
+
+async function extendReserveHold() {
+  // Extend the EXISTING hold in place (same token, no release/re-acquire gap) so
+  // the renew can't collide with our own still-live hold.
+  if (!reserveHold?.token || !reserveHold?.slot_keys?.length) {
+    return;
+  }
+  const token = reserveHold.token;
+  try {
+    await api.extendReservationHold(token, reserveHold.slot_keys);
+    if (reserveHold?.token === token) {
+      scheduleHoldRenew();
+    }
+  } catch (error) {
+    // Hold lapsed/lost — drop it and re-acquire the current selection cleanly.
+    if (reserveHold?.token === token) {
+      reserveHold = null;
+      if (reserveHoldRefreshTimer) {
+        window.clearTimeout(reserveHoldRefreshTimer);
+        reserveHoldRefreshTimer = null;
+      }
+      refreshReserveHold();
+    }
+  }
+}
+
 async function refreshReserveHold() {
   // Holds require auth (the backend endpoint uses get_current_user).
   // Guests fall back to the optimistic flow (Layer 2 DB constraint catches races).
@@ -1044,8 +1081,25 @@ async function refreshReserveHold() {
   const desiredRoom = state.selectedRoom.id;
   const desiredStart = selectedStart;
   const desiredDuration = selection.duration;
-  // Release any prior hold first so overlapping slot keys don't collide.
-  clearReserveHold();
+  // Fully release any prior hold BEFORE acquiring the new one (awaited), so a
+  // new selection whose slot keys overlap the old one can't collide with our
+  // own not-yet-released hold.
+  const priorHold = reserveHold;
+  reserveHold = null;
+  if (reserveHoldRefreshTimer) {
+    window.clearTimeout(reserveHoldRefreshTimer);
+    reserveHoldRefreshTimer = null;
+  }
+  if (priorHold?.token && priorHold?.slot_keys?.length) {
+    try {
+      await api.releaseReservationHold(priorHold.token, priorHold.slot_keys);
+    } catch (releaseError) {
+      /* best-effort; the hold TTLs out on its own */
+    }
+  }
+  if (requestToken !== reserveHoldRefreshToken) {
+    return; // a newer selection superseded us while releasing
+  }
   try {
     const hold = await api.createReservationHold({
       room_id: desiredRoom,
@@ -1067,15 +1121,7 @@ async function refreshReserveHold() {
       expires_at: hold.expires_at,
       slot_keys: hold.slot_keys || [],
     };
-    // Renew before the 5-min TTL elapses so the customer keeps the slot if they
-    // linger on the form.
-    if (reserveHoldRefreshTimer) {
-      window.clearTimeout(reserveHoldRefreshTimer);
-    }
-    reserveHoldRefreshTimer = window.setTimeout(() => {
-      reserveHold = null;
-      refreshReserveHold();
-    }, 4 * 60 * 1000);
+    scheduleHoldRenew();
   } catch (error) {
     if (requestToken !== reserveHoldRefreshToken) {
       return;
