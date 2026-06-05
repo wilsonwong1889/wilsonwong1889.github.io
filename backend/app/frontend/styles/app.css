@@ -10404,7 +10404,7 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
 .staff-card-media {
   position: relative;
   width: 100%;
-  height: 220px;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   background: #e8edf2;
 }
@@ -10412,8 +10412,8 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
 .staff-card-photo {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: top center;
+  object-fit: contain;
+  object-position: center;
   display: block;
 }
 
