@@ -50,6 +50,7 @@ class StaffTest(BaseAppTest):
 
         business_timezone = ZoneInfo("America/Edmonton")
         start_time = self._future_time(day=5, hour=11, minute=0)
+        self._make_staff_available_for_time(profile_id, start_time)
 
         past_date = datetime.now(business_timezone).date() - timedelta(days=1)
         past_start = datetime(
@@ -184,6 +185,7 @@ class StaffTest(BaseAppTest):
             profile_id = str(profile.id)
 
         start_time = self._future_time(day=6, hour=12, minute=0)
+        self._make_staff_available_for_time(profile_id, start_time)
 
         resp = self.client.post(
             "/api/staff-bookings/guest",

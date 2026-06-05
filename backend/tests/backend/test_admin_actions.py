@@ -238,9 +238,12 @@ class AdminActionsTest(BaseAppTest):
         base_candidate = datetime.now(biz_tz).date() + timedelta(days=10)
         base = base_candidate + timedelta(days=(2 - base_candidate.weekday()) % 7)
 
-        def make_start(day_offset, hour):
+        def make_dt(day_offset, hour):
             d = base + timedelta(days=day_offset)
-            return datetime(d.year, d.month, d.day, hour + 2, 0, tzinfo=biz_tz).isoformat()
+            return datetime(d.year, d.month, d.day, hour + 2, 0, tzinfo=biz_tz)
+
+        def make_start(day_offset, hour):
+            return make_dt(day_offset, hour).isoformat()
 
         # 1. admin mark-paid (room booking)
         resp = self.client.post(
@@ -303,6 +306,7 @@ class AdminActionsTest(BaseAppTest):
         self.assertTrue(waived["payment_intent_id"].startswith("admin_waived_"))
 
         # 5. staff booking: waive-payment
+        self._make_staff_available_for_time(profile_id, make_dt(2, 10))
         resp = self.client.post(
             "/api/staff-bookings",
             headers=guest_headers,
@@ -331,6 +335,7 @@ class AdminActionsTest(BaseAppTest):
         self.assertEqual(resp.json()["price_cents"], 0)
 
         # 6. staff booking: mark-paid
+        self._make_staff_available_for_time(profile_id, make_dt(3, 10))
         resp = self.client.post(
             "/api/staff-bookings",
             headers=guest_headers,
@@ -527,12 +532,14 @@ class AdminActionsTest(BaseAppTest):
 
         # Booking a staff member on their own is free — a request, regardless of
         # the configured rate (the rate no longer drives direct staff bookings).
+        first_staff_start = self._future_time(day=3, hour=10, minute=0)
+        self._make_staff_available_for_time(profile_id, first_staff_start)
         resp = self.client.post(
             "/api/staff-bookings",
             headers=member_headers,
             json={
                 "staff_profile_id": profile_id,
-                "start_time": self._future_time(day=3, hour=10, minute=0).isoformat(),
+                "start_time": first_staff_start.isoformat(),
                 "duration_minutes": 60,
             },
         )
@@ -548,12 +555,14 @@ class AdminActionsTest(BaseAppTest):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["booking_rate_cents"], 5000)
 
+        second_staff_start = self._future_time(day=4, hour=10, minute=0)
+        self._make_staff_available_for_time(profile_id, second_staff_start)
         resp = self.client.post(
             "/api/staff-bookings",
             headers=member_headers,
             json={
                 "staff_profile_id": profile_id,
-                "start_time": self._future_time(day=4, hour=10, minute=0).isoformat(),
+                "start_time": second_staff_start.isoformat(),
                 "duration_minutes": 60,
             },
         )

@@ -136,65 +136,31 @@ DEFAULT_ROOM_SEEDS: tuple[dict, ...] = (
 
 DEFAULT_STAFF_PROFILE_SEEDS: tuple[dict, ...] = (
     {
-        "name": "Jordan Lee",
-        "description": "Versatile sound engineer and music producer with a decade of experience in recording, mixing, and live production across genres.",
-        "skills": ["Sound Engineering", "Music Production", "Mixing & Mastering"],
-        "talents": ["Live Recording", "Vocal Production", "Beat Making"],
-        "service_types": ["Sound Engineer", "Music Producer"],
-        "booking_rate_cents": 7500,
-        "photo_url": "/assets/media/staff/05e8ac68bc274a04a5c2795433a5e4a6.jpg",
-        "active": True,
-    },
-    {
-        "name": "Priya Sharma",
-        "description": "Award-winning photographer specializing in portrait, editorial, and brand photography. Brings warmth and intentionality to every shoot.",
-        "skills": ["Portrait Photography", "Editorial Photography", "Lighting Design"],
-        "talents": ["Retouching", "Brand Storytelling", "Studio Lighting"],
-        "service_types": ["Photographer"],
-        "booking_rate_cents": 8500,
-        "photo_url": "/assets/media/staff/14f170a760ad41c6a228c04ca64f545d.jpg",
-        "active": True,
-    },
-    {
-        "name": "Marcus Webb",
-        "description": "Filmmaker and videographer focused on documentary, narrative, and social media content. Skilled with cinema cameras and post-production.",
-        "skills": ["Videography", "Film Directing", "Color Grading"],
-        "talents": ["Drone Operation", "Motion Graphics", "Interview Production"],
-        "service_types": ["Videographer / Filmer", "Creative Director"],
-        "booking_rate_cents": 9000,
-        "photo_url": "/assets/media/staff/2864e21b8bc54f1480fe1a7d1346aa38.jpg",
-        "active": True,
-    },
-    {
-        "name": "Amara Osei",
+        "name": "Wilson Wong",
         "description": "Podcast producer and audio storyteller helping creators build consistent, professional shows from concept to final episode.",
         "skills": ["Podcast Production", "Audio Editing", "Show Development"],
         "talents": ["Guest Coaching", "RSS & Distribution", "Sound Design"],
         "service_types": ["Podcast Producer"],
         "booking_rate_cents": 6500,
-        "photo_url": "/assets/media/staff/50ea9fe562724e939b0e3da828c6cb07.jpg",
+        "add_on_price_cents": 2000,
+        "equipment_rental_cost_cents": 1000,
+        "photo_url": "/assets/media/staff/0619eb1aecb74f4d876502e7b35cf5ae.jpg",
+        "role_title": "Photography",
+        "booking_enabled": True,
+        "schedule_published": True,
         "active": True,
     },
+)
+
+LEGACY_DEMO_STAFF_PROFILE_NAMES = frozenset(
     {
-        "name": "Tasha Rivera",
-        "description": "Graphic designer and content creator crafting bold visual identities, social media assets, and digital campaigns for independent artists and brands.",
-        "skills": ["Graphic Design", "Brand Identity", "Social Media Content"],
-        "talents": ["Logo Design", "Typography", "Campaign Strategy"],
-        "service_types": ["Graphic Designer", "Content Creator"],
-        "booking_rate_cents": 6000,
-        "photo_url": "/assets/media/staff/976e0904078b457f94586eddf6447dd4.jpg",
-        "active": True,
-    },
-    {
-        "name": "Devon Clarke",
-        "description": "Lighting technician with expertise in studio, stage, and film setups. Helps teams achieve the exact look and feel their creative vision demands.",
-        "skills": ["Lighting Design", "Studio Setup", "Colour Temperature"],
-        "talents": ["LED Programming", "Photography Assist", "Video Lighting"],
-        "service_types": ["Lighting Technician"],
-        "booking_rate_cents": 5500,
-        "photo_url": "/assets/media/staff/c4750caebf464a9eb8cf982474c32a45.jpg",
-        "active": True,
-    },
+        "Jordan Lee",
+        "Priya Sharma",
+        "Marcus Webb",
+        "Amara Osei",
+        "Tasha Rivera",
+        "Devon Clarke",
+    }
 )
 
 DEFAULT_PROMO_CODE_SEEDS: tuple[dict, ...] = (
@@ -284,7 +250,21 @@ def ensure_rooms(db: Session, rooms: Sequence[dict] = DEFAULT_ROOM_SEEDS) -> lis
     return created_rooms
 
 
+def deactivate_legacy_demo_staff_profiles(db: Session) -> int:
+    legacy_names = {name.lower() for name in LEGACY_DEMO_STAFF_PROFILE_NAMES}
+    updated = 0
+    for profile in db.query(StaffProfile).all():
+        if profile.name.strip().lower() in legacy_names and profile.active:
+            profile.active = False
+            db.add(profile)
+            updated += 1
+    if updated:
+        db.commit()
+    return updated
+
+
 def ensure_staff_profiles(db: Session, profiles: Sequence[dict] = DEFAULT_STAFF_PROFILE_SEEDS) -> list[StaffProfile]:
+    deactivate_legacy_demo_staff_profiles(db)
     created_profiles: list[StaffProfile] = []
     existing_by_name = {profile.name.lower(): profile for profile in db.query(StaffProfile).all()}
     for payload in profiles:
@@ -301,12 +281,37 @@ def ensure_staff_profiles(db: Session, profiles: Sequence[dict] = DEFAULT_STAFF_
             if not existing.talents and payload.get("talents"):
                 existing.talents = payload["talents"]
                 updated = True
+            if not existing.service_types and payload.get("service_types"):
+                existing.service_types = payload["service_types"]
+                updated = True
+            if not existing.services and payload.get("services"):
+                existing.services = payload["services"]
+                updated = True
             if not existing.photo_url and payload.get("photo_url"):
                 existing.photo_url = payload["photo_url"]
+                updated = True
+            if not existing.role_title and payload.get("role_title"):
+                existing.role_title = payload["role_title"]
+                updated = True
+            if not existing.bio and payload.get("bio"):
+                existing.bio = payload["bio"]
+                updated = True
+            if not existing.portfolio_url and payload.get("portfolio_url"):
+                existing.portfolio_url = payload["portfolio_url"]
                 updated = True
             if not existing.add_on_price_cents and payload.get("add_on_price_cents"):
                 existing.add_on_price_cents = payload["add_on_price_cents"]
                 updated = True
+            if not existing.booking_rate_cents and payload.get("booking_rate_cents"):
+                existing.booking_rate_cents = payload["booking_rate_cents"]
+                updated = True
+            if not existing.equipment_rental_cost_cents and payload.get("equipment_rental_cost_cents"):
+                existing.equipment_rental_cost_cents = payload["equipment_rental_cost_cents"]
+                updated = True
+            for field in ("active", "booking_enabled", "schedule_published"):
+                if field in payload and getattr(existing, field) != payload[field]:
+                    setattr(existing, field, payload[field])
+                    updated = True
             if updated:
                 db.add(existing)
             continue

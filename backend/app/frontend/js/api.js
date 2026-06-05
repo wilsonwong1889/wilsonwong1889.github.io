@@ -254,6 +254,9 @@ export const api = {
   getStaffAvailability(staffId, date) {
     return request(`/api/staff/${staffId}/availability?date=${date}`);
   },
+  getStaffMonthlyAvailability(staffId, month) {
+    return request(`/api/staff/${staffId}/availability/monthly?month=${encodeURIComponent(month)}`);
+  },
   createStaffBooking(payload) {
     return request("/api/staff-bookings", {
       method: "POST",

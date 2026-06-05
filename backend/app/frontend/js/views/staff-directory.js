@@ -19,6 +19,10 @@ let selectedAvailability = null;
 let loadingAvailability = false;
 let lastAvailabilityKey = "";
 let availabilityRequestToken = 0;
+let displayedStaffMonth = firstOfMonth(selectedDate);
+let staffMonthAvailability = {};
+let loadingStaffMonth = false;
+let staffMonthAvailabilityRequestToken = 0;
 let viewBound = false;
 let staffSearchQuery = "";
 let staffCategoryFilter = "all";
@@ -41,6 +45,17 @@ function isDateBeforeToday(value) {
 
 function clampBookingDate(value) {
   return isDateBeforeToday(value) ? todayString() : value || todayString();
+}
+
+function firstOfMonth(value) {
+  return `${String(value || todayString()).slice(0, 7)}-01`;
+}
+
+function daysInMonth(monthValue) {
+  const base = new Date(`${monthValue}T00:00:00`);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  return new Date(year, month + 1, 0).getDate();
 }
 
 function formatCurrency(cents) {
@@ -260,6 +275,22 @@ function getSubmitButton() {
 
 function getBookingDateInput() {
   return document.getElementById("staff-booking-date");
+}
+
+function getStaffBookingMonthGrid() {
+  return document.getElementById("staff-booking-month-grid");
+}
+
+function getStaffBookingCalendarTitle() {
+  return document.getElementById("staff-booking-calendar-title");
+}
+
+function getStaffBookingPrevMonth() {
+  return document.getElementById("staff-booking-prev-month");
+}
+
+function getStaffBookingNextMonth() {
+  return document.getElementById("staff-booking-next-month");
 }
 
 function getBookingDurationSelect() {
@@ -784,6 +815,74 @@ function getStaffSelectionValidity(profile) {
   };
 }
 
+function renderStaffBookingCalendar(profile) {
+  const grid = getStaffBookingMonthGrid();
+  const title = getStaffBookingCalendarTitle();
+  if (!grid || !title || !displayedStaffMonth) {
+    return;
+  }
+
+  const monthDate = new Date(`${displayedStaffMonth}T00:00:00`);
+  title.textContent = new Intl.DateTimeFormat("en-CA", {
+    month: "long",
+    year: "numeric",
+  }).format(monthDate);
+
+  const prev = getStaffBookingPrevMonth();
+  if (prev) {
+    prev.disabled = displayedStaffMonth <= firstOfMonth(todayString()) || !profile;
+  }
+  const next = getStaffBookingNextMonth();
+  if (next) {
+    next.disabled = !profile;
+  }
+
+  if (!profile) {
+    grid.innerHTML = '<div class="empty-state staff-calendar-empty">Choose a staff member first.</div>';
+    return;
+  }
+
+  const firstDay = new Date(`${displayedStaffMonth}T00:00:00`);
+  const startOffset = firstDay.getDay();
+  const totalDays = daysInMonth(displayedStaffMonth);
+  const cells = [];
+
+  for (let index = 0; index < startOffset; index += 1) {
+    cells.push('<div class="calendar-cell calendar-cell-empty"></div>');
+  }
+
+  for (let day = 1; day <= totalDays; day += 1) {
+    const date = new Date(`${displayedStaffMonth}T00:00:00`);
+    date.setDate(day);
+    const isoDate = date.toISOString().slice(0, 10);
+    const isPast = isDateBeforeToday(isoDate);
+    const count = isPast ? 0 : staffMonthAvailability[isoDate];
+    const isSelected = isoDate === selectedDate;
+    const label = isPast
+      ? "Past"
+      : loadingStaffMonth && count === undefined
+        ? "checking"
+        : count
+          ? `${count} slots`
+          : "Unavailable";
+    const ariaLabel = `${formatDateLabel(isoDate)}: ${label}${isSelected ? ", selected" : ""}`;
+    cells.push(`
+      <button
+        class="calendar-cell ${isSelected ? "is-selected" : ""} ${count ? "is-open" : "is-closed"} ${isPast ? "is-past" : ""}"
+        type="button"
+        data-staff-booking-date="${escapeHtml(isoDate)}"
+        aria-label="${escapeHtml(ariaLabel)}"
+        ${isPast ? "disabled" : ""}
+      >
+        <strong>${day}</strong>
+        <span>${escapeHtml(label)}</span>
+      </button>
+    `);
+  }
+
+  grid.innerHTML = cells.join("");
+}
+
 function hasContactDetails() {
   return Boolean(getBookingNameInput()?.value.trim() && getBookingPhoneInput()?.value.trim());
 }
@@ -955,6 +1054,7 @@ function renderStaffBookingShell(currentState) {
   }
 
   renderAvailability(profile);
+  renderStaffBookingCalendar(profile);
   syncDurationControls();
   renderSummary(profile);
   renderStaffPromoFeedback(profile);
@@ -1039,6 +1139,47 @@ async function loadAvailabilityForSelectedStaff() {
   }
 }
 
+async function loadStaffMonthAvailability() {
+  const profile = getSelectedStaffProfile();
+  if (!profile || !displayedStaffMonth) {
+    staffMonthAvailability = {};
+    renderStaffBookingShell({ currentUser: state.currentUser });
+    return;
+  }
+
+  const staffId = String(profile.id);
+  const monthValue = displayedStaffMonth;
+  const requestToken = staffMonthAvailabilityRequestToken + 1;
+  staffMonthAvailabilityRequestToken = requestToken;
+  loadingStaffMonth = true;
+  staffMonthAvailability = {};
+  renderStaffBookingShell({ currentUser: state.currentUser });
+
+  try {
+    const payload = await request(`/api/staff/${staffId}/availability/monthly?month=${encodeURIComponent(monthValue.slice(0, 7))}`);
+    if (
+      requestToken !== staffMonthAvailabilityRequestToken ||
+      displayedStaffMonth !== monthValue ||
+      String(selectedStaffId) !== staffId
+    ) {
+      return;
+    }
+    staffMonthAvailability = payload.days || {};
+    setStatus(`Calendar loaded for ${profile.name}.`);
+  } catch (error) {
+    if (requestToken !== staffMonthAvailabilityRequestToken) {
+      return;
+    }
+    staffMonthAvailability = {};
+    setStatus(error.message || "Could not load this staff calendar.", true);
+  } finally {
+    if (requestToken === staffMonthAvailabilityRequestToken) {
+      loadingStaffMonth = false;
+      renderStaffBookingShell({ currentUser: state.currentUser });
+    }
+  }
+}
+
 async function selectStaffBooking(staffId, { syncUrl = true, scroll = true } = {}) {
   const nextId = String(staffId || "");
   if (!nextId) {
@@ -1049,6 +1190,8 @@ async function selectStaffBooking(staffId, { syncUrl = true, scroll = true } = {
   selectedTime = "";
   selectedAvailability = null;
   lastAvailabilityKey = "";
+  displayedStaffMonth = firstOfMonth(selectedDate);
+  staffMonthAvailability = {};
   if (syncUrl) {
     syncSelectionUrl(nextId);
   }
@@ -1061,7 +1204,7 @@ async function selectStaffBooking(staffId, { syncUrl = true, scroll = true } = {
   if (scroll) {
     shell?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  await loadAvailabilityForSelectedStaff();
+  await Promise.all([loadStaffMonthAvailability(), loadAvailabilityForSelectedStaff()]);
 }
 
 function handleTeamGridClick(event) {
@@ -1295,14 +1438,54 @@ export function initStaffDirectoryView() {
     renderStaffDirectoryView(state);
   });
   getTimeGrid()?.addEventListener("click", handleTimeGridClick);
+  getStaffBookingMonthGrid()?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-staff-booking-date]");
+    if (!button || button.disabled) {
+      return;
+    }
+    selectedDate = clampBookingDate(button.dataset.staffBookingDate || selectedDate);
+    selectedAvailability = null;
+    selectedTime = "";
+    lastAvailabilityKey = "";
+    displayedStaffMonth = firstOfMonth(selectedDate);
+    renderStaffBookingShell({ currentUser: state.currentUser });
+    await loadAvailabilityForSelectedStaff();
+  });
   getBookingDateInput()?.addEventListener("change", async (event) => {
     selectedDate = clampBookingDate(event.target.value || selectedDate);
     event.target.value = selectedDate;
     selectedAvailability = null;
     selectedTime = "";
     lastAvailabilityKey = "";
+    const nextMonth = firstOfMonth(selectedDate);
+    const monthChanged = nextMonth !== displayedStaffMonth;
+    displayedStaffMonth = nextMonth;
     renderStaffBookingShell({ currentUser: state.currentUser });
-    await loadAvailabilityForSelectedStaff();
+    await Promise.all([
+      loadAvailabilityForSelectedStaff(),
+      monthChanged ? loadStaffMonthAvailability() : Promise.resolve(),
+    ]);
+  });
+  getStaffBookingPrevMonth()?.addEventListener("click", async () => {
+    if (!getSelectedStaffProfile() || !displayedStaffMonth) {
+      return;
+    }
+    const date = new Date(`${displayedStaffMonth}T00:00:00`);
+    date.setMonth(date.getMonth() - 1);
+    const previousMonth = `${date.toISOString().slice(0, 7)}-01`;
+    displayedStaffMonth = previousMonth < firstOfMonth(todayString()) ? firstOfMonth(todayString()) : previousMonth;
+    renderStaffBookingShell({ currentUser: state.currentUser });
+    await loadStaffMonthAvailability();
+  });
+  getStaffBookingNextMonth()?.addEventListener("click", async () => {
+    if (!getSelectedStaffProfile() || !displayedStaffMonth) {
+      return;
+    }
+    const date = new Date(`${displayedStaffMonth}T00:00:00`);
+    date.setMonth(date.getMonth() + 1);
+    displayedStaffMonth = `${date.toISOString().slice(0, 7)}-01`;
+    renderStaffBookingShell({ currentUser: state.currentUser });
+    await loadStaffMonthAvailability();
   });
   getBookingDurationSelect()?.addEventListener("change", () => {
     selectedDuration = Number(getBookingDurationSelect()?.value || 60);
@@ -1374,6 +1557,9 @@ function renderBookingSection(currentState) {
 
   if (profile && !selectedAvailability && !loadingAvailability) {
     void loadAvailabilityForSelectedStaff();
+  }
+  if (profile && !loadingStaffMonth && !Object.keys(staffMonthAvailability).length) {
+    void loadStaffMonthAvailability();
   }
 
   renderStaffBookingShell(currentState);

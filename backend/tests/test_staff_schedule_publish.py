@@ -69,13 +69,18 @@ class StaffSchedulePublishTest(BaseAppTest):
     def test_03_publishing_makes_bookable(self) -> None:
         admin = self._admin_headers()
         staff = self._unpublished_staff(admin)
+        day = self._future_time(day=1, hour=10).date()
+        self.client.post(
+            f"/api/admin/staff/{staff['id']}/availability/rules",
+            json={"weekday": day.weekday(), "start_minute": 720, "end_minute": 1200},
+            headers=admin,
+        )
         published = self.client.put(
             f"/api/admin/staff/{staff['id']}", json={"schedule_published": True}, headers=admin
         )
         self.assertEqual(published.status_code, 200, published.text)
         self.assertTrue(published.json()["schedule_published"])
 
-        day = self._future_time(day=1, hour=10).date()
         self.assertTrue(self._start_times(staff["id"], day))  # now has availability
 
         start = self._future_time(day=1, hour=12).isoformat()

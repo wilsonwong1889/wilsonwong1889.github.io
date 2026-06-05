@@ -100,6 +100,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
         )
         from app.models.promo_code import PromoCode
         from app.models.room import Room
+        from app.models.staff_availability import StaffAvailabilityException
         from app.models.staff_booking import StaffBooking
         from app.models.staff_profile import StaffProfile
         from app.models.user import User
@@ -165,6 +166,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
         cls.WebhookEventLog = WebhookEventLog
         cls.PromoCode = PromoCode
         cls.Room = Room
+        cls.StaffAvailabilityException = StaffAvailabilityException
         cls.StaffBooking = StaffBooking
         cls.StaffProfile = StaffProfile
         cls.User = User
@@ -256,6 +258,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
                 self.Refund,
                 self.Review,
                 self.PromoCode,
+                self.StaffAvailabilityException,
                 self.BookingStaffAssignment,
                 self.BookingSlot,
                 self.Booking,
@@ -826,6 +829,8 @@ class BookingServiceMatrixTest(unittest.TestCase):
 
             first_start = self.normalize_booking_start(self._aware_time(day=3, hour=10))
             second_start = self.normalize_booking_start(self._aware_time(day=3, hour=15))
+            first_start_local = first_start.astimezone(BUSINESS_TIMEZONE)
+            first_start_minute = first_start_local.hour * 60 + first_start_local.minute
             first = self.StaffBooking(
                 user_id=user_one.id,
                 staff_profile_id=profile.id,
@@ -854,7 +859,20 @@ class BookingServiceMatrixTest(unittest.TestCase):
                 user_full_name_snapshot=user_two.full_name,
                 user_phone_snapshot=user_two.phone,
             )
-            db.add_all([first, second])
+            db.add_all(
+                [
+                    first,
+                    second,
+                    self.StaffAvailabilityException(
+                        staff_profile_id=profile.id,
+                        exception_date=first_start_local.date(),
+                        start_minute=first_start_minute,
+                        end_minute=first_start_minute + 60,
+                        is_available=True,
+                        reason="Test availability",
+                    ),
+                ]
+            )
             db.commit()
             db.refresh(second)
 

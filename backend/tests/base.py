@@ -192,3 +192,25 @@ class BaseAppTest(unittest.TestCase):
     def _staff_price(booking_rate_cents: int, duration_minutes: int) -> int:
         from math import floor
         return floor(booking_rate_cents * duration_minutes / 60)
+
+    def _make_staff_available_for_time(
+        self,
+        staff_profile_id,
+        start_time: datetime,
+        *,
+        duration_minutes: int = 60,
+    ) -> None:
+        local_start = start_time.astimezone(ZoneInfo("America/Edmonton"))
+        start_minute = local_start.hour * 60 + local_start.minute
+        with self.SessionLocal() as db:
+            db.add(
+                self.StaffAvailabilityException(
+                    staff_profile_id=staff_profile_id,
+                    exception_date=local_start.date(),
+                    start_minute=start_minute,
+                    end_minute=start_minute + duration_minutes,
+                    is_available=True,
+                    reason="Test availability",
+                )
+            )
+            db.commit()

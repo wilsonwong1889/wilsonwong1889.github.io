@@ -15,7 +15,8 @@ class PageContentTest(BaseAppTest):
 
     def test_00_all_pages_return_200(self) -> None:
         for path in ("/", "/account", "/pricing", "/rooms", "/room", "/reserve",
-                     "/bookings", "/booking", "/payment-success", "/admin"):
+                     "/staff", "/staff-dashboard", "/bookings", "/booking",
+                     "/payment-success", "/admin"):
             resp = self.client.get(path)
             self.assertEqual(resp.status_code, 200, f"{path} returned {resp.status_code}")
 
@@ -105,6 +106,20 @@ class PageContentTest(BaseAppTest):
         self.assertIn("reserve-promo-preview-button", resp.text)
         self.assertIn("reserve-promo-feedback", resp.text)
 
+    def test_06b_staff_pages(self) -> None:
+        resp = self.client.get("/staff")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("staff-booking-calendar-panel", resp.text)
+        self.assertIn("staff-booking-month-grid", resp.text)
+        self.assertIn("staff-booking-prev-month", resp.text)
+        self.assertIn("staff-booking-next-month", resp.text)
+
+        dashboard = self.client.get("/staff-dashboard")
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertIn("staff-dashboard-month-grid", dashboard.text)
+        self.assertIn("staff-dashboard-selected-date-label", dashboard.text)
+        self.assertIn('data-staff-calendar-action="available"', dashboard.text)
+
     def test_07_admin_page(self) -> None:
         resp = self.client.get("/admin")
         self.assertEqual(resp.status_code, 200)
@@ -126,6 +141,9 @@ class PageContentTest(BaseAppTest):
         self.assertIn("admin-accounts-list", resp.text)
         self.assertIn("admin-test-case-summary", resp.text)
         self.assertIn("admin-test-cases-list", resp.text)
+        self.assertIn('id="admin-staff-schedule-date"', resp.text)
+        self.assertEqual(resp.text.count('id="admin-staff-schedule-date"'), 1)
+        self.assertEqual(resp.text.count('id="admin-schedule-date"'), 1)
         self.assertIn('/assets/styles/app.css?v=', resp.text)
         self.assertLess(resp.text.index("Room management"), resp.text.index("Backend test cases"))
         # From test_41 extended checks

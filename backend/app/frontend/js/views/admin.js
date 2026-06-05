@@ -1154,7 +1154,7 @@ function renderAdminStaffSchedule(rows) {
 }
 
 async function loadAdminStaffSchedule() {
-  const dateInput = document.getElementById("admin-schedule-date");
+  const dateInput = document.getElementById("admin-staff-schedule-date");
   if (!dateInput) return;
   if (!dateInput.value) {
     dateInput.value = new Date().toISOString().slice(0, 10);
@@ -2858,7 +2858,7 @@ export function initAdminView(actions) {
     }
   });
 
-  document.getElementById("admin-schedule-date")?.addEventListener("change", () => loadAdminStaffSchedule());
+  document.getElementById("admin-staff-schedule-date")?.addEventListener("change", () => loadAdminStaffSchedule());
   document.getElementById("admin-schedule-refresh")?.addEventListener("click", () => loadAdminStaffSchedule());
   document.getElementById("admin-tab-schedule")?.addEventListener("click", () => loadAdminStaffSchedule());
 
