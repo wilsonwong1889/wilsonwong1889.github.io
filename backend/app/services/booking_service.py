@@ -895,7 +895,9 @@ def get_monthly_availability_summary(db: Session, month: str) -> dict:
     return {"month": month, "total_rooms": total_rooms, "days": days}
 
 
-def get_room_availability(db: Session, room_id: str, target_date: date) -> dict:
+def get_room_availability(
+    db: Session, room_id: str, target_date: date, *, exclude_hold_token: str | None = None
+) -> dict:
     expire_stale_pending_bookings(db)
     room = get_room_or_404(db, room_id)
     business_timezone = get_business_timezone()
@@ -936,18 +938,31 @@ def get_room_availability(db: Session, room_id: str, target_date: date) -> dict:
         slot_starts.append(slot_cursor)
         slot_cursor += timedelta(minutes=30)
 
+    # Slots another customer is mid-booking (Redis reservation holds) are treated
+    # as taken so two people don't see the same slot as open. The caller's own
+    # hold is ignored so their selected slot stays visible to them.
+    from app.services.reservation_service import active_held_slot_keys
+
+    held_keys = active_held_slot_keys(
+        build_reservation_slot_keys(room.id, slot_starts), ignore_token=exclude_hold_token
+    )
+    blocked_slots = set(booked_slots)
+    for slot_start in slot_starts:
+        if f"room:{room.id}:slot:{slot_start.isoformat()}" in held_keys:
+            blocked_slots.add(slot_start)
+
     for index, slot_start in enumerate(slot_starts):
         local_start = slot_start.astimezone(business_timezone)
         if local_start.hour < open_hour or local_start.minute != 0:
             continue
         if slot_start <= current_time:
             continue
-        if slot_start in booked_slots:
+        if slot_start in blocked_slots:
             continue
 
         contiguous_free_slots = 0
         for future_slot in slot_starts[index:]:
-            if future_slot in booked_slots:
+            if future_slot in blocked_slots:
                 break
             contiguous_free_slots += 1
 

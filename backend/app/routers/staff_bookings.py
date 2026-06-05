@@ -39,6 +39,7 @@ from app.services.staff_booking_service import (
     get_staff_availability,
     get_staff_booking_for_user,
     get_staff_booking_payment_session,
+    get_staff_monthly_availability_summary,
     list_staff_bookings_for_user,
     reschedule_staff_booking,
     update_staff_booking_contact,
@@ -58,6 +59,19 @@ def staff_availability(
 ):
     try:
         return get_staff_availability(db, staff_profile_id, date_value)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/staff/{staff_profile_id}/availability/monthly")
+def staff_monthly_availability(
+    staff_profile_id: str,
+    month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
+    db: Session = Depends(get_db),
+    _: None = Depends(booking_rate_limit),
+):
+    try:
+        return get_staff_monthly_availability_summary(db, staff_profile_id, month)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

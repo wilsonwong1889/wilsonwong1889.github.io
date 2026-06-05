@@ -136,6 +136,11 @@ class ReservationOut(BaseModel):
     slot_keys: List[str]
 
 
+class ReservationExtend(BaseModel):
+    token: str
+    slot_keys: List[str]
+
+
 class BookingCancel(BaseModel):
     reason: Optional[str] = None
 

@@ -40,11 +40,12 @@ class StaffResponseTokenTest(BaseAppTest):
             json={"name": f"Tok Engineer {email}", "booking_rate_cents": 6000, "active": True, "schedule_published": True},
             headers=admin,
         ).json()
-        start = self._future_time(day=1, hour=hour).isoformat()
+        start = self._future_time(day=1, hour=hour)
+        self._make_staff_available_for_time(staff["id"], start)
         resp = self.client.post(
             "/api/staff-bookings",
             headers=self._customer_headers(email),
-            json={"staff_profile_id": staff["id"], "start_time": start, "duration_minutes": 60},
+            json={"staff_profile_id": staff["id"], "start_time": start.isoformat(), "duration_minutes": 60},
         )
         self.assertEqual(resp.status_code, 201, resp.text)
         return resp.json()["id"]

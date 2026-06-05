@@ -69,6 +69,7 @@ class AppSmokeTest(unittest.TestCase):
         )
         from app.models.promo_code import PromoCode
         from app.models.room import Room
+        from app.models.staff_availability import StaffAvailabilityException, StaffAvailabilityRule
         from app.models.staff_booking import StaffBooking
         from app.models.staff_profile import StaffProfile
         from app.models.user import User
@@ -87,6 +88,8 @@ class AppSmokeTest(unittest.TestCase):
         cls.WebhookEventLog = WebhookEventLog
         cls.PromoCode = PromoCode
         cls.Room = Room
+        cls.StaffAvailabilityRule = StaffAvailabilityRule
+        cls.StaffAvailabilityException = StaffAvailabilityException
         cls.StaffBooking = StaffBooking
         cls.StaffProfile = StaffProfile
         cls.User = User
@@ -117,6 +120,8 @@ class AppSmokeTest(unittest.TestCase):
                 self.Refund,
                 self.Review,
                 self.PromoCode,
+                self.StaffAvailabilityRule,
+                self.StaffAvailabilityException,
                 self.BookingStaffAssignment,
                 self.BookingSlot,
                 self.Booking,
@@ -189,6 +194,28 @@ class AppSmokeTest(unittest.TestCase):
     def _staff_price(booking_rate_cents: int, duration_minutes: int) -> int:
         from math import floor
         return floor(booking_rate_cents * duration_minutes / 60)
+
+    def _make_staff_available_for_time(
+        self,
+        staff_profile_id,
+        start_time: datetime,
+        *,
+        duration_minutes: int = 60,
+    ) -> None:
+        local_start = start_time.astimezone(ZoneInfo("America/Edmonton"))
+        start_minute = local_start.hour * 60 + local_start.minute
+        with self.SessionLocal() as db:
+            db.add(
+                self.StaffAvailabilityException(
+                    staff_profile_id=staff_profile_id,
+                    exception_date=local_start.date(),
+                    start_minute=start_minute,
+                    end_minute=start_minute + duration_minutes,
+                    is_available=True,
+                    reason="Test availability",
+                )
+            )
+            db.commit()
 
     def test_00_seed_helpers(self) -> None:
         with self.SessionLocal() as db:
@@ -1098,6 +1125,7 @@ class AppSmokeTest(unittest.TestCase):
 
         business_timezone = ZoneInfo("America/Edmonton")
         start_time = self._future_time(day=5, hour=11, minute=0)
+        self._make_staff_available_for_time(profile_id, start_time)
 
         past_date = datetime.now(business_timezone).date() - timedelta(days=1)
         past_start = datetime(
@@ -1240,6 +1268,7 @@ class AppSmokeTest(unittest.TestCase):
 
         business_timezone = ZoneInfo("America/Edmonton")
         start_time = self._future_time(day=6, hour=12, minute=0)
+        self._make_staff_available_for_time(profile_id, start_time)
 
         response = self.client.post(
             "/api/staff-bookings/guest",
@@ -1592,9 +1621,12 @@ class AppSmokeTest(unittest.TestCase):
         base_candidate = datetime.now(biz_tz).date() + timedelta(days=10)
         base = base_candidate + timedelta(days=(2 - base_candidate.weekday()) % 7)
 
-        def make_start(day_offset, hour):
+        def make_dt(day_offset, hour):
             d = base + timedelta(days=day_offset)
-            return datetime(d.year, d.month, d.day, hour + 2, 0, tzinfo=biz_tz).isoformat()
+            return datetime(d.year, d.month, d.day, hour + 2, 0, tzinfo=biz_tz)
+
+        def make_start(day_offset, hour):
+            return make_dt(day_offset, hour).isoformat()
 
         # ── 1. admin mark-paid (room booking) ─────────────────────────────────
         resp = self.client.post(
@@ -1651,6 +1683,7 @@ class AppSmokeTest(unittest.TestCase):
         self.assertTrue(waived["payment_intent_id"].startswith("admin_waived_"))
 
         # ── 5. staff booking: waive-payment ───────────────────────────────────
+        self._make_staff_available_for_time(profile_id, make_dt(2, 10))
         resp = self.client.post(
             "/api/staff-bookings",
             headers=guest_headers,
@@ -1679,6 +1712,7 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(resp.json()["price_cents"], 0)
 
         # ── 6. staff booking: mark-paid ────────────────────────────────────────
+        self._make_staff_available_for_time(profile_id, make_dt(3, 10))
         resp = self.client.post(
             "/api/staff-bookings",
             headers=guest_headers,

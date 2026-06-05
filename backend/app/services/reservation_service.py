@@ -65,6 +65,58 @@ def create_hold(slot_keys: list[str], ttl_seconds: Optional[int] = None) -> Rese
     return ReservationHold(token=token, expires_at=expires_at, slot_keys=slot_keys)
 
 
+def active_held_slot_keys(slot_keys: list[str], *, ignore_token: Optional[str] = None) -> set[str]:
+    """Of the given slot keys, return those currently held — optionally ignoring
+    holds owned by `ignore_token` (so a caller's own hold doesn't hide the slot
+    from their own availability view)."""
+    if not slot_keys:
+        return set()
+    keys = list(slot_keys)
+    held: set[str] = set()
+    redis_client = _redis_client()
+    if redis_client is not None:
+        for key, value in zip(keys, redis_client.mget(keys)):
+            if value is not None and value != ignore_token:
+                held.add(key)
+        return held
+
+    with _memory_lock:
+        _cleanup_expired_memory_holds()
+        for key in keys:
+            entry = _memory_holds.get(key)
+            if entry is not None and entry[1] != ignore_token:
+                held.add(key)
+    return held
+
+
+def extend_hold(slot_keys: list[str], token: str, ttl_seconds: Optional[int] = None) -> bool:
+    """Renew the TTL on an existing hold the caller still owns, without minting a
+    new token or briefly releasing the slot. Returns False if the token no longer
+    owns every slot (e.g. it already expired)."""
+    if not slot_keys:
+        return False
+    ttl_seconds = ttl_seconds or settings.RESERVATION_HOLD_MINUTES * 60
+    keys = list(slot_keys)
+    redis_client = _redis_client()
+    if redis_client is not None:
+        if any(value != token for value in redis_client.mget(keys)):
+            return False
+        pipeline = redis_client.pipeline()
+        for key in keys:
+            pipeline.expire(key, ttl_seconds)
+        pipeline.execute()
+        return True
+
+    with _memory_lock:
+        _cleanup_expired_memory_holds()
+        if any(_memory_holds.get(key, (None, None))[1] != token for key in keys):
+            return False
+        new_expiry = time.time() + ttl_seconds
+        for key in keys:
+            _memory_holds[key] = (new_expiry, token)
+    return True
+
+
 def validate_hold(slot_keys: list[str], token: str) -> bool:
     redis_client = _redis_client()
     if redis_client is not None:

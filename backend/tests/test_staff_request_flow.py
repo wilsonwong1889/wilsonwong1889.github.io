@@ -44,11 +44,12 @@ class StaffRequestFlowTest(BaseAppTest):
         return resp.json()["id"]
 
     def _book(self, staff_id, headers, *, hour=10):
-        start = self._future_time(day=1, hour=hour).isoformat()
+        start = self._future_time(day=1, hour=hour)
+        self._make_staff_available_for_time(staff_id, start)
         return self.client.post(
             "/api/staff-bookings",
             headers=headers,
-            json={"staff_profile_id": staff_id, "start_time": start, "duration_minutes": 60},
+            json={"staff_profile_id": staff_id, "start_time": start.isoformat(), "duration_minutes": 60},
         )
 
     def _book_at(self, staff_id, headers, start):

@@ -58,8 +58,8 @@ class StaffAvailabilityEndpointTest(BaseAppTest):
         staff_id = self._staff_id(headers)
         friday = self._next_friday()
 
-        # Without any rule, business hours (12:00-20:00) apply -> 12:00 bookable.
-        self.assertIn(12, self._start_hours(staff_id, friday))
+        # Without any rule, staff are unavailable by default.
+        self.assertEqual(self._start_hours(staff_id, friday), [])
 
         # Friday 14:00-18:00 rule -> only 14,15,16,17 start hours.
         self.client.post(
@@ -127,3 +127,19 @@ class StaffAvailabilityEndpointTest(BaseAppTest):
             headers=headers,
         )
         self.assertEqual(self._start_hours(staff_id, sunday), [12, 13])
+
+        monthly = self.client.get(
+            f"/api/staff/{staff_id}/availability/monthly?month={sunday.isoformat()[:7]}"
+        )
+        self.assertEqual(monthly.status_code, 200, monthly.text)
+        self.assertEqual(monthly.json()["days"][sunday.isoformat()], 2)
+
+    def test_06_invalid_staff_id_returns_not_found(self) -> None:
+        target_day = self._next_friday().isoformat()
+        daily = self.client.get(f"/api/staff/not-a-uuid/availability?date={target_day}")
+        monthly = self.client.get(
+            f"/api/staff/not-a-uuid/availability/monthly?month={target_day[:7]}"
+        )
+
+        self.assertEqual(daily.status_code, 404, daily.text)
+        self.assertEqual(monthly.status_code, 404, monthly.text)

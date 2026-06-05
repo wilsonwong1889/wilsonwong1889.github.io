@@ -119,8 +119,9 @@ export const api = {
   getRoom(roomId) {
     return request(`/api/rooms/${roomId}`);
   },
-  getAvailability(roomId, date) {
-    return request(`/api/rooms/${roomId}/availability?date=${date}`);
+  getAvailability(roomId, date, holdToken = null) {
+    const holdParam = holdToken ? `&hold_token=${encodeURIComponent(holdToken)}` : "";
+    return request(`/api/rooms/${roomId}/availability?date=${date}${holdParam}`);
   },
   getMonthlyAvailability(month) {
     return request(`/api/availability/monthly?month=${encodeURIComponent(month)}`);
@@ -173,6 +174,12 @@ export const api = {
     return request("/api/bookings/reservations", {
       method: "POST",
       body: JSON.stringify(payload),
+    });
+  },
+  extendReservationHold(token, slotKeys) {
+    return request("/api/bookings/reservations/extend", {
+      method: "POST",
+      body: JSON.stringify({ token, slot_keys: slotKeys || [] }),
     });
   },
   releaseReservationHold(token, slotKeys) {
@@ -253,6 +260,9 @@ export const api = {
   },
   getStaffAvailability(staffId, date) {
     return request(`/api/staff/${staffId}/availability?date=${date}`);
+  },
+  getStaffMonthlyAvailability(staffId, month) {
+    return request(`/api/staff/${staffId}/availability/monthly?month=${encodeURIComponent(month)}`);
   },
   createStaffBooking(payload) {
     return request("/api/staff-bookings", {

@@ -7,6 +7,10 @@ const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satur
 // who is building/awaiting approval on a studio-engineer application.
 let dashboardMode = "staff";
 let headshotUrls = [];
+let scheduleRules = [];
+let scheduleExceptions = [];
+let dashboardSelectedDate = todayString();
+let dashboardCalendarMonth = firstOfMonth(dashboardSelectedDate);
 
 function el(id) {
   return document.getElementById(id);
@@ -22,6 +26,31 @@ function timeToMinutes(value) {
   const [hours, mins] = String(value || "").split(":").map(Number);
   if (Number.isNaN(hours)) return null;
   return hours * 60 + (mins || 0);
+}
+
+function todayString() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function firstOfMonth(value) {
+  return `${String(value || todayString()).slice(0, 7)}-01`;
+}
+
+function daysInMonth(monthValue) {
+  const base = new Date(`${monthValue}T00:00:00`);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function formatDateLabel(value) {
+  return new Intl.DateTimeFormat("en-CA", {
+    dateStyle: "medium",
+  }).format(new Date(`${value}T00:00:00`));
 }
 
 function setFeedback(message, type) {
@@ -57,6 +86,139 @@ function parseList(value) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function mergeWindows(windows) {
+  const ordered = windows
+    .filter((window) => Number.isFinite(window.start) && Number.isFinite(window.end) && window.start < window.end)
+    .sort((left, right) => left.start - right.start);
+  const merged = [];
+  ordered.forEach((window) => {
+    const previous = merged[merged.length - 1];
+    if (previous && window.start <= previous.end) {
+      previous.end = Math.max(previous.end, window.end);
+      return;
+    }
+    merged.push({ ...window });
+  });
+  return merged;
+}
+
+function subtractWindow(windows, block) {
+  const result = [];
+  windows.forEach((window) => {
+    if (block.end <= window.start || block.start >= window.end) {
+      result.push(window);
+      return;
+    }
+    if (block.start > window.start) {
+      result.push({ start: window.start, end: block.start });
+    }
+    if (block.end < window.end) {
+      result.push({ start: block.end, end: window.end });
+    }
+  });
+  return result;
+}
+
+function dateWeekday(value) {
+  return (new Date(`${value}T00:00:00`).getDay() + 6) % 7;
+}
+
+function exceptionsForDate(value) {
+  return scheduleExceptions.filter((item) => String(item.exception_date) === String(value));
+}
+
+function windowsForDate(value) {
+  let windows = scheduleRules
+    .filter((rule) => rule.active !== false && Number(rule.weekday) === dateWeekday(value))
+    .map((rule) => ({ start: Number(rule.start_minute), end: Number(rule.end_minute) }));
+
+  exceptionsForDate(value)
+    .filter((item) => item.is_available)
+    .forEach((item) => {
+      windows.push({
+        start: item.start_minute == null ? 0 : Number(item.start_minute),
+        end: item.end_minute == null ? 1440 : Number(item.end_minute),
+      });
+    });
+  windows = mergeWindows(windows);
+
+  exceptionsForDate(value)
+    .filter((item) => !item.is_available)
+    .forEach((item) => {
+      windows = subtractWindow(windows, {
+        start: item.start_minute == null ? 0 : Number(item.start_minute),
+        end: item.end_minute == null ? 1440 : Number(item.end_minute),
+      });
+    });
+
+  return mergeWindows(windows);
+}
+
+function syncExceptionFormToSelectedDate() {
+  const form = el("staff-exception-form");
+  if (!form || !dashboardSelectedDate) return;
+  form.elements.date.value = dashboardSelectedDate;
+}
+
+function renderDashboardCalendar() {
+  const grid = el("staff-dashboard-month-grid");
+  const title = el("staff-dashboard-calendar-title");
+  const selectedLabel = el("staff-dashboard-selected-date-label");
+  const selectedWindows = el("staff-dashboard-day-windows");
+  if (!grid || !title || !dashboardCalendarMonth) return;
+
+  const monthDate = new Date(`${dashboardCalendarMonth}T00:00:00`);
+  title.textContent = new Intl.DateTimeFormat("en-CA", {
+    month: "long",
+    year: "numeric",
+  }).format(monthDate);
+
+  const firstDay = new Date(`${dashboardCalendarMonth}T00:00:00`);
+  const startOffset = firstDay.getDay();
+  const totalDays = daysInMonth(dashboardCalendarMonth);
+  const cells = [];
+
+  for (let index = 0; index < startOffset; index += 1) {
+    cells.push('<div class="calendar-cell calendar-cell-empty"></div>');
+  }
+
+  for (let day = 1; day <= totalDays; day += 1) {
+    const date = new Date(`${dashboardCalendarMonth}T00:00:00`);
+    date.setDate(day);
+    const isoDate = date.toISOString().slice(0, 10);
+    const windows = windowsForDate(isoDate);
+    const isSelected = isoDate === dashboardSelectedDate;
+    const label = windows.length ? `${windows.length} window${windows.length === 1 ? "" : "s"}` : "Unavailable";
+    const ariaLabel = `${formatDateLabel(isoDate)}: ${label}${isSelected ? ", selected" : ""}`;
+    cells.push(`
+      <button
+        class="calendar-cell ${isSelected ? "is-selected" : ""} ${windows.length ? "is-open" : "is-closed"}"
+        type="button"
+        data-staff-dashboard-date="${escapeHtml(isoDate)}"
+        aria-label="${escapeHtml(ariaLabel)}"
+      >
+        <strong>${day}</strong>
+        <span>${escapeHtml(label)}</span>
+      </button>
+    `);
+  }
+
+  grid.innerHTML = cells.join("");
+
+  if (selectedLabel) {
+    selectedLabel.textContent = formatDateLabel(dashboardSelectedDate);
+  }
+  if (selectedWindows) {
+    const windows = windowsForDate(dashboardSelectedDate);
+    selectedWindows.innerHTML = windows.length
+      ? windows
+          .map((window) => `<span class="pill">${minutesToTime(window.start)}-${minutesToTime(window.end)}</span>`)
+          .join("")
+      : '<span class="empty-state">Unavailable until you add a weekly window or one-off availability.</span>';
+  }
+  syncExceptionFormToSelectedDate();
 }
 
 function setProfilePhotoPreview(photoUrl) {
@@ -193,14 +355,13 @@ async function renderRequests() {
 async function renderRules() {
   const list = el("staff-rules-list");
   if (!list) return;
-  let rules = [];
   try {
-    rules = await api.getMyAvailabilityRules();
+    scheduleRules = await api.getMyAvailabilityRules();
   } catch (error) {
     return;
   }
-  list.innerHTML = rules.length
-    ? rules
+  list.innerHTML = scheduleRules.length
+    ? scheduleRules
         .map(
           (rule) => `
         <div class="summary-line staff-schedule-row">
@@ -210,19 +371,19 @@ async function renderRules() {
         )
         .join("")
     : '<div class="empty-state">No weekly windows yet. Add one above.</div>';
+  renderDashboardCalendar();
 }
 
 async function renderExceptions() {
   const list = el("staff-exceptions-list");
   if (!list) return;
-  let exceptions = [];
   try {
-    exceptions = await api.getMyAvailabilityExceptions();
+    scheduleExceptions = await api.getMyAvailabilityExceptions();
   } catch (error) {
     return;
   }
-  list.innerHTML = exceptions.length
-    ? exceptions
+  list.innerHTML = scheduleExceptions.length
+    ? scheduleExceptions
         .map((exc) => {
           const span =
             exc.start_minute != null
@@ -237,6 +398,7 @@ async function renderExceptions() {
         })
         .join("")
     : '<div class="empty-state">No one-off changes.</div>';
+  renderDashboardCalendar();
 }
 
 function showGate() {
@@ -301,6 +463,67 @@ async function loadDashboard() {
 
 export function initStaffDashboardView() {
   if (CURRENT_PAGE !== "staff-dashboard") return;
+
+  el("staff-dashboard-month-grid")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-staff-dashboard-date]");
+    if (!button) return;
+    dashboardSelectedDate = button.dataset.staffDashboardDate || dashboardSelectedDate;
+    dashboardCalendarMonth = firstOfMonth(dashboardSelectedDate);
+    renderDashboardCalendar();
+  });
+
+  el("staff-dashboard-prev-month")?.addEventListener("click", () => {
+    const date = new Date(`${dashboardCalendarMonth}T00:00:00`);
+    date.setMonth(date.getMonth() - 1);
+    dashboardCalendarMonth = `${date.toISOString().slice(0, 7)}-01`;
+    renderDashboardCalendar();
+  });
+
+  el("staff-dashboard-next-month")?.addEventListener("click", () => {
+    const date = new Date(`${dashboardCalendarMonth}T00:00:00`);
+    date.setMonth(date.getMonth() + 1);
+    dashboardCalendarMonth = `${date.toISOString().slice(0, 7)}-01`;
+    renderDashboardCalendar();
+  });
+
+  document.querySelectorAll("[data-staff-calendar-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const action = button.dataset.staffCalendarAction;
+      try {
+        button.disabled = true;
+        if (action === "available") {
+          const fullDayBlocks = exceptionsForDate(dashboardSelectedDate).filter(
+            (item) => !item.is_available && item.start_minute == null && item.end_minute == null,
+          );
+          for (const block of fullDayBlocks) {
+            await api.deleteMyAvailabilityException(block.id);
+          }
+          await api.createMyAvailabilityException({
+            exception_date: dashboardSelectedDate,
+            is_available: true,
+            start_minute: 720,
+            end_minute: 1200,
+            reason: "Available",
+          });
+          setFeedback("Selected day is available from 12 PM to 8 PM.", "success");
+        } else if (action === "blocked") {
+          await api.createMyAvailabilityException({
+            exception_date: dashboardSelectedDate,
+            is_available: false,
+            start_minute: null,
+            end_minute: null,
+            reason: "Unavailable",
+          });
+          setFeedback("Selected day marked unavailable.", "success");
+        }
+        await renderExceptions();
+      } catch (error) {
+        setFeedback(error?.message || "Could not update that day.", "error");
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
 
   el("staff-profile-headshots-file")?.addEventListener("change", async (event) => {
     const input = event.currentTarget;
@@ -409,7 +632,10 @@ export function initStaffDashboardView() {
     };
     try {
       await api.createMyAvailabilityException(payload);
+      dashboardSelectedDate = payload.exception_date || dashboardSelectedDate;
+      dashboardCalendarMonth = firstOfMonth(dashboardSelectedDate);
       form.reset();
+      syncExceptionFormToSelectedDate();
       setFeedback("Change saved.", "success");
       await renderExceptions();
     } catch (error) {

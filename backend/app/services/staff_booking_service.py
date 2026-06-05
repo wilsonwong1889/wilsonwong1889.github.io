@@ -26,7 +26,6 @@ from app.schemas.staff_booking import (
     StaffBookingRescheduleIn,
 )
 from app.services.booking_service import (
-    BOOKING_OPEN_WEEKDAYS,
     DailyBookingLimitError,
     PaymentSessionError,
     create_audit_log,
@@ -137,7 +136,12 @@ def calculate_price_cents(hourly_rate_cents: int, duration_minutes: int) -> int:
 
 
 def get_staff_profile_or_404(db: Session, staff_profile_id: UUID | str, include_inactive: bool = False) -> StaffProfile:
-    profile = db.query(StaffProfile).filter(StaffProfile.id == staff_profile_id).first()
+    try:
+        normalized_profile_id = staff_profile_id if isinstance(staff_profile_id, UUID) else UUID(str(staff_profile_id))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Staff profile not found") from exc
+
+    profile = db.query(StaffProfile).filter(StaffProfile.id == normalized_profile_id).first()
     if not profile or (not profile.active and not include_inactive):
         raise ValueError("Staff profile not found")
     if not profile.booking_enabled and not include_inactive:
@@ -260,7 +264,6 @@ def _availability_windows_for_staff_date(
 ) -> list[tuple[int, int]]:
     from app.services.staff_availability_service import (
         available_windows_for_date,
-        has_availability_rules,
     )
 
     # Unpublished schedules aren't bookable by the public — the staff member is
@@ -273,16 +276,9 @@ def _availability_windows_for_staff_date(
     if not published:
         return []
 
-    open_hour, close_hour = get_booking_window_hours()
-    if has_availability_rules(db, staff_profile_id):
-        return available_windows_for_date(db, staff_profile_id, target_date)
-
-    base_windows = (
-        [(open_hour * 60, close_hour * 60)]
-        if target_date.weekday() in BOOKING_OPEN_WEEKDAYS
-        else []
-    )
-    return available_windows_for_date(db, staff_profile_id, target_date, base_windows=base_windows)
+    # Staff are unavailable by default. Public bookable windows only come from
+    # their weekly rules or explicit one-off available exceptions.
+    return available_windows_for_date(db, staff_profile_id, target_date)
 
 
 def ensure_staff_window_is_available(
@@ -363,6 +359,33 @@ def get_staff_availability(db: Session, staff_profile_id: UUID | str, target_dat
         "timezone": settings.BUSINESS_TIMEZONE,
         "available_start_times": available_start_times,
         "max_duration_minutes_by_start": max_duration_minutes_by_start,
+    }
+
+
+def get_staff_monthly_availability_summary(db: Session, staff_profile_id: UUID | str, month: str) -> dict:
+    try:
+        year, month_number = [int(part) for part in month.split("-")]
+        month_start = date(year, month_number, 1)
+    except ValueError as exc:
+        raise ValueError("Month must use YYYY-MM format") from exc
+
+    if month_number == 12:
+        next_month = date(year + 1, 1, 1)
+    else:
+        next_month = date(year, month_number + 1, 1)
+
+    days = {}
+    current = month_start
+    while current < next_month:
+        availability = get_staff_availability(db, staff_profile_id, current)
+        days[current.isoformat()] = len(availability["available_start_times"])
+        current += timedelta(days=1)
+
+    return {
+        "staff_profile_id": staff_profile_id,
+        "month": month,
+        "timezone": settings.BUSINESS_TIMEZONE,
+        "days": days,
     }
 
 

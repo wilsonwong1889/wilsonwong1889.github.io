@@ -89,11 +89,12 @@ class StaffPortalTest(BaseAppTest):
 
         # A customer requests this staff member.
         self._register("buyer@example.com")
-        start = self._future_time(day=1, hour=12).isoformat()
+        start = self._future_time(day=1, hour=12)
+        self._make_staff_available_for_time(staff_id, start)
         booked = self.client.post(
             "/api/staff-bookings",
             headers=self._login("buyer@example.com"),
-            json={"staff_profile_id": staff_id, "start_time": start, "duration_minutes": 60},
+            json={"staff_profile_id": staff_id, "start_time": start.isoformat(), "duration_minutes": 60},
         )
         self.assertEqual(booked.status_code, 201, booked.text)
         booking_id = booked.json()["id"]
@@ -114,11 +115,12 @@ class StaffPortalTest(BaseAppTest):
         self._linked_staff(admin, "Engineer B", "engb@example.com")
 
         self._register("buyer2@example.com")
-        start = self._future_time(day=1, hour=12).isoformat()
+        start = self._future_time(day=1, hour=12)
+        self._make_staff_available_for_time(staff_a, start)
         booking_id = self.client.post(
             "/api/staff-bookings",
             headers=self._login("buyer2@example.com"),
-            json={"staff_profile_id": staff_a, "start_time": start, "duration_minutes": 60},
+            json={"staff_profile_id": staff_a, "start_time": start.isoformat(), "duration_minutes": 60},
         ).json()["id"]
 
         # Engineer B can't accept Engineer A's request.

@@ -141,6 +141,42 @@
 
           <section class="panel panel-wide">
             <div class="panel-header">
+              <p class="panel-kicker">Calendar</p>
+              <h2>Your availability calendar</h2>
+              <p class="panel-copy">Days start unavailable. Add a weekly window or mark a selected day available so customers can request those times.</p>
+            </div>
+            <div class="staff-dashboard-calendar">
+              <div class="reserve-calendar-header reserve-calendar-header-tight">
+                <button id="staff-dashboard-prev-month" class="reserve-calendar-nav" type="button" aria-label="Previous month">‹</button>
+                <h3 id="staff-dashboard-calendar-title">Availability by day</h3>
+                <button id="staff-dashboard-next-month" class="reserve-calendar-nav" type="button" aria-label="Next month">›</button>
+              </div>
+              <div class="calendar-weekdays reserve-calendar-weekdays">
+                <span>Sun</span>
+                <span>Mon</span>
+                <span>Tue</span>
+                <span>Wed</span>
+                <span>Thu</span>
+                <span>Fri</span>
+                <span>Sat</span>
+              </div>
+              <div id="staff-dashboard-month-grid" class="calendar-grid reserve-calendar-grid staff-dashboard-calendar-grid"></div>
+              <div class="staff-dashboard-day-panel">
+                <div>
+                  <p class="panel-kicker">Selected day</p>
+                  <h3 id="staff-dashboard-selected-date-label">Choose a day</h3>
+                  <div id="staff-dashboard-day-windows" class="staff-dashboard-day-windows"></div>
+                </div>
+                <div class="hero-actions">
+                  <button class="ghost-button" type="button" data-staff-calendar-action="available">Make available 12 PM-8 PM</button>
+                  <button class="ghost-button" type="button" data-staff-calendar-action="blocked">Mark unavailable</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel panel-wide">
+            <div class="panel-header">
               <p class="panel-kicker">Weekly schedule</p>
               <h2>When you're available</h2>
               <p class="panel-copy">Add the weekly windows you're open for booking. Customers only see times inside these windows.</p>

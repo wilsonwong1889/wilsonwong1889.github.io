@@ -161,7 +161,24 @@
 
           <section class="reserve-booking-section">
             <div class="reserve-section-heading"><strong>Select Time</strong></div>
-            <label class="inline-field"><span>Date</span><input id="staff-booking-date" type="date" /></label>
+            <section id="staff-booking-calendar-panel" class="staff-booking-calendar-panel">
+              <div class="reserve-calendar-header reserve-calendar-header-tight">
+                <button id="staff-booking-prev-month" class="reserve-calendar-nav" type="button" aria-label="Previous month">‹</button>
+                <h2 id="staff-booking-calendar-title">Availability by day</h2>
+                <button id="staff-booking-next-month" class="reserve-calendar-nav" type="button" aria-label="Next month">›</button>
+              </div>
+              <div class="calendar-weekdays reserve-calendar-weekdays">
+                <span>Sun</span>
+                <span>Mon</span>
+                <span>Tue</span>
+                <span>Wed</span>
+                <span>Thu</span>
+                <span>Fri</span>
+                <span>Sat</span>
+              </div>
+              <div id="staff-booking-month-grid" class="calendar-grid reserve-calendar-grid staff-booking-calendar-grid"></div>
+            </section>
+            <label class="inline-field"><span>Selected date</span><input id="staff-booking-date" type="date" /></label>
             <div id="staff-booking-availability" class="reserve-helper-copy staff-booking-availability">Pick a staff member and date to see openings.</div>
             <div id="staff-booking-time-grid" class="slot-grid reserve-slot-grid staff-booking-time-grid"></div>
           </section>
@@ -244,10 +261,6 @@
       <p class="panel-kicker">Join the team</p>
       <h2>Apply to be a studio engineer</h2>
       <p class="panel-copy">Are you an audio, video, or production engineer who wants to work out of the Hub? Tell us about your skills and gear and we'll be in touch.</p>
-      <div class="engineer-fullprofile-cta">
-        <p class="panel-copy"><strong>Already a studio engineer?</strong> Create an account and build your full profile — headshots, portfolio, skills, and gear. An admin reviews it and grants you studio engineer access.</p>
-        <a class="primary-button" href="/account?mode=signup&amp;next=/staff-dashboard">Create your engineer profile →</a>
-      </div>
     </div>
     <form id="engineer-application-form" class="stack-form intake-form" novalidate>
       <p id="engineer-application-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
@@ -281,6 +294,13 @@
         <button type="submit" class="primary-button" id="engineer-application-submit">Submit application</button>
       </div>
     </form>
+    <div class="engineer-fullprofile-cta">
+      <div>
+        <p class="panel-kicker">Already a studio engineer?</p>
+        <p class="panel-copy">Create an account and build your full profile — headshots, portfolio, skills, and gear. An admin reviews it and grants you studio engineer access.</p>
+      </div>
+      <a class="primary-button" href="/account?mode=signup&amp;next=/staff-dashboard">Create your engineer profile →</a>
+    </div>
   </section>
 
 </main>
