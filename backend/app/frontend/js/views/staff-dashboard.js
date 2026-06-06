@@ -294,13 +294,16 @@ function applyDashboardMode(profile) {
   const submitBtn = el("staff-profile-submit");
   const isApplicant = dashboardMode === "applicant";
   if (approvedSections) approvedSections.classList.toggle("hidden", isApplicant);
+  const eyebrow = el("staff-dashboard-eyebrow");
   if (!isApplicant) {
     setApplicationBanner(null);
-    if (heading) heading.textContent = "Profile & details";
-    if (subhead) subhead.textContent = "Edit how you appear to customers. Pricing, publishing your schedule, your account link, and studio assignments are managed by an admin.";
+    if (eyebrow) eyebrow.textContent = "Studio engineer ✓";
+    if (heading) heading.textContent = "Edit your profile";
+    if (subhead) subhead.textContent = "You're an approved studio engineer. Edit how you appear to customers here. Pricing, publishing your schedule, your account link, and studio assignments are managed by an admin.";
     if (submitBtn) submitBtn.textContent = "Save profile";
     return;
   }
+  if (eyebrow) eyebrow.textContent = "Studio engineer application";
   if (heading) heading.textContent = "Your studio engineer profile";
   if (subhead) subhead.textContent = "Fill out your profile — headshots, portfolio, skills, and gear. Submit it and an admin will review and grant you studio engineer access.";
   if (submitBtn) submitBtn.textContent = "Submit application";
@@ -420,8 +423,8 @@ async function loadStaffDashboard(profile) {
   const subtitle = el("staff-dashboard-subtitle");
   if (subtitle) {
     subtitle.textContent = profile.schedule_published
-      ? "Your schedule is published — customers can request to book you."
-      : "Set your availability and respond to requests. An admin publishes your schedule to make it public.";
+      ? "You're a studio engineer — edit your profile and manage your schedule below. Your schedule is published, so customers can request to book you."
+      : "You're a studio engineer — edit your profile and manage your schedule and booking requests below. An admin publishes your schedule to make it public.";
   }
   populateProfileForm(profile);
   await Promise.all([renderRequests(), renderRules(), renderExceptions()]);
