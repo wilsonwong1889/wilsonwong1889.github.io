@@ -307,7 +307,7 @@ function applyDashboardMode(profile) {
   }
   if (eyebrow) eyebrow.textContent = "Studio engineer application";
   if (heading) heading.textContent = "Your studio engineer profile";
-  if (subhead) subhead.textContent = "Fill out your profile — headshots, portfolio, skills, and gear. Submit it and an admin will review and grant you studio engineer access.";
+  if (subhead) subhead.textContent = "Fill out your profile — photo, portfolio photos, skills, and gear. Submit it and an admin will review and grant you studio engineer access.";
   if (submitBtn) submitBtn.textContent = "Submit application";
   const submitted = profile && profile.application_status === "submitted";
   setApplicationBanner(
@@ -596,7 +596,7 @@ export function initStaffDashboardView() {
     const input = event.currentTarget;
     const files = Array.from(input.files || []);
     if (!files.length) return;
-    setProfileFeedback("Uploading headshots…");
+    setProfileFeedback("Uploading portfolio photos…");
     try {
       const upload = dashboardMode === "applicant" ? api.uploadMyApplicationPhoto : api.uploadMyStaffPhoto;
       for (const file of files) {
@@ -606,7 +606,7 @@ export function initStaffDashboardView() {
       renderHeadshots();
       setProfileFeedback("Headshots added — remember to save.", "success");
     } catch (error) {
-      setProfileFeedback(error?.message || "Could not upload that headshot.", "error");
+      setProfileFeedback(error?.message || "Could not upload that photo.", "error");
     } finally {
       input.value = "";
     }

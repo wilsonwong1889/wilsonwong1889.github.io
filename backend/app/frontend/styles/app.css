@@ -10830,6 +10830,35 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
   border-top: 1px solid var(--line);
 }
 
+.staff-profile-portfolio {
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.staff-portfolio-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.staff-portfolio-item {
+  display: block;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid var(--line, rgba(24, 33, 39, 0.14));
+  background: #e8edf2;
+}
+.staff-portfolio-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.2s ease;
+}
+.staff-portfolio-item:hover img {
+  transform: scale(1.05);
+}
+
 .staff-profile-meta-block {
   display: flex;
   flex-direction: column;

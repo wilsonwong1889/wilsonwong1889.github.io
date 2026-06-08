@@ -634,6 +634,22 @@ function renderSelectedCard(profile) {
 
     const skillTags = skills.map((s) => `<span class="staff-profile-tag">${escapeHtml(s)}</span>`).join("") || '<span class="staff-profile-tag">Creative</span>';
     const talentTags = talents.map((t) => `<span class="staff-profile-tag">${escapeHtml(t)}</span>`).join("") || '<span class="staff-profile-tag">Production</span>';
+    const portfolioPhotos = (Array.isArray(profile.headshot_urls) ? profile.headshot_urls : []).filter(Boolean);
+    const portfolioHtml = portfolioPhotos.length
+      ? `<div class="staff-profile-portfolio">
+          <p class="staff-profile-section-label">Portfolio</p>
+          <div class="staff-portfolio-gallery">
+            ${portfolioPhotos
+              .map(
+                (url, index) => `
+              <a class="staff-portfolio-item" href="${escapeHtml(url)}" target="_blank" rel="noreferrer" aria-label="Open portfolio image ${index + 1} for ${name}">
+                <img src="${escapeHtml(url)}" alt="${name} portfolio ${index + 1}" loading="lazy" />
+              </a>`,
+              )
+              .join("")}
+          </div>
+        </div>`
+      : "";
 
     profileCard.innerHTML = `
       <div class="staff-profile-photo-block">
@@ -675,6 +691,7 @@ function renderSelectedCard(profile) {
             <span class="staff-profile-meta-sub">12:00 PM – 8:00 PM</span>
           </div>
         </div>
+        ${portfolioHtml}
       </div>
     `;
   }
