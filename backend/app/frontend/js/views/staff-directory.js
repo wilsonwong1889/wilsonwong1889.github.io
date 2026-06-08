@@ -1325,7 +1325,7 @@ async function handleBookingSubmit(event) {
       payment_client_secret: response.payment_client_secret || booking.payment_client_secret || null,
     });
 
-    setStatus("Booking created. Redirecting to checkout...");
+    setStatus("Time held — review and confirm your request...");
     window.location.href = `/booking?id=${bookingId}&kind=staff`;
   } catch (error) {
     setStatus(error.message, true);

@@ -62,12 +62,21 @@ class StaffRequestFlowTest(BaseAppTest):
     def test_01_create_is_requested_without_payment(self) -> None:
         admin = self._admin_headers()
         staff_id = self._staff_id(admin)
-        resp = self._book(staff_id, self._customer_headers("c1@example.com"))
+        customer = self._customer_headers("c1@example.com")
+        resp = self._book(staff_id, customer)
         self.assertEqual(resp.status_code, 201, resp.text)
         body = resp.json()
         self.assertEqual(body["status"], "Requested")
         self.assertIsNone(body["payment_client_secret"])
-        self.assertIsNotNone(body["request_expires_at"])
+        # Held but not yet sent — awaiting the customer's confirmation.
+        self.assertIsNone(body["customer_confirmed_at"])
+        self.assertIsNone(body["request_expires_at"])
+
+        # Confirming sends it to the staff member and starts their response window.
+        confirmed = self.client.post(f"/api/staff-bookings/{body['id']}/confirm-request", headers=customer)
+        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+        self.assertIsNotNone(confirmed.json()["customer_confirmed_at"])
+        self.assertIsNotNone(confirmed.json()["request_expires_at"])
 
     def test_02_accept_enables_free_confirmation(self) -> None:
         admin = self._admin_headers()

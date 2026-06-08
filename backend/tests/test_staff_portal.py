@@ -164,6 +164,14 @@ class StaffPortalTest(BaseAppTest):
         self.assertEqual(booked.status_code, 201, booked.text)
         booking_id = booked.json()["id"]
 
+        # Double-confirmation: the request is only sent to the staff once the
+        # customer confirms it.
+        confirmed = self.client.post(
+            f"/api/staff-bookings/{booking_id}/confirm-request",
+            headers=self._login("buyer@example.com"),
+        )
+        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+
         requests = self.client.get("/api/staff/me/booking-requests", headers=staff_headers)
         self.assertEqual(requests.status_code, 200, requests.text)
         self.assertTrue(any(item["id"] == booking_id for item in requests.json()))

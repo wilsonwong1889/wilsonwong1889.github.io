@@ -226,12 +226,19 @@ function bookingNeedsConfirmation(booking) {
   );
 }
 
+function bookingNeedsRequestConfirmation(booking) {
+  return (
+    Boolean(booking.needs_request_confirmation) ||
+    (getBookingKind(booking) === "staff" && booking.status === "Requested" && !booking.customer_confirmed_at)
+  );
+}
+
 function getBookingStatusLabel(booking) {
   if (booking.status === "PendingPayment") {
     return "Pending payment";
   }
   if (booking.status === "Requested") {
-    return "Awaiting staff response";
+    return bookingNeedsRequestConfirmation(booking) ? "Awaiting your confirmation" : "Awaiting staff response";
   }
   if (booking.status === "AcceptedPendingPayment") {
     return bookingNeedsConfirmation(booking) ? "Accepted — confirm to book" : "Accepted — payment due";
@@ -314,8 +321,9 @@ function renderBookingCollection(bookings, emptyMessage, { upcoming = false } = 
 function renderBookingCard(booking, { upcoming = false } = {}) {
   const pendingPayment = booking.status === "PendingPayment";
   const needsConfirmation = bookingNeedsConfirmation(booking);
+  const needsRequestConfirmation = bookingNeedsRequestConfirmation(booking);
   const isRequested = booking.status === "Requested";
-  const highlight = pendingPayment || needsConfirmation;
+  const highlight = pendingPayment || needsConfirmation || needsRequestConfirmation;
   const kind = getBookingKind(booking);
   const category = inferBookingCategory(booking);
   const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
@@ -339,7 +347,9 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
       : kind === "staff"
         ? "Finish payment to keep the staff session reserved."
         : "Finish payment to keep the reservation"
-    : needsConfirmation
+    : needsRequestConfirmation
+      ? `Confirm to send your request to ${bookingTitle}. It isn't booked until you confirm.`
+      : needsConfirmation
       ? `${bookingTitle} accepted your request — confirm to lock in your session.`
       : isRequested
         ? `Waiting for ${bookingTitle} to accept your request.`
@@ -381,6 +391,7 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
           <span class="booking-card-status-note"${supportNoteAttrs}>${escapeHtml(supportCopy)}</span>
         </div>
         <div class="booking-card-actions">
+          ${needsRequestConfirmation ? `<button class="primary-button" type="button" data-booking-action="confirm-request" data-booking-id="${escapeHtml(booking.id)}">Confirm &amp; send request</button>` : ""}
           ${needsConfirmation ? `<button class="primary-button" type="button" data-booking-action="confirm-free" data-booking-id="${escapeHtml(booking.id)}">Confirm booking (free)</button>` : ""}
           <a class="${actionClass}" href="${escapeHtml(detailHref)}">${escapeHtml(actionLabel)}</a>
           ${canCancel ? `<button class="ghost-button" type="button" data-booking-action="cancel" data-booking-id="${escapeHtml(booking.id)}">Cancel</button>` : ""}
@@ -443,6 +454,22 @@ export function initBookingsView(actions) {
         setState({ message: "Confirming your booking..." });
         await api.confirmFreeStaffBooking(bookingId);
         await actions.refreshAvailabilityAndBookings("Booking confirmed.");
+      } catch (error) {
+        setState({ message: error.message });
+      }
+      return;
+    }
+
+    if (action === "confirm-request") {
+      const booking = state.bookings.find((item) => String(item.id) === String(bookingId));
+      const staffName = booking ? getBookingDisplayName(booking) : "this staff member";
+      if (!window.confirm(`Send your booking request to ${staffName}? They'll be notified and have time to respond.`)) {
+        return;
+      }
+      try {
+        setState({ message: "Sending your request..." });
+        await api.confirmStaffBookingRequest(bookingId);
+        await actions.refreshAvailabilityAndBookings("Request sent — the staff member has been notified.");
       } catch (error) {
         setState({ message: error.message });
       }

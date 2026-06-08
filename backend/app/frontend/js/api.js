@@ -252,6 +252,9 @@ export const api = {
   confirmFreeStaffBooking(bookingId) {
     return request(`/api/staff-bookings/${bookingId}/confirm`, { method: "POST" });
   },
+  confirmStaffBookingRequest(bookingId) {
+    return request(`/api/staff-bookings/${bookingId}/confirm-request`, { method: "POST" });
+  },
   rescheduleStaffBooking(bookingId, payload) {
     return request(`/api/staff-bookings/${bookingId}/reschedule`, {
       method: "POST",

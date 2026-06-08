@@ -33,6 +33,7 @@ from app.services.staff_booking_service import (
     accept_staff_booking,
     cancel_staff_booking,
     confirm_free_staff_booking,
+    confirm_staff_booking_request,
     create_guest_staff_booking,
     create_staff_booking,
     decline_staff_booking,
@@ -178,6 +179,23 @@ def confirm_my_free_staff_booking(
         raise HTTPException(status_code=404, detail="Staff booking not found")
     try:
         return confirm_free_staff_booking(db, booking)
+    except StaffBookingStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/staff-bookings/{staff_booking_id}/confirm-request", response_model=StaffBookingOut)
+def confirm_my_staff_booking_request(
+    staff_booking_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(booking_rate_limit),
+):
+    """Double-confirmation: the customer sends their held request to the staff member."""
+    booking = get_staff_booking_for_user(db, staff_booking_id, current_user)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Staff booking not found")
+    try:
+        return confirm_staff_booking_request(db, booking)
     except StaffBookingStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
