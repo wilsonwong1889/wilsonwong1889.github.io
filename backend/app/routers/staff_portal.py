@@ -18,6 +18,7 @@ from app.schemas.staff_availability import (
     StaffAvailabilityExceptionOut,
     StaffAvailabilityRuleCreate,
     StaffAvailabilityRuleOut,
+    StaffWeekdayWindowsUpdate,
 )
 from app.schemas.staff_booking import StaffBookingCancel, StaffBookingOut
 from app.services import staff_availability_service as availability
@@ -107,6 +108,20 @@ def create_my_rules_bulk(
 ):
     """Apply one window to several weekdays at once (set a typical week)."""
     return availability.create_rules_bulk(db, profile.id, payload)
+
+
+@router.put("/availability/rules/weekday/{weekday}", response_model=List[StaffAvailabilityRuleOut])
+def set_my_weekday_rules(
+    weekday: int,
+    payload: StaffWeekdayWindowsUpdate,
+    db: Session = Depends(get_db),
+    profile: StaffProfile = Depends(require_my_profile),
+):
+    """Replace all windows for one weekday (the per-day editor)."""
+    try:
+        return availability.set_weekday_rules(db, profile.id, weekday, payload)
+    except availability.StaffAvailabilityError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.delete("/availability/rules/{rule_id}", status_code=204)

@@ -9,6 +9,8 @@ let dashboardMode = "staff";
 let headshotUrls = [];
 let scheduleRules = [];
 let scheduleExceptions = [];
+let weeklyWindows = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+const DEFAULT_WINDOW = { start_minute: 720, end_minute: 1200 }; // 12:00–20:00
 let dashboardSelectedDate = todayString();
 let dashboardCalendarMonth = firstOfMonth(dashboardSelectedDate);
 
@@ -355,26 +357,88 @@ async function renderRequests() {
     .join("");
 }
 
+function buildWeeklyWindows() {
+  weeklyWindows = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+  for (const rule of scheduleRules) {
+    if (!weeklyWindows[rule.weekday]) weeklyWindows[rule.weekday] = [];
+    weeklyWindows[rule.weekday].push({ start_minute: rule.start_minute, end_minute: rule.end_minute });
+  }
+  for (const day of Object.keys(weeklyWindows)) {
+    weeklyWindows[day].sort((a, b) => a.start_minute - b.start_minute);
+  }
+}
+
+function renderWeeklyEditor() {
+  const editor = el("staff-weekly-editor");
+  if (!editor) return;
+  editor.innerHTML = WEEKDAYS.map((dayName, weekday) => {
+    const windows = weeklyWindows[weekday] || [];
+    const isOpen = windows.length > 0;
+    const blocks = isOpen
+      ? windows
+          .map(
+            (w, index) => `
+            <div class="staff-day-window" data-index="${index}">
+              <input type="time" step="1800" data-win-start value="${minutesToTime(w.start_minute)}" aria-label="${dayName} start" />
+              <span class="staff-day-dash">–</span>
+              <input type="time" step="1800" data-win-end value="${minutesToTime(w.end_minute)}" aria-label="${dayName} end" />
+              <button type="button" class="staff-day-remove" data-win-remove aria-label="Remove time block">×</button>
+            </div>`,
+          )
+          .join("")
+      : '<span class="staff-day-unavailable">Unavailable</span>';
+    return `
+      <div class="staff-day-row ${isOpen ? "is-open" : ""}" data-weekday="${weekday}">
+        <div class="staff-day-head">
+          <label class="staff-day-toggle">
+            <input type="checkbox" data-day-toggle ${isOpen ? "checked" : ""} aria-label="${dayName} available" />
+            <span class="staff-day-name">${dayName}</span>
+          </label>
+          ${isOpen ? `<button type="button" class="ghost-button staff-day-copy" data-copy-day>Copy to all days</button>` : ""}
+        </div>
+        <div class="staff-day-windows">${blocks}</div>
+        ${isOpen ? `<button type="button" class="ghost-button staff-add-window" data-add-window>+ Add time</button>` : ""}
+      </div>`;
+  }).join("");
+}
+
 async function renderRules() {
-  const list = el("staff-rules-list");
-  if (!list) return;
   try {
     scheduleRules = await api.getMyAvailabilityRules();
   } catch (error) {
     return;
   }
-  list.innerHTML = scheduleRules.length
-    ? scheduleRules
-        .map(
-          (rule) => `
-        <div class="summary-line staff-schedule-row">
-          <span>${escapeHtml(WEEKDAYS[rule.weekday] || "Day")} · ${minutesToTime(rule.start_minute)}–${minutesToTime(rule.end_minute)}</span>
-          <button class="ghost-button" type="button" data-staff-action="delete-rule" data-rule-id="${escapeHtml(rule.id)}">Remove</button>
-        </div>`,
-        )
-        .join("")
-    : '<div class="empty-state">No weekly windows yet. Add one above.</div>';
+  buildWeeklyWindows();
+  renderWeeklyEditor();
   renderDashboardCalendar();
+}
+
+async function saveWeekday(weekday) {
+  try {
+    await api.setMyAvailabilityWeekday(weekday, weeklyWindows[weekday] || []);
+    setFeedback("Schedule updated.", "success");
+  } catch (error) {
+    setFeedback(error?.message || "Could not update your schedule.", "error");
+  }
+  await renderRules();
+}
+
+async function copyDayToAllDays(weekday) {
+  const source = (weeklyWindows[weekday] || []).map((w) => ({ ...w }));
+  if (!source.length) {
+    setFeedback("Add some hours to this day first, then copy them.", "error");
+    return;
+  }
+  try {
+    for (let day = 0; day < 7; day += 1) {
+      weeklyWindows[day] = source.map((w) => ({ ...w }));
+      await api.setMyAvailabilityWeekday(day, weeklyWindows[day]);
+    }
+    setFeedback(`Copied ${WEEKDAYS[weekday]}'s hours to every day.`, "success");
+  } catch (error) {
+    setFeedback(error?.message || "Could not copy those hours.", "error");
+  }
+  await renderRules();
 }
 
 async function renderExceptions() {
@@ -603,49 +667,45 @@ export function initStaffDashboardView() {
     }
   });
 
-  const WEEKDAY_PRESETS = {
-    open: [2, 3, 4, 5],
-    weekdays: [0, 1, 2, 3, 4],
-    all: [0, 1, 2, 3, 4, 5, 6],
-    clear: [],
-  };
-  el("staff-rule-form")?.querySelector(".staff-weekday-presets")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-weekday-preset]");
-    if (!button) return;
-    const days = WEEKDAY_PRESETS[button.dataset.weekdayPreset] || [];
-    el("staff-rule-form")
-      .querySelectorAll("input[name='weekday']")
-      .forEach((box) => {
-        box.checked = days.includes(Number(box.value));
-      });
-  });
-
-  el("staff-rule-form")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const weekdays = Array.from(form.querySelectorAll("input[name='weekday']:checked")).map((box) => Number(box.value));
-    if (!weekdays.length) {
-      setFeedback("Pick at least one day to add hours to.", "error");
+  const editorEl = el("staff-weekly-editor");
+  editorEl?.addEventListener("change", async (event) => {
+    const row = event.target.closest(".staff-day-row");
+    if (!row) return;
+    const weekday = Number(row.dataset.weekday);
+    if (event.target.matches("[data-day-toggle]")) {
+      weeklyWindows[weekday] = event.target.checked ? [{ ...DEFAULT_WINDOW }] : [];
+      await saveWeekday(weekday);
       return;
     }
-    const payload = {
-      weekdays,
-      start_minute: timeToMinutes(form.elements.start.value),
-      end_minute: timeToMinutes(form.elements.end.value),
-    };
-    try {
-      const created = await api.createMyAvailabilityRulesBulk(payload);
-      form.reset();
-      const added = Array.isArray(created) ? created.length : 0;
-      setFeedback(
-        added
-          ? `Hours added to ${added} day${added === 1 ? "" : "s"}.`
-          : "Those days already had this window — nothing to add.",
-        "success",
-      );
-      await renderRules();
-    } catch (error) {
-      setFeedback(error?.message || "Could not add those hours.", "error");
+    if (event.target.matches("[data-win-start], [data-win-end]")) {
+      const block = event.target.closest(".staff-day-window");
+      const index = Number(block.dataset.index);
+      const start = timeToMinutes(block.querySelector("[data-win-start]").value);
+      const end = timeToMinutes(block.querySelector("[data-win-end]").value);
+      if (start == null || end == null || start >= end) {
+        setFeedback("Each block needs a start time before its end time.", "error");
+        await renderRules();
+        return;
+      }
+      weeklyWindows[weekday][index] = { start_minute: start, end_minute: end };
+      await saveWeekday(weekday);
+    }
+  });
+
+  editorEl?.addEventListener("click", async (event) => {
+    const row = event.target.closest(".staff-day-row");
+    if (!row) return;
+    const weekday = Number(row.dataset.weekday);
+    if (event.target.closest("[data-add-window]")) {
+      if (!weeklyWindows[weekday]) weeklyWindows[weekday] = [];
+      weeklyWindows[weekday].push({ ...DEFAULT_WINDOW });
+      await saveWeekday(weekday);
+    } else if (event.target.closest("[data-win-remove]")) {
+      const block = event.target.closest(".staff-day-window");
+      weeklyWindows[weekday].splice(Number(block.dataset.index), 1);
+      await saveWeekday(weekday);
+    } else if (event.target.closest("[data-copy-day]")) {
+      await copyDayToAllDays(weekday);
     }
   });
 

@@ -35,6 +35,24 @@ class StaffAvailabilityBulkRuleCreate(BaseModel):
         return self
 
 
+class ScheduleWindowIn(BaseModel):
+    start_minute: int = Field(ge=0, le=1439)
+    end_minute: int = Field(ge=1, le=1440)
+
+    @model_validator(mode="after")
+    def _check(self):
+        if self.start_minute >= self.end_minute:
+            raise ValueError("start_minute must be before end_minute")
+        return self
+
+
+class StaffWeekdayWindowsUpdate(BaseModel):
+    """Replace all of a weekday's windows at once (the Calendly-style editor).
+    An empty list marks the day unavailable."""
+
+    windows: List[ScheduleWindowIn] = Field(default_factory=list)
+
+
 class StaffAvailabilityRuleOut(BaseModel):
     id: UUID
     staff_profile_id: UUID

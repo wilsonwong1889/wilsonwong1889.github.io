@@ -110,6 +110,38 @@ class StaffPortalTest(BaseAppTest):
         )
         self.assertEqual(bad.status_code, 422, bad.text)
 
+    def test_02c_set_weekday_windows_replaces(self) -> None:
+        admin = self._admin_headers()
+        self._linked_staff(admin, "Editor Engineer", "editor@example.com")
+        headers = self._login("editor@example.com")
+
+        # Set Monday to two blocks (morning + afternoon).
+        resp = self.client.put(
+            "/api/staff/me/availability/rules/weekday/0",
+            json={"windows": [{"start_minute": 540, "end_minute": 720}, {"start_minute": 780, "end_minute": 1020}]},
+            headers=headers,
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(len(resp.json()), 2)
+
+        # Re-setting replaces (not appends): one block now.
+        resp2 = self.client.put(
+            "/api/staff/me/availability/rules/weekday/0",
+            json={"windows": [{"start_minute": 720, "end_minute": 1200}]},
+            headers=headers,
+        )
+        self.assertEqual(resp2.status_code, 200, resp2.text)
+        mondays = [r for r in self.client.get("/api/staff/me/availability/rules", headers=headers).json() if r["weekday"] == 0]
+        self.assertEqual(len(mondays), 1)
+        self.assertEqual(mondays[0]["start_minute"], 720)
+
+        # Empty windows clears the day.
+        cleared = self.client.put(
+            "/api/staff/me/availability/rules/weekday/0", json={"windows": []}, headers=headers
+        )
+        self.assertEqual(cleared.status_code, 200, cleared.text)
+        self.assertEqual(len([r for r in self.client.get("/api/staff/me/availability/rules", headers=headers).json() if r["weekday"] == 0]), 0)
+
     def test_03_non_staff_forbidden(self) -> None:
         self._register("justcustomer@example.com")
         resp = self.client.get("/api/staff/me", headers=self._login("justcustomer@example.com"))

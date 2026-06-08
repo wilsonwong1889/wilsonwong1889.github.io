@@ -9954,61 +9954,81 @@ body[data-page="account"] #account-profile-panel {
   gap: 8px;
   margin-top: 16px;
 }
-.staff-weekday-picker {
-  border: 0;
-  margin: 0 0 4px;
-  padding: 0;
+.staff-weekly-editor {
+  display: grid;
+  gap: 10px;
 }
-.staff-weekday-label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 8px;
+.staff-day-row {
+  display: grid;
+  grid-template-columns: 150px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line, rgba(24, 33, 39, 0.14));
+  border-radius: var(--radius-md, 14px);
+  background: rgba(255, 255, 255, 0.6);
 }
-.staff-weekday-chips {
+.staff-day-row:not(.is-open) {
+  background: rgba(24, 33, 39, 0.03);
+}
+.staff-day-head {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
 }
-.staff-weekday-chip {
-  display: inline-flex;
-  cursor: pointer;
-}
-.staff-weekday-chip input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.staff-weekday-chip span {
+.staff-day-toggle {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 52px;
-  padding: 8px 12px;
-  border: 1px solid var(--line, rgba(24, 33, 39, 0.18));
-  border-radius: 999px;
-  font-weight: 600;
-  background: rgba(255, 255, 255, 0.7);
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.staff-weekday-chip input:checked + span {
-  background: #d71920;
-  border-color: #d71920;
-  color: #ffffff;
-}
-.staff-weekday-chip input:focus-visible + span {
-  outline: 2px solid #d71920;
-  outline-offset: 2px;
-}
-.staff-weekday-presets {
-  display: flex;
-  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  cursor: pointer;
+  font-weight: 700;
 }
-.staff-weekday-presets .ghost-button {
-  min-height: 32px;
-  padding: 4px 12px;
+.staff-day-copy {
+  min-height: 28px;
+  padding: 2px 10px;
+  font-size: 13px;
+  align-self: flex-start;
+}
+.staff-day-windows {
+  display: grid;
+  gap: 8px;
+}
+.staff-day-window {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.staff-day-window input[type="time"] {
+  padding: 6px 10px;
+  border: 1px solid var(--line, rgba(24, 33, 39, 0.18));
+  border-radius: 10px;
+}
+.staff-day-dash {
+  color: var(--ink-muted, #5a6b76);
+}
+.staff-day-remove {
+  border: 0;
+  background: transparent;
+  color: var(--danger, #d71920);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 6px;
+}
+.staff-day-unavailable {
+  color: var(--ink-muted, #5a6b76);
+  font-style: italic;
+}
+.staff-add-window {
+  min-height: 30px;
+  padding: 2px 10px;
+  align-self: start;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .staff-day-row {
+    grid-template-columns: 1fr;
+  }
 }
 .staff-schedule-row {
   display: flex;
@@ -10691,7 +10711,7 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
 .staff-profile-photo-block {
   position: relative;
   width: 100%;
-  height: 320px;
+  aspect-ratio: 4 / 5;
   overflow: hidden;
   background: #e8edf2;
 }
@@ -10700,7 +10720,7 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: top center;
+  object-position: center;
   display: block;
 }
 

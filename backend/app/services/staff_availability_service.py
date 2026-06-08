@@ -10,6 +10,7 @@ from app.schemas.staff_availability import (
     StaffAvailabilityBulkRuleCreate,
     StaffAvailabilityExceptionCreate,
     StaffAvailabilityRuleCreate,
+    StaffWeekdayWindowsUpdate,
 )
 
 WHOLE_DAY: Tuple[int, int] = (0, 1440)
@@ -70,6 +71,34 @@ def create_rules_bulk(
         db.commit()
         for rule in created:
             db.refresh(rule)
+    return created
+
+
+def set_weekday_rules(
+    db: Session, staff_profile_id, weekday: int, payload: StaffWeekdayWindowsUpdate
+) -> List[StaffAvailabilityRule]:
+    """Replace every window for one weekday with the provided set (Calendly-style
+    per-day editor). Empty windows = the day is unavailable."""
+    if weekday < 0 or weekday > 6:
+        raise StaffAvailabilityError("weekday must be 0 (Monday) through 6 (Sunday)")
+    db.query(StaffAvailabilityRule).filter(
+        StaffAvailabilityRule.staff_profile_id == staff_profile_id,
+        StaffAvailabilityRule.weekday == weekday,
+    ).delete()
+    created: List[StaffAvailabilityRule] = []
+    for window in payload.windows:
+        rule = StaffAvailabilityRule(
+            staff_profile_id=staff_profile_id,
+            weekday=weekday,
+            start_minute=window.start_minute,
+            end_minute=window.end_minute,
+            active=True,
+        )
+        db.add(rule)
+        created.append(rule)
+    db.commit()
+    for rule in created:
+        db.refresh(rule)
     return created
 
 

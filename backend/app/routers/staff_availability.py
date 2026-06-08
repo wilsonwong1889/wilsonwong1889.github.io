@@ -16,6 +16,7 @@ from app.schemas.staff_availability import (
     StaffAvailabilityRuleCreate,
     StaffAvailabilityRuleOut,
     StaffDayScheduleOut,
+    StaffWeekdayWindowsUpdate,
 )
 from app.services import staff_availability_service as availability
 
@@ -94,6 +95,24 @@ def create_rules_bulk(
 ):
     _ensure_staff_exists(db, staff_profile_id)
     return availability.create_rules_bulk(db, staff_profile_id, payload)
+
+
+@router.put(
+    "/{staff_profile_id}/availability/rules/weekday/{weekday}",
+    response_model=List[StaffAvailabilityRuleOut],
+)
+def set_weekday_rules(
+    staff_profile_id: UUID,
+    weekday: int,
+    payload: StaffWeekdayWindowsUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_admin_user),
+):
+    _ensure_staff_exists(db, staff_profile_id)
+    try:
+        return availability.set_weekday_rules(db, staff_profile_id, weekday, payload)
+    except availability.StaffAvailabilityError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.delete("/{staff_profile_id}/availability/rules/{rule_id}", status_code=204)

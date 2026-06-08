@@ -177,37 +177,11 @@
 
           <section class="panel panel-wide">
             <div class="panel-header">
-              <p class="panel-kicker">Weekly schedule</p>
+              <p class="panel-kicker">Weekly hours</p>
               <h2>When you're available</h2>
-              <p class="panel-copy">Add the weekly windows you're open for booking. Customers only see times inside these windows.</p>
+              <p class="panel-copy">Toggle each day on and set the hours you're open. Add more than one block per day for breaks, and use “Copy to all days” to reuse a day's hours. Customers can only book inside these windows.</p>
             </div>
-            <form id="staff-rule-form" class="stack-form intake-form">
-              <fieldset class="staff-weekday-picker">
-                <span class="staff-weekday-label">Days</span>
-                <div class="staff-weekday-chips" id="staff-weekday-chips">
-                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="0" /><span>Mon</span></label>
-                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="1" /><span>Tue</span></label>
-                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="2" /><span>Wed</span></label>
-                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="3" /><span>Thu</span></label>
-                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="4" /><span>Fri</span></label>
-                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="5" /><span>Sat</span></label>
-                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="6" /><span>Sun</span></label>
-                </div>
-                <div class="staff-weekday-presets">
-                  <button type="button" class="ghost-button" data-weekday-preset="open">Open days (Wed–Sat)</button>
-                  <button type="button" class="ghost-button" data-weekday-preset="weekdays">Weekdays</button>
-                  <button type="button" class="ghost-button" data-weekday-preset="all">Every day</button>
-                  <button type="button" class="ghost-button" data-weekday-preset="clear">Clear</button>
-                </div>
-              </fieldset>
-              <div class="intake-form-grid">
-                <label><span>From</span><input type="time" name="start" step="3600" required /></label>
-                <label><span>To</span><input type="time" name="end" step="3600" required /></label>
-              </div>
-              <p class="field-help">Pick one or more days and a time range — the same hours apply to every selected day.</p>
-              <div class="hero-actions"><button class="primary-button" type="submit">Add hours to selected days</button></div>
-            </form>
-            <div id="staff-rules-list" class="staff-rules-list"></div>
+            <div id="staff-weekly-editor" class="staff-weekly-editor"></div>
           </section>
 
           <section class="panel panel-wide">

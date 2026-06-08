@@ -479,6 +479,12 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  setMyAvailabilityWeekday(weekday, windows) {
+    return request(`/api/staff/me/availability/rules/weekday/${weekday}`, {
+      method: "PUT",
+      body: JSON.stringify({ windows: windows || [] }),
+    });
+  },
   createMyAvailabilityRule(payload) {
     return request("/api/staff/me/availability/rules", {
       method: "POST",
