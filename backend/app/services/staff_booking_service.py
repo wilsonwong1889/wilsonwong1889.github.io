@@ -188,6 +188,19 @@ def expire_pending_staff_booking(
     Cancelled. Returns True if the status changed."""
     current_time = now or datetime.now(timezone.utc)
     if booking.status == "Requested":
+        # Unconfirmed request (slot held but not yet sent): free the slot if the
+        # customer doesn't confirm within the short pending window.
+        if booking.customer_confirmed_at is None:
+            created_at = booking.created_at
+            if not created_at:
+                return False
+            if created_at.tzinfo is None or created_at.utcoffset() is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            if created_at + timedelta(minutes=settings.PENDING_BOOKING_EXPIRY_MINUTES) > current_time:
+                return False
+            booking.status = "Expired"
+            booking.cancellation_reason = "Request was not confirmed in time"
+            return True
         if not booking.request_expires_at or booking.request_expires_at > current_time:
             return False
         booking.status = "Expired"
@@ -406,9 +419,13 @@ def list_staff_bookings_for_user(db: Session, user: User) -> list[StaffBooking]:
 
 
 def list_staff_bookings_for_profile(db: Session, staff_profile_id, statuses=None) -> list[StaffBooking]:
-    """Bookings for a staff member's own profile (for the staff portal)."""
+    """Bookings for a staff member's own profile (for the staff portal). Requests
+    the customer hasn't confirmed yet are hidden until they're actually sent."""
     expire_stale_pending_staff_bookings(db)
-    query = db.query(StaffBooking).filter(StaffBooking.staff_profile_id == staff_profile_id)
+    query = db.query(StaffBooking).filter(
+        StaffBooking.staff_profile_id == staff_profile_id,
+        StaffBooking.customer_confirmed_at.isnot(None),
+    )
     if statuses:
         query = query.filter(StaffBooking.status.in_(tuple(statuses)))
     bookings = query.order_by(StaffBooking.start_time.asc()).all()
@@ -633,7 +650,8 @@ def _create_staff_booking_record(
         },
     )
     db.commit()
-    _dispatch_staff_request_notifications(booking.id)
+    # The slot is held, but the staff member is NOT notified yet — the request
+    # is only sent once the customer confirms (confirm_staff_booking_request).
     return booking
 
 
@@ -650,6 +668,29 @@ def create_staff_booking(db: Session, user: User, payload: StaffBookingCreate) -
         note=payload.note,
         enforce_daily_limit=not user_has_admin_access(user),
     )
+
+
+def confirm_staff_booking_request(db: Session, booking: StaffBooking) -> StaffBooking:
+    """The customer's double-confirmation: send the held request to the staff
+    member (this is when they're notified). Idempotent if already confirmed."""
+    expire_stale_pending_staff_bookings(db)
+    db.refresh(booking)
+    if booking.status != "Requested":
+        raise StaffBookingStateError("This booking can no longer be confirmed")
+    if booking.customer_confirmed_at is not None:
+        return attach_staff_profile_snapshot(db, booking)
+    booking.customer_confirmed_at = datetime.now(timezone.utc)
+    create_audit_log(
+        db,
+        actor_id=booking.user_id,
+        booking_id=None,
+        action="staff_booking_request_confirmed",
+        details={"staff_booking_id": str(booking.id)},
+    )
+    db.commit()
+    db.refresh(booking)
+    _dispatch_staff_request_notifications(booking.id)
+    return attach_staff_profile_snapshot(db, booking)
 
 
 def create_guest_staff_booking(db: Session, payload: GuestStaffBookingCreate) -> GuestStaffBookingCreateOut:
@@ -1146,7 +1187,11 @@ def build_staff_booking_feed_item(booking: StaffBooking, *, profile: Optional[St
         "updated_at": booking.updated_at,
         "location_label": "Studio support session",
         "request_expires_at": booking.request_expires_at,
-        "awaiting_approval": booking.status == "Requested",
+        "customer_confirmed_at": booking.customer_confirmed_at,
+        # Awaiting the customer's own double-confirmation (held, not yet sent).
+        "needs_request_confirmation": booking.status == "Requested" and booking.customer_confirmed_at is None,
+        # Sent and waiting for the staff member to accept/decline.
+        "awaiting_approval": booking.status == "Requested" and booking.customer_confirmed_at is not None,
         "can_cancel": booking.status in ("Requested", "AcceptedPendingPayment", "PendingPayment", "Paid"),
         "can_pay": booking.status in PAYABLE_STATUSES,
         # Accepted free request the customer still needs to confirm at $0.

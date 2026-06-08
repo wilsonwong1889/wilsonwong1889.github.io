@@ -289,7 +289,18 @@ function inferBookingCategory(booking) {
   return "recording";
 }
 
+function isUnconfirmedStaffRequest(booking) {
+  return (
+    getBookingKind(booking) === "staff" &&
+    booking.status === "Requested" &&
+    !booking.customer_confirmed_at
+  );
+}
+
 function getBookingPrimaryKicker(booking) {
+  if (isUnconfirmedStaffRequest(booking)) {
+    return "Confirm your request";
+  }
   if (booking.status === "AcceptedPendingPayment" && (booking.price_cents || 0) <= 0) {
     return "Confirm your booking";
   }
@@ -307,6 +318,9 @@ function getBookingPrimaryKicker(booking) {
 
 function getBookingPrimaryTitle(booking) {
   const kind = getBookingKind(booking);
+  if (isUnconfirmedStaffRequest(booking)) {
+    return "Review & send your booking request";
+  }
   if (booking.status === "AcceptedPendingPayment" && (booking.price_cents || 0) <= 0) {
     return "Your request was accepted — confirm to book";
   }
@@ -329,6 +343,9 @@ function getBookingPrimaryTitle(booking) {
 }
 
 function getBookingStatusLabel(booking) {
+  if (isUnconfirmedStaffRequest(booking)) {
+    return "Awaiting your confirmation";
+  }
   return String(booking.status || "Booking").replace(/([a-z])([A-Z])/g, "$1 $2");
 }
 
@@ -1200,6 +1217,23 @@ export function initBookingDetailView(actions) {
         return;
       }
 
+      if (action === "confirm-staff-request") {
+        const selected = state.selectedBooking;
+        const staffName = selected?.staff_profile?.name || selected?.staff_name || "this staff member";
+        if (!window.confirm(`Send your booking request to ${staffName}? They'll be notified and have 48 hours to respond.`)) {
+          return;
+        }
+        // Save the contact details so the staff member has them, then send.
+        await saveBookingContactDetails({ silent: true });
+        setState({ message: "Sending your request..." });
+        const booking = await api.confirmStaffBookingRequest(button.dataset.bookingId);
+        setState({ selectedBooking: booking, message: "Request sent." });
+        if (actions?.reloadBookingDetail) {
+          await actions.reloadBookingDetail("Request sent — the staff member has been notified.");
+        }
+        return;
+      }
+
       if (action === "load-payment") {
         setState({ message: "Loading payment session..." });
         const booking =
@@ -1466,6 +1500,7 @@ export function renderBookingDetailView(state) {
     bookingKindForActions === "staff" &&
     booking.status === "AcceptedPendingPayment" &&
     (booking.price_cents || 0) <= 0;
+  const canConfirmRequest = isUnconfirmedStaffRequest(booking);
   const canCancel = booking.status === "PendingPayment" || booking.status === "Paid";
   const canPay = booking.status === "PendingPayment";
   const canAddToCalendar = ["Paid", "Completed"].includes(booking.status);
@@ -1474,6 +1509,7 @@ export function renderBookingDetailView(state) {
   const canAdminRefund = isAdmin && bookingKindForActions !== "staff" && booking.price_cents > 0 && ["Paid", "Completed", "Cancelled"].includes(booking.status);
   if (elements.bookingDetailActions) {
     elements.bookingDetailActions.innerHTML = `
+      ${canConfirmRequest ? `<button class="primary-button" type="button" data-booking-detail-action="confirm-staff-request" data-booking-id="${booking.id}">Confirm &amp; send request</button>` : ""}
       ${canConfirmFreeStaff ? `<button class="primary-button" type="button" data-booking-detail-action="confirm-free-staff" data-booking-id="${booking.id}">Confirm booking (free)</button>` : ""}
       ${canAddToCalendar ? `<button class="ghost-button" type="button" data-booking-detail-action="download-calendar" data-booking-id="${booking.id}">Add to calendar</button>` : ""}
       ${canDownloadReceipt ? `<button class="ghost-button" type="button" data-booking-detail-action="download-receipt" data-booking-id="${booking.id}">Download receipt PDF</button>` : ""}

@@ -46,6 +46,10 @@ class StaffBooking(Base):
     cancellation_reason = Column(String)
     # When the staff member accepted/declined the request.
     responded_at = Column(DateTime(timezone=True))
+    # When the customer confirmed (the double-confirmation step). The booking
+    # holds the slot from creation, but is only sent to the staff member once
+    # this is set. NULL = awaiting the customer's confirmation.
+    customer_confirmed_at = Column(DateTime(timezone=True))
     note = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -87,12 +91,14 @@ class StaffBooking(Base):
 
     @property
     def request_expires_at(self):
-        if self.status != "Requested" or not self.created_at:
+        # The staff-response window only starts once the customer has confirmed
+        # (when the request is actually sent to the staff member).
+        if self.status != "Requested" or not self.customer_confirmed_at:
             return None
-        created_at = self.created_at
-        if created_at.tzinfo is None or created_at.utcoffset() is None:
-            created_at = created_at.replace(tzinfo=timezone.utc)
-        return created_at + timedelta(hours=settings.STAFF_REQUEST_EXPIRY_HOURS)
+        anchor = self.customer_confirmed_at
+        if anchor.tzinfo is None or anchor.utcoffset() is None:
+            anchor = anchor.replace(tzinfo=timezone.utc)
+        return anchor + timedelta(hours=settings.STAFF_REQUEST_EXPIRY_HOURS)
 
     @property
     def payment_seconds_remaining(self):

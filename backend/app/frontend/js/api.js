@@ -252,6 +252,9 @@ export const api = {
   confirmFreeStaffBooking(bookingId) {
     return request(`/api/staff-bookings/${bookingId}/confirm`, { method: "POST" });
   },
+  confirmStaffBookingRequest(bookingId) {
+    return request(`/api/staff-bookings/${bookingId}/confirm-request`, { method: "POST" });
+  },
   rescheduleStaffBooking(bookingId, payload) {
     return request(`/api/staff-bookings/${bookingId}/reschedule`, {
       method: "POST",
@@ -472,6 +475,18 @@ export const api = {
   },
   getMyAvailabilityRules() {
     return request("/api/staff/me/availability/rules");
+  },
+  createMyAvailabilityRulesBulk(payload) {
+    return request("/api/staff/me/availability/rules/bulk", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  setMyAvailabilityWeekday(weekday, windows) {
+    return request(`/api/staff/me/availability/rules/weekday/${weekday}`, {
+      method: "PUT",
+      body: JSON.stringify({ windows: windows || [] }),
+    });
   },
   createMyAvailabilityRule(payload) {
     return request("/api/staff/me/availability/rules", {
