@@ -77,6 +77,39 @@ class StaffPortalTest(BaseAppTest):
         )
         self.assertEqual(exc.status_code, 201, exc.text)
 
+    def test_02b_bulk_set_weekly_hours(self) -> None:
+        admin = self._admin_headers()
+        self._linked_staff(admin, "Bulk Engineer", "bulk@example.com")
+        headers = self._login("bulk@example.com")
+
+        # Apply one window to Wed/Thu/Fri/Sat in a single call.
+        resp = self.client.post(
+            "/api/staff/me/availability/rules/bulk",
+            json={"weekdays": [2, 3, 4, 5], "start_minute": 720, "end_minute": 1200},
+            headers=headers,
+        )
+        self.assertEqual(resp.status_code, 201, resp.text)
+        self.assertEqual(len(resp.json()), 4)
+        self.assertEqual(len(self.client.get("/api/staff/me/availability/rules", headers=headers).json()), 4)
+
+        # Re-applying the same window is a no-op (deduped), not a duplicate.
+        again = self.client.post(
+            "/api/staff/me/availability/rules/bulk",
+            json={"weekdays": [2, 3, 4, 5], "start_minute": 720, "end_minute": 1200},
+            headers=headers,
+        )
+        self.assertEqual(again.status_code, 201, again.text)
+        self.assertEqual(len(again.json()), 0)
+        self.assertEqual(len(self.client.get("/api/staff/me/availability/rules", headers=headers).json()), 4)
+
+        # Bad range is rejected.
+        bad = self.client.post(
+            "/api/staff/me/availability/rules/bulk",
+            json={"weekdays": [1], "start_minute": 1200, "end_minute": 720},
+            headers=headers,
+        )
+        self.assertEqual(bad.status_code, 422, bad.text)
+
     def test_03_non_staff_forbidden(self) -> None:
         self._register("justcustomer@example.com")
         resp = self.client.get("/api/staff/me", headers=self._login("justcustomer@example.com"))

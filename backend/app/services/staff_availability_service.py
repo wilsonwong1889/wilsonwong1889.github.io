@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.staff_availability import StaffAvailabilityException, StaffAvailabilityRule
 from app.schemas.staff_availability import (
+    StaffAvailabilityBulkRuleCreate,
     StaffAvailabilityExceptionCreate,
     StaffAvailabilityRuleCreate,
 )
@@ -41,6 +42,35 @@ def create_rule(db: Session, staff_profile_id, payload: StaffAvailabilityRuleCre
     db.commit()
     db.refresh(rule)
     return rule
+
+
+def create_rules_bulk(
+    db: Session, staff_profile_id, payload: StaffAvailabilityBulkRuleCreate
+) -> List[StaffAvailabilityRule]:
+    """Create one window across several weekdays in a single action. Skips a day
+    that already has an identical window so re-applying is harmless."""
+    existing = {
+        (rule.weekday, rule.start_minute, rule.end_minute)
+        for rule in list_rules(db, staff_profile_id)
+    }
+    created: List[StaffAvailabilityRule] = []
+    for weekday in sorted(set(payload.weekdays)):
+        if (weekday, payload.start_minute, payload.end_minute) in existing:
+            continue
+        rule = StaffAvailabilityRule(
+            staff_profile_id=staff_profile_id,
+            weekday=weekday,
+            start_minute=payload.start_minute,
+            end_minute=payload.end_minute,
+            active=payload.active,
+        )
+        db.add(rule)
+        created.append(rule)
+    if created:
+        db.commit()
+        for rule in created:
+            db.refresh(rule)
+    return created
 
 
 def delete_rule(db: Session, staff_profile_id, rule_id) -> None:

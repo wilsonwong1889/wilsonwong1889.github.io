@@ -18,6 +18,23 @@ class StaffAvailabilityRuleCreate(BaseModel):
         return self
 
 
+class StaffAvailabilityBulkRuleCreate(BaseModel):
+    """Apply one time window to several weekdays at once (set a typical week)."""
+
+    weekdays: List[int] = Field(min_length=1)
+    start_minute: int = Field(ge=0, le=1439)
+    end_minute: int = Field(ge=1, le=1440)
+    active: bool = True
+
+    @model_validator(mode="after")
+    def _check(self):
+        if self.start_minute >= self.end_minute:
+            raise ValueError("start_minute must be before end_minute")
+        if any(d < 0 or d > 6 for d in self.weekdays):
+            raise ValueError("weekdays must be 0 (Monday) through 6 (Sunday)")
+        return self
+
+
 class StaffAvailabilityRuleOut(BaseModel):
     id: UUID
     staff_profile_id: UUID

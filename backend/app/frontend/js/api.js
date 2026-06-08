@@ -473,6 +473,12 @@ export const api = {
   getMyAvailabilityRules() {
     return request("/api/staff/me/availability/rules");
   },
+  createMyAvailabilityRulesBulk(payload) {
+    return request("/api/staff/me/availability/rules/bulk", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
   createMyAvailabilityRule(payload) {
     return request("/api/staff/me/availability/rules", {
       method: "POST",

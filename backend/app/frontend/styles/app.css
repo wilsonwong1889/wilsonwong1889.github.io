@@ -9954,6 +9954,62 @@ body[data-page="account"] #account-profile-panel {
   gap: 8px;
   margin-top: 16px;
 }
+.staff-weekday-picker {
+  border: 0;
+  margin: 0 0 4px;
+  padding: 0;
+}
+.staff-weekday-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.staff-weekday-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.staff-weekday-chip {
+  display: inline-flex;
+  cursor: pointer;
+}
+.staff-weekday-chip input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.staff-weekday-chip span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--line, rgba(24, 33, 39, 0.18));
+  border-radius: 999px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.7);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.staff-weekday-chip input:checked + span {
+  background: #d71920;
+  border-color: #d71920;
+  color: #ffffff;
+}
+.staff-weekday-chip input:focus-visible + span {
+  outline: 2px solid #d71920;
+  outline-offset: 2px;
+}
+.staff-weekday-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.staff-weekday-presets .ghost-button {
+  min-height: 32px;
+  padding: 4px 12px;
+}
 .staff-schedule-row {
   display: flex;
   align-items: center;

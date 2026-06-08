@@ -603,21 +603,49 @@ export function initStaffDashboardView() {
     }
   });
 
+  const WEEKDAY_PRESETS = {
+    open: [2, 3, 4, 5],
+    weekdays: [0, 1, 2, 3, 4],
+    all: [0, 1, 2, 3, 4, 5, 6],
+    clear: [],
+  };
+  el("staff-rule-form")?.querySelector(".staff-weekday-presets")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-weekday-preset]");
+    if (!button) return;
+    const days = WEEKDAY_PRESETS[button.dataset.weekdayPreset] || [];
+    el("staff-rule-form")
+      .querySelectorAll("input[name='weekday']")
+      .forEach((box) => {
+        box.checked = days.includes(Number(box.value));
+      });
+  });
+
   el("staff-rule-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
+    const weekdays = Array.from(form.querySelectorAll("input[name='weekday']:checked")).map((box) => Number(box.value));
+    if (!weekdays.length) {
+      setFeedback("Pick at least one day to add hours to.", "error");
+      return;
+    }
     const payload = {
-      weekday: Number(form.elements.weekday.value),
+      weekdays,
       start_minute: timeToMinutes(form.elements.start.value),
       end_minute: timeToMinutes(form.elements.end.value),
     };
     try {
-      await api.createMyAvailabilityRule(payload);
+      const created = await api.createMyAvailabilityRulesBulk(payload);
       form.reset();
-      setFeedback("Weekly window added.", "success");
+      const added = Array.isArray(created) ? created.length : 0;
+      setFeedback(
+        added
+          ? `Hours added to ${added} day${added === 1 ? "" : "s"}.`
+          : "Those days already had this window — nothing to add.",
+        "success",
+      );
       await renderRules();
     } catch (error) {
-      setFeedback(error?.message || "Could not add that window.", "error");
+      setFeedback(error?.message || "Could not add those hours.", "error");
     }
   });
 

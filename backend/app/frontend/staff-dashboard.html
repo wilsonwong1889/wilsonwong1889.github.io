@@ -182,23 +182,30 @@
               <p class="panel-copy">Add the weekly windows you're open for booking. Customers only see times inside these windows.</p>
             </div>
             <form id="staff-rule-form" class="stack-form intake-form">
+              <fieldset class="staff-weekday-picker">
+                <span class="staff-weekday-label">Days</span>
+                <div class="staff-weekday-chips" id="staff-weekday-chips">
+                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="0" /><span>Mon</span></label>
+                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="1" /><span>Tue</span></label>
+                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="2" /><span>Wed</span></label>
+                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="3" /><span>Thu</span></label>
+                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="4" /><span>Fri</span></label>
+                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="5" /><span>Sat</span></label>
+                  <label class="staff-weekday-chip"><input type="checkbox" name="weekday" value="6" /><span>Sun</span></label>
+                </div>
+                <div class="staff-weekday-presets">
+                  <button type="button" class="ghost-button" data-weekday-preset="open">Open days (Wed–Sat)</button>
+                  <button type="button" class="ghost-button" data-weekday-preset="weekdays">Weekdays</button>
+                  <button type="button" class="ghost-button" data-weekday-preset="all">Every day</button>
+                  <button type="button" class="ghost-button" data-weekday-preset="clear">Clear</button>
+                </div>
+              </fieldset>
               <div class="intake-form-grid">
-                <label>
-                  <span>Day</span>
-                  <select name="weekday" required>
-                    <option value="0">Monday</option>
-                    <option value="1">Tuesday</option>
-                    <option value="2">Wednesday</option>
-                    <option value="3">Thursday</option>
-                    <option value="4">Friday</option>
-                    <option value="5">Saturday</option>
-                    <option value="6">Sunday</option>
-                  </select>
-                </label>
                 <label><span>From</span><input type="time" name="start" step="3600" required /></label>
                 <label><span>To</span><input type="time" name="end" step="3600" required /></label>
               </div>
-              <div class="hero-actions"><button class="primary-button" type="submit">Add window</button></div>
+              <p class="field-help">Pick one or more days and a time range — the same hours apply to every selected day.</p>
+              <div class="hero-actions"><button class="primary-button" type="submit">Add hours to selected days</button></div>
             </form>
             <div id="staff-rules-list" class="staff-rules-list"></div>
           </section>

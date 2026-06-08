@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.staff_profile import StaffProfile
 from app.models.user import User
 from app.schemas.staff_availability import (
+    StaffAvailabilityBulkRuleCreate,
     StaffAvailabilityExceptionCreate,
     StaffAvailabilityExceptionOut,
     StaffAvailabilityRuleCreate,
@@ -78,6 +79,21 @@ def create_rule(
 ):
     _ensure_staff_exists(db, staff_profile_id)
     return availability.create_rule(db, staff_profile_id, payload)
+
+
+@router.post(
+    "/{staff_profile_id}/availability/rules/bulk",
+    response_model=List[StaffAvailabilityRuleOut],
+    status_code=201,
+)
+def create_rules_bulk(
+    staff_profile_id: UUID,
+    payload: StaffAvailabilityBulkRuleCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_admin_user),
+):
+    _ensure_staff_exists(db, staff_profile_id)
+    return availability.create_rules_bulk(db, staff_profile_id, payload)
 
 
 @router.delete("/{staff_profile_id}/availability/rules/{rule_id}", status_code=204)
