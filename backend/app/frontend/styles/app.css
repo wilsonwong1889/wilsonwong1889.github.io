@@ -12224,3 +12224,115 @@ button.avail-cal-day:focus-visible {
     width: min(132px, 100%);
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Home mobile header rework
+   - Brand row mirrors desktop: AM logo | centered title | BIPOC logo (+ menu).
+   - The blue utility bar drops BELOW the logos/title.
+   - Login / account buttons surface on that blue bar.
+   - Logos, buttons, and fonts shrink a touch so the row fits on phones.
+   Scoped to the home page only; other pages keep their existing mobile header.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Reorder direct children: brand row (header) first, blue utility bar
+     second, hero/content third, then footer + acknowledgement. */
+  body[data-page="home"] .site-frame-home {
+    display: flex;
+    flex-direction: column;
+  }
+  body[data-page="home"] .site-frame-home > .site-header { order: 1; }
+  body[data-page="home"] .site-frame-home > .home-top-utility { order: 2; }
+  body[data-page="home"] .site-frame-home > main { order: 3; }
+  body[data-page="home"] .site-frame-home > .studio-footer { order: 4; }
+  body[data-page="home"] .site-frame-home > .site-acknowledgement { order: 5; }
+
+  /* Brand row: single row — AM logo, centered title, BIPOC logo, menu. */
+  body[data-page="home"] .site-header-brand-row {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "am title bipoc menu";
+    column-gap: 6px;
+    row-gap: 0;
+    align-items: center;
+  }
+  body[data-page="home"] .header-brand-block {
+    grid-area: am;
+    align-items: center;
+  }
+  body[data-page="home"] .header-hub-title {
+    grid-area: title;
+    text-align: center;
+    font-size: clamp(0.74rem, 2.7vw, 0.95rem);
+    line-height: 1.18;
+  }
+  body[data-page="home"] .header-bipoc-logo-link {
+    grid-area: bipoc;
+    justify-self: end;
+    min-height: 0;
+  }
+  body[data-page="home"] .mobile-nav-toggle {
+    grid-area: menu;
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+  }
+
+  /* Smaller logos so logo | title | logo | menu all fit on one row and the
+     centered title keeps a usable width. */
+  body[data-page="home"] .header-am-logo {
+    height: 46px;
+  }
+  body[data-page="home"] .header-bipoc-side-logo {
+    height: 34px;
+    max-width: 84px;
+  }
+
+  /* Blue utility bar — now below the header: surface the login / account
+     buttons (they were hidden on mobile) and keep the bar compact. */
+  body[data-page="home"] .home-top-utility .home-utility-actions {
+    display: flex;
+    width: auto;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+  body[data-page="home"] .home-utility-inner {
+    gap: 10px;
+    padding: 10px 0;
+  }
+  body[data-page="home"] .home-contact-list {
+    gap: 6px 14px;
+  }
+  body[data-page="home"] .home-contact-item,
+  body[data-page="home"] .home-contact-item span {
+    font-size: 0.78rem;
+  }
+  body[data-page="home"] .home-utility-actions .ghost-button,
+  body[data-page="home"] .home-utility-actions .header-user-trigger {
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 0.82rem;
+  }
+  body[data-page="home"] .home-utility-actions .home-header-book-button {
+    min-height: 36px;
+    padding: 7px 18px;
+    font-size: 0.82rem;
+  }
+  body[data-page="home"] .home-utility-actions .header-user-trigger-label {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Log in / Book Now already live on the blue bar now, so drop the
+     duplicate pair from inside the nav drawer on the home page. */
+  body[data-page="home"] .mobile-nav-cta {
+    display: none;
+  }
+
+  /* Trim the nav link size a touch. */
+  body[data-page="home"] .site-header.site-header-public .nav-link,
+  body[data-page="home"] .site-header.site-header-public .nav-link.is-active {
+    font-size: 0.9rem;
+  }
+}
