@@ -1,6 +1,4 @@
-from pathlib import Path
 from typing import List, Optional
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
@@ -38,6 +36,7 @@ from app.schemas.staff import AdminStaffProfileOut, StaffPhotoUploadOut, StaffPr
 from app.schemas.staff_booking import StaffBookingOut
 from app.schemas.user import AdminUserAccountOut, AdminUserDeleteConfirm, AdminUserRoleUpdate
 from app.core.image_utils import ACCEPTED_PHOTO_EXTENSIONS, MAX_PHOTO_BYTES, to_jpeg_bytes
+from app.core.media_storage import store_media
 from app.core.security import verify_password
 from app.services.account_service import (
     apply_user_role,
@@ -99,7 +98,6 @@ from app.services.suitedash_service import (
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
 admin_rate_limit = rate_limit_dependency("admin", settings.ADMIN_RATE_LIMIT_MAX_REQUESTS)
-ROOM_MEDIA_DIR = Path(__file__).resolve().parents[1] / "frontend" / "media" / "rooms"
 
 
 @router.get("/analytics/summary", response_model=AdminAnalyticsSummaryOut)
@@ -375,11 +373,8 @@ async def admin_upload_room_photo(
         raise HTTPException(status_code=400, detail="Photo must be 20 MB or smaller.")
 
     jpeg_bytes = to_jpeg_bytes(file_bytes)
-    ROOM_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-    saved_filename = f"{uuid4().hex}.jpg"
-    saved_path = ROOM_MEDIA_DIR / saved_filename
-    saved_path.write_bytes(jpeg_bytes)
-    return {"photo_url": f"/assets/media/rooms/{saved_filename}"}
+    photo_url = store_media(jpeg_bytes, folder="rooms")
+    return {"photo_url": photo_url}
 
 
 @router.get("/bookings", response_model=List[AdminBookingLookupOut])

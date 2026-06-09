@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_PUBLISHABLE_KEY: str = ""
     SUPABASE_TIMEOUT_SECONDS: int = 20
+    # Server-side key (service_role) used to upload media to Supabase Storage.
+    # When set together with SUPABASE_URL + a bucket, uploaded images persist
+    # in object storage instead of the container's ephemeral local disk.
+    SUPABASE_SERVICE_KEY: str = Field(default="", repr=False)
+    SUPABASE_STORAGE_BUCKET: str = "media"
 
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_SECRET_KEY: str = Field(default="sk_test_placeholder", repr=False)
