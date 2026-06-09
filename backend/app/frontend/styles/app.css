@@ -10809,6 +10809,20 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
   font-size: 0.92rem;
   color: var(--ink);
   line-height: 1.7;
+  white-space: pre-line;
+}
+
+.staff-profile-bio-lead {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+
+.staff-profile-gear-text {
+  font-size: 0.88rem;
+  color: var(--ink-soft, #4b5563);
 }
 
 .staff-profile-section-label {
