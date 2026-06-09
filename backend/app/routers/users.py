@@ -1,11 +1,9 @@
-from pathlib import Path
-from uuid import uuid4
-
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
 from app.core.image_utils import ACCEPTED_PHOTO_EXTENSIONS as ACCEPTED_AVATAR_EXTENSIONS
 from app.core.image_utils import MAX_PHOTO_BYTES as MAX_AVATAR_BYTES
 from app.core.image_utils import to_jpeg_bytes as _to_jpeg_bytes
+from app.core.media_storage import store_media
 from app.database import get_db
 from app.models.user import User
 from app.roles import user_has_admin_access
@@ -16,7 +14,6 @@ from app.services.account_service import can_delete_admin_account, delete_user_a
 from app.services.booking_service import create_audit_log
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
-AVATAR_MEDIA_DIR = Path(__file__).resolve().parents[1] / "frontend" / "media" / "avatars"
 
 
 @router.get("/me", response_model=UserOut)
@@ -55,11 +52,8 @@ async def upload_profile_avatar(
         raise HTTPException(status_code=400, detail="Avatar image must be 20 MB or smaller.")
 
     jpeg_bytes = _to_jpeg_bytes(file_bytes)
-    AVATAR_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-    saved_filename = f"{uuid4().hex}.jpg"
-    saved_path = AVATAR_MEDIA_DIR / saved_filename
-    saved_path.write_bytes(jpeg_bytes)
-    return {"avatar_url": f"/assets/media/avatars/{saved_filename}"}
+    avatar_url = store_media(jpeg_bytes, folder="avatars")
+    return {"avatar_url": avatar_url}
 
 
 @router.put("/me/password", status_code=204)

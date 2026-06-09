@@ -1,20 +1,16 @@
 from __future__ import annotations
 
-from pathlib import Path
-from uuid import uuid4
-
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.image_utils import ACCEPTED_PHOTO_EXTENSIONS, MAX_PHOTO_BYTES, to_jpeg_bytes
+from app.core.media_storage import delete_media, store_media
 from app.models.room import Room
 from app.models.staff_profile import StaffProfile
 from app.models.user import User
 from app.roles import USER_ROLE_STAFF, user_has_admin_access
 from app.schemas.staff import StaffProfileCreate, StaffProfileUpdate, StaffSelfProfileUpdate
 from app.staffing import build_staff_snapshot, normalize_staff_roles, normalize_string_list
-
-STAFF_MEDIA_DIR = Path(__file__).resolve().parents[1] / "frontend" / "media" / "staff"
 
 
 class StaffPhotoError(ValueError):
@@ -32,10 +28,7 @@ def save_staff_photo(file_bytes: bytes, filename: str | None) -> str:
     if len(file_bytes) > MAX_PHOTO_BYTES:
         raise StaffPhotoError("Photo must be 20 MB or smaller.")
     jpeg_bytes = to_jpeg_bytes(file_bytes)
-    STAFF_MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-    saved_filename = f"{uuid4().hex}.jpg"
-    (STAFF_MEDIA_DIR / saved_filename).write_bytes(jpeg_bytes)
-    return f"/assets/media/staff/{saved_filename}"
+    return store_media(jpeg_bytes, folder="staff")
 
 
 def update_own_staff_profile(
@@ -109,7 +102,7 @@ def _sync_staff_snapshot_to_rooms(db: Session, profile: StaffProfile) -> None:
 
 
 def _delete_photo_if_unused(db: Session, photo_url: str | None, exclude_profile_id=None) -> None:
-    if not photo_url or not photo_url.startswith("/assets/media/staff/"):
+    if not photo_url:
         return
 
     query = db.query(StaffProfile).filter(StaffProfile.photo_url == photo_url)
@@ -118,9 +111,7 @@ def _delete_photo_if_unused(db: Session, photo_url: str | None, exclude_profile_
     if query.first():
         return
 
-    photo_path = STAFF_MEDIA_DIR / photo_url.rsplit("/", 1)[-1]
-    if photo_path.exists():
-        photo_path.unlink()
+    delete_media(photo_url)
 
 
 def list_staff_profiles(db: Session) -> list[StaffProfile]:
