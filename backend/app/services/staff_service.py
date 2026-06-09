@@ -212,6 +212,7 @@ def create_staff_profile(db: Session, payload: StaffProfileCreate) -> StaffProfi
         headshot_urls=normalize_string_list(payload.headshot_urls),
         portfolio_url=payload.portfolio_url.strip() if payload.portfolio_url else None,
         gear=payload.gear.strip() if payload.gear else None,
+        instagram_url=payload.instagram_url.strip() if payload.instagram_url else None,
         add_on_price_cents=payload.add_on_price_cents,
         booking_rate_cents=payload.booking_rate_cents,
         equipment_rental_cost_cents=payload.equipment_rental_cost_cents,
@@ -261,6 +262,8 @@ def update_staff_profile(db: Session, profile_id: str, payload: StaffProfileUpda
         profile.portfolio_url = update_data["portfolio_url"].strip() if update_data["portfolio_url"] else None
     if "gear" in update_data:
         profile.gear = update_data["gear"].strip() if update_data["gear"] else None
+    if "instagram_url" in update_data:
+        profile.instagram_url = update_data["instagram_url"].strip() if update_data["instagram_url"] else None
     if "add_on_price_cents" in update_data and update_data["add_on_price_cents"] is not None:
         profile.add_on_price_cents = update_data["add_on_price_cents"]
     if "booking_rate_cents" in update_data and update_data["booking_rate_cents"] is not None:

@@ -10772,6 +10772,32 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
   background: #ffffff;
 }
 
+.staff-profile-instagram {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-decoration: none;
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  box-shadow: 0 6px 16px rgba(220, 39, 67, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.staff-profile-instagram:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 8px 20px rgba(220, 39, 67, 0.38);
+}
+
+.staff-profile-instagram svg {
+  flex-shrink: 0;
+}
+
 .staff-profile-body {
   padding: 28px;
   display: flex;

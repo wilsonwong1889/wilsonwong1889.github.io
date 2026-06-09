@@ -261,6 +261,7 @@ function populateProfileForm(profile) {
   form.elements.services.value = (profile.services || []).join(", ");
   form.elements.service_types.value = (profile.service_types || []).join(", ");
   form.elements.gear.value = profile.gear || "";
+  form.elements.instagram_url.value = profile.instagram_url || "";
   form.elements.portfolio_url.value = profile.portfolio_url || "";
   form.elements.notification_email.value = profile.notification_email || "";
   form.elements.notification_phone.value = profile.notification_phone || "";
@@ -641,6 +642,7 @@ export function initStaffDashboardView() {
         services: parseList(form.elements.services.value),
         service_types: parseList(form.elements.service_types.value),
         gear: form.elements.gear.value.trim() || null,
+        instagram_url: form.elements.instagram_url.value.trim() || null,
         portfolio_url: form.elements.portfolio_url.value.trim() || null,
         headshot_urls: headshotUrls,
         notification_email: form.elements.notification_email.value.trim() || null,

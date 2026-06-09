@@ -47,6 +47,8 @@ class StaffProfile(Base):
     # Additional headshot image URLs beyond the primary photo_url avatar.
     headshot_urls = Column(JSONB, default=list)
     portfolio_url = Column(String)
+    # Public Instagram profile URL (shown as an Instagram button on the profile).
+    instagram_url = Column(String)
     # Free-form list of equipment/gear the engineer works with.
     gear = Column(String)
     # Self-service application workflow: NULL for admin-created profiles,

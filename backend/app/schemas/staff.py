@@ -31,6 +31,7 @@ class StaffProfileCreate(BaseModel):
     headshot_urls: List[str] = Field(default_factory=list)
     portfolio_url: Optional[str] = Field(default=None, max_length=500)
     gear: Optional[str] = Field(default=None, max_length=2000)
+    instagram_url: Optional[str] = Field(default=None, max_length=300)
     add_on_price_cents: int = Field(default=0, ge=0)
     booking_rate_cents: int = Field(default=0, ge=0)
     equipment_rental_cost_cents: int = Field(default=0, ge=0)
@@ -64,6 +65,7 @@ class StaffProfileUpdate(BaseModel):
     headshot_urls: Optional[List[str]] = None
     portfolio_url: Optional[str] = Field(default=None, max_length=500)
     gear: Optional[str] = Field(default=None, max_length=2000)
+    instagram_url: Optional[str] = Field(default=None, max_length=300)
     add_on_price_cents: Optional[int] = Field(default=None, ge=0)
     booking_rate_cents: Optional[int] = Field(default=None, ge=0)
     equipment_rental_cost_cents: Optional[int] = Field(default=None, ge=0)
@@ -102,6 +104,7 @@ class StaffSelfProfileUpdate(BaseModel):
     headshot_urls: Optional[List[str]] = None
     portfolio_url: Optional[str] = Field(default=None, max_length=500)
     gear: Optional[str] = Field(default=None, max_length=2000)
+    instagram_url: Optional[str] = Field(default=None, max_length=300)
     service_types: Optional[List[str]] = None
     role_title: Optional[str] = Field(default=None, max_length=120)
     notification_email: Optional[str] = Field(default=None, max_length=120)
@@ -131,6 +134,7 @@ class StaffProfileOut(BaseModel):
     headshot_urls: List[str] = Field(default_factory=list)
     portfolio_url: Optional[str] = None
     gear: Optional[str] = None
+    instagram_url: Optional[str] = None
     add_on_price_cents: int
     booking_rate_cents: int
     equipment_rental_cost_cents: int = 0

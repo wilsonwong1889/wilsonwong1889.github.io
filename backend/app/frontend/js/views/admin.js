@@ -1268,6 +1268,7 @@ function populateStaffProfileForm(profile) {
   elements.adminStaffProfileForm.elements.services.value = (profile.services || []).join(", ");
   elements.adminStaffProfileForm.elements.bio.value = profile.bio || "";
   elements.adminStaffProfileForm.elements.gear.value = profile.gear || "";
+  elements.adminStaffProfileForm.elements.instagram_url.value = profile.instagram_url || "";
   elements.adminStaffProfileForm.elements.portfolio_url.value = profile.portfolio_url || "";
   elements.adminStaffProfileForm.elements.headshot_urls.value = (profile.headshot_urls || []).join("\n");
   elements.adminStaffProfileForm.elements.add_on_price_cents.value = profile.add_on_price_cents || 0;
@@ -2565,6 +2566,7 @@ export function initAdminView(actions) {
         photo_url: photoUrl,
         headshot_urls: parseListInput(form.elements.headshot_urls.value),
         portfolio_url: form.elements.portfolio_url.value.trim() || null,
+        instagram_url: form.elements.instagram_url.value.trim() || null,
         gear: form.elements.gear.value.trim() || null,
         add_on_price_cents: Number(form.elements.add_on_price_cents.value || 0),
         equipment_rental_cost_cents: Number(form.elements.equipment_rental_cost_cents.value || 0),
