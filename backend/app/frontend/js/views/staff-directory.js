@@ -626,14 +626,37 @@ function renderSelectedCard(profile) {
   if (profileCard) {
     const name = escapeHtml(profile.name || "Team Member");
     const role = escapeHtml(getStaffPrimaryCategory(profile));
-    const bio = escapeHtml(profile.description || "Arts Marvels creative professional.");
+    const tagline = (profile.description || "").trim();
+    const bioBody = (profile.bio || "").trim();
+    const bioText = escapeHtml(bioBody || tagline || "Arts Marvels creative professional.");
+    // Show the short description as a lead line only when there is also a longer bio.
+    const taglineHtml = bioBody && tagline && tagline !== bioBody
+      ? `<p class="staff-profile-bio-lead">${escapeHtml(tagline)}</p>`
+      : "";
     const rate = escapeHtml(getStaffRateLabel(profile));
     const skills = (profile.skills || []);
     const talents = (profile.talents || []);
+    const services = Array.from(
+      new Set([...(profile.service_types || []), ...(profile.services || [])].filter(Boolean)),
+    );
+    const gear = (profile.gear || "").trim();
     const photoSrc = profile.photo_url || STAFF_PLACEHOLDER_IMAGE;
 
     const skillTags = skills.map((s) => `<span class="staff-profile-tag">${escapeHtml(s)}</span>`).join("") || '<span class="staff-profile-tag">Creative</span>';
     const talentTags = talents.map((t) => `<span class="staff-profile-tag">${escapeHtml(t)}</span>`).join("") || '<span class="staff-profile-tag">Production</span>';
+    const serviceTags = services.map((s) => `<span class="staff-profile-tag">${escapeHtml(s)}</span>`).join("");
+    const servicesHtml = services.length
+      ? `<div>
+          <p class="staff-profile-section-label">Services offered</p>
+          <div class="staff-profile-tags">${serviceTags}</div>
+        </div>`
+      : "";
+    const gearHtml = gear
+      ? `<div>
+          <p class="staff-profile-section-label">Gear &amp; equipment</p>
+          <p class="staff-profile-bio-text staff-profile-gear-text">${escapeHtml(gear)}</p>
+        </div>`
+      : "";
     const portfolioPhotos = (Array.isArray(profile.headshot_urls) ? profile.headshot_urls : []).filter(Boolean);
     const portfolioHtml = portfolioPhotos.length
       ? `<div class="staff-profile-portfolio">
@@ -650,6 +673,12 @@ function renderSelectedCard(profile) {
           </div>
         </div>`
       : "";
+    const instagramHtml = profile.instagram_url
+      ? `<a class="staff-profile-instagram" href="${escapeHtml(profile.instagram_url)}" target="_blank" rel="noreferrer" aria-label="${name} on Instagram">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+          <span>Instagram</span>
+        </a>`
+      : "";
 
     profileCard.innerHTML = `
       <div class="staff-profile-photo-block">
@@ -665,9 +694,11 @@ function renderSelectedCard(profile) {
         </div>
       </div>
       <div class="staff-profile-body">
+        ${instagramHtml}
         <div>
           <p class="staff-profile-section-label">About</p>
-          <p class="staff-profile-bio-text">${bio}</p>
+          ${taglineHtml}
+          <p class="staff-profile-bio-text">${bioText}</p>
         </div>
         <div class="staff-profile-skills-grid">
           <div class="staff-profile-tag-group">
@@ -679,6 +710,8 @@ function renderSelectedCard(profile) {
             <div class="staff-profile-tags">${talentTags}</div>
           </div>
         </div>
+        ${servicesHtml}
+        ${gearHtml}
         <div class="staff-profile-meta-row">
           <div class="staff-profile-meta-block">
             <span class="staff-profile-meta-label">Rate</span>

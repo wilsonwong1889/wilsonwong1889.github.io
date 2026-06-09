@@ -262,7 +262,7 @@ class StaffRequestFlowTest(BaseAppTest):
         with self.SessionLocal() as db:
             row = db.query(StaffBooking).filter(StaffBooking.id == booking["id"]).first()
             row.responded_at = datetime.now(timezone.utc) - timedelta(
-                minutes=settings.PENDING_BOOKING_EXPIRY_MINUTES + 1
+                hours=settings.STAFF_PAYMENT_EXPIRY_HOURS + 1
             )
             db.commit()
 

@@ -87,7 +87,7 @@ class StaffBooking(Base):
             return None
         if anchor.tzinfo is None or anchor.utcoffset() is None:
             anchor = anchor.replace(tzinfo=timezone.utc)
-        return anchor + timedelta(minutes=settings.PENDING_BOOKING_EXPIRY_MINUTES)
+        return anchor + timedelta(hours=settings.STAFF_PAYMENT_EXPIRY_HOURS)
 
     @property
     def request_expires_at(self):

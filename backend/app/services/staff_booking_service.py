@@ -196,7 +196,7 @@ def expire_pending_staff_booking(
                 return False
             if created_at.tzinfo is None or created_at.utcoffset() is None:
                 created_at = created_at.replace(tzinfo=timezone.utc)
-            if created_at + timedelta(minutes=settings.PENDING_BOOKING_EXPIRY_MINUTES) > current_time:
+            if created_at + timedelta(minutes=settings.STAFF_REQUEST_CONFIRM_EXPIRY_MINUTES) > current_time:
                 return False
             booking.status = "Expired"
             booking.cancellation_reason = "Request was not confirmed in time"
@@ -215,7 +215,7 @@ def expire_pending_staff_booking(
         booking.status = "Cancelled"
         booking.cancelled_at = current_time
         booking.cancellation_reason = (
-            f"Payment window expired after {settings.PENDING_BOOKING_EXPIRY_MINUTES} minutes"
+            f"Payment window expired after {settings.STAFF_PAYMENT_EXPIRY_HOURS} hours"
         )
         return True
     return False
@@ -324,6 +324,9 @@ def get_staff_availability(db: Session, staff_profile_id: UUID | str, target_dat
     available_start_times: list[str] = []
     max_duration_minutes_by_start: dict[str, int] = {}
     current_time = datetime.now(timezone.utc)
+    # Staff sessions must be booked at least N hours ahead (time for the staff
+    # member to approve and the customer to pay), so don't offer nearer slots.
+    earliest_start = current_time + timedelta(hours=settings.STAFF_BOOKING_MIN_ADVANCE_HOURS)
 
     if is_booking_date_before_today(target_date, now=current_time):
         return {
@@ -339,7 +342,7 @@ def get_staff_availability(db: Session, staff_profile_id: UUID | str, target_dat
         start_time = local_start.astimezone(timezone.utc)
         if start_time < utc_start or start_time >= utc_end:
             continue
-        if start_time <= current_time:
+        if start_time < earliest_start:
             continue
 
         slot_start_minute = local_hour * 60
@@ -582,6 +585,9 @@ def _create_staff_booking_record(
     expire_stale_pending_staff_bookings(db)
     normalized_start = normalize_booking_start(start_time)
     ensure_booking_start_not_in_past(normalized_start)
+    min_advance = settings.STAFF_BOOKING_MIN_ADVANCE_HOURS
+    if normalized_start < datetime.now(timezone.utc) + timedelta(hours=min_advance):
+        raise ValueError(f"Staff bookings must be made at least {min_advance} hours in advance")
     end_time = normalized_start + timedelta(minutes=duration_minutes)
     validate_booking_window(normalized_start, end_time)
     ensure_staff_window_is_available(db, profile.id, normalized_start, end_time)

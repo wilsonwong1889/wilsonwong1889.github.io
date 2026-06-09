@@ -84,8 +84,15 @@ class Settings(BaseSettings):
     REMINDER_DISPATCH_INTERVAL_MINUTES: int = 30
     PENDING_BOOKING_CLEANUP_INTERVAL_MINUTES: int = 1
     PENDING_BOOKING_EXPIRY_MINUTES: int = 5
-    # How long a staff member has to accept a booking request before it expires.
-    STAFF_REQUEST_EXPIRY_HOURS: int = 48
+    # How long a staff member has to accept a request (starts once the customer
+    # confirms), then how long the customer has to pay/confirm once accepted.
+    STAFF_REQUEST_EXPIRY_HOURS: int = 24
+    STAFF_PAYMENT_EXPIRY_HOURS: int = 24
+    # How long a held-but-unconfirmed staff request lives before the slot frees.
+    STAFF_REQUEST_CONFIRM_EXPIRY_MINUTES: int = 30
+    # A staff booking must start at least this far in the future (24h to approve
+    # + 24h to pay needs lead time).
+    STAFF_BOOKING_MIN_ADVANCE_HOURS: int = 48
     RATE_LIMIT_WINDOW_SECONDS: int = 60
     AUTH_RATE_LIMIT_MAX_REQUESTS: int = 20
     BOOKING_RATE_LIMIT_MAX_REQUESTS: int = 30
