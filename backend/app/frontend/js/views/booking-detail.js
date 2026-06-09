@@ -1042,12 +1042,16 @@ function renderCheckoutPricingRows(booking, kind, staffTotal) {
   const gstLine = taxCents > 0
     ? `<div class="booking-summary-price-line"><span>GST (5%)</span><strong>${formatCurrency(taxCents, booking.currency)}</strong></div>`
     : "";
+  // Staff bookings are request-based — no "Free" service fee line for them.
+  const serviceFeeLine = kind === "staff"
+    ? ""
+    : `<div class="booking-summary-price-line"><span>Service fee</span><strong class="booking-summary-price-free">Free</strong></div>`;
 
   if (discountCents > 0) {
     return `
       <div class="booking-summary-price-line"><span>${kind === "staff" ? "Staff session" : "Session subtotal"}</span><strong>${formatCurrency(originalTotal, booking.currency)}</strong></div>
       <div class="booking-summary-price-line"><span>Promo ${escapeHtml(booking.promo_code || "")}</span><strong class="booking-summary-price-free">-${formatCurrency(discountCents, booking.currency)}</strong></div>
-      <div class="booking-summary-price-line"><span>Service fee</span><strong class="booking-summary-price-free">Free</strong></div>
+      ${serviceFeeLine}
       ${gstLine}
       <div class="booking-summary-total"><span>Total</span><strong>${formatCurrency(finalTotal, booking.currency)}</strong></div>
     `;
@@ -1056,7 +1060,7 @@ function renderCheckoutPricingRows(booking, kind, staffTotal) {
   if (kind === "staff") {
     return `
       <div class="booking-summary-price-line"><span>Staff session</span><strong>${formatCurrency(finalTotal, booking.currency)}</strong></div>
-      <div class="booking-summary-price-line"><span>Service fee</span><strong class="booking-summary-price-free">Free</strong></div>
+      ${serviceFeeLine}
       ${gstLine}
       <div class="booking-summary-total"><span>Total</span><strong>${formatCurrency(finalTotal, booking.currency)}</strong></div>
     `;
@@ -1070,7 +1074,7 @@ function renderCheckoutPricingRows(booking, kind, staffTotal) {
         ? `<div class="booking-summary-price-line"><span>Staff add-ons</span><strong>${formatCurrency(staffTotal, booking.currency)}</strong></div>`
         : ""
     }
-    <div class="booking-summary-price-line"><span>Service fee</span><strong class="booking-summary-price-free">Free</strong></div>
+    ${serviceFeeLine}
     ${gstLine}
     <div class="booking-summary-total"><span>Total</span><strong>${formatCurrency(finalTotal, booking.currency)}</strong></div>
   `;
@@ -1510,7 +1514,7 @@ export function renderBookingDetailView(state) {
   if (elements.bookingDetailActions) {
     elements.bookingDetailActions.innerHTML = `
       ${canConfirmRequest ? `<button class="primary-button" type="button" data-booking-detail-action="confirm-staff-request" data-booking-id="${booking.id}">Confirm &amp; send request</button>` : ""}
-      ${canConfirmFreeStaff ? `<button class="primary-button" type="button" data-booking-detail-action="confirm-free-staff" data-booking-id="${booking.id}">Confirm booking (free)</button>` : ""}
+      ${canConfirmFreeStaff ? `<button class="primary-button" type="button" data-booking-detail-action="confirm-free-staff" data-booking-id="${booking.id}">Confirm booking</button>` : ""}
       ${canAddToCalendar ? `<button class="ghost-button" type="button" data-booking-detail-action="download-calendar" data-booking-id="${booking.id}">Add to calendar</button>` : ""}
       ${canDownloadReceipt ? `<button class="ghost-button" type="button" data-booking-detail-action="download-receipt" data-booking-id="${booking.id}">Download receipt PDF</button>` : ""}
       ${canAdminCheckIn ? `<button class="ghost-button" type="button" data-booking-detail-action="check-in" data-booking-id="${booking.id}">Mark guest arrived</button>` : ""}

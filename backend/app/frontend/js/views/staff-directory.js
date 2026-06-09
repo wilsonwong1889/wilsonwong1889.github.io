@@ -135,9 +135,10 @@ function getStaffRateCents(profile) {
 }
 
 function getStaffRateLabel(profile) {
-  // Booking a staff member on their own is free — it is sent as a request and
-  // confirmed at no charge. (Staff added to a room booking are charged there.)
-  return "Free · request to book";
+  // Booking a staff member on their own is request-based: the customer sends a
+  // request and the staff member confirms the rate. (Staff added to a room
+  // booking are charged there.) Shown as "Request" — never "Free".
+  return "Request";
 }
 
 function getStaffRating(profile) {
@@ -1036,7 +1037,7 @@ function renderSummary(profile) {
     durationNode.textContent = formatDuration(durationMinutes);
   }
   if (totalNode) {
-    totalNode.textContent = "Free";
+    totalNode.textContent = "Request";
   }
   if (submitButton) {
     submitButton.disabled = !formReady;
@@ -1397,7 +1398,7 @@ function renderStaffCatalogCard(profile) {
         <p class="staff-card-bio">${bio}</p>
         <div class="staff-card-skills">${skillTags}</div>
         <div class="staff-card-footer">
-          <div class="staff-card-rate">${rate}<span>/hr</span></div>
+          <div class="staff-card-rate">${rate}</div>
           <div class="staff-card-actions">
             <button class="staff-card-view-btn" type="button" data-staff-view="${id}">Profile</button>
             <button class="staff-card-book-btn" type="button" data-staff-book="${id}">Book →</button>

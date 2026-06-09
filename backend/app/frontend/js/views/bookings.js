@@ -334,7 +334,7 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
   const bookingDateLabel = formatBookingDay(booking.start_time);
   const bookingTimeLabel = `${formatTimeOnly(booking.start_time)} · ${formatDuration(booking.duration_minutes)}`;
   const bookingTotalLabel = needsConfirmation || (kind === "staff" && (booking.price_cents || 0) <= 0)
-    ? "Free"
+    ? "Request"
     : formatCurrency(booking.price_cents);
   const actionLabel = pendingPayment ? "Finish payment" : upcoming ? "Manage booking" : "View details";
   const actionClass = pendingPayment ? "primary-button primary-link" : "ghost-button ghost-link";
@@ -392,7 +392,7 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
         </div>
         <div class="booking-card-actions">
           ${needsRequestConfirmation ? `<button class="primary-button" type="button" data-booking-action="confirm-request" data-booking-id="${escapeHtml(booking.id)}">Confirm &amp; send request</button>` : ""}
-          ${needsConfirmation ? `<button class="primary-button" type="button" data-booking-action="confirm-free" data-booking-id="${escapeHtml(booking.id)}">Confirm booking (free)</button>` : ""}
+          ${needsConfirmation ? `<button class="primary-button" type="button" data-booking-action="confirm-free" data-booking-id="${escapeHtml(booking.id)}">Confirm booking</button>` : ""}
           <a class="${actionClass}" href="${escapeHtml(detailHref)}">${escapeHtml(actionLabel)}</a>
           ${canCancel ? `<button class="ghost-button" type="button" data-booking-action="cancel" data-booking-id="${escapeHtml(booking.id)}">Cancel</button>` : ""}
         </div>
