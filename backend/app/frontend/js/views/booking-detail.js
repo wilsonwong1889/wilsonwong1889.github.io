@@ -23,7 +23,6 @@ let rescheduleDateValue = "";
 let rescheduleLoading = false;
 let rescheduleStatusMessage = "";
 let rescheduleRequestToken = 0;
-let reviewFormFingerprint = null;
 let autoLoadingPaymentBookingId = null;
 let publicConfigPromise = null;
 let confirmPaymentInFlight = false;
@@ -331,7 +330,7 @@ function getBookingPrimaryTitle(booking) {
     return kind === "staff" ? "Your staff booking is confirmed" : "Your booking is confirmed";
   }
   if (booking.status === "Completed") {
-    return kind === "staff" ? "Review your completed staff booking" : "Review your completed booking";
+    return kind === "staff" ? "Your completed staff booking" : "Your completed booking";
   }
   if (booking.status === "Cancelled") {
     return "This booking was cancelled";
@@ -961,42 +960,6 @@ function renderReschedulePanel(booking) {
       `Move this booking to a different start time while keeping the same ${formatDuration(booking.duration_minutes)} duration.`;
 }
 
-function renderReviewPanel(currentState, booking) {
-  if (!elements.bookingReviewPanel || !elements.bookingReviewForm || !elements.bookingReviewStatus) {
-    return;
-  }
-
-  const canReview =
-    getBookingKind(booking) !== "staff" &&
-    (booking.status === "Completed" || (booking.status === "Paid" && new Date(booking.end_time).getTime() <= Date.now()));
-  toggleHidden(elements.bookingReviewPanel, !canReview);
-  if (!canReview) {
-    reviewFormFingerprint = null;
-    return;
-  }
-
-  const review = currentState.selectedBookingReview;
-  const nextFingerprint = JSON.stringify({
-    bookingId: booking.id,
-    reviewId: review?.id || null,
-    rating: review?.rating || null,
-    comment: review?.comment || null,
-  });
-  if (reviewFormFingerprint !== nextFingerprint) {
-    elements.bookingReviewForm.elements.rating.value = String(review?.rating || 5);
-    elements.bookingReviewForm.elements.comment.value = review?.comment || "";
-    reviewFormFingerprint = nextFingerprint;
-  }
-
-  elements.bookingReviewStatus.textContent = review
-    ? `Last updated ${formatBookingDate(review.updated_at || review.created_at)} by ${review.reviewer_name || "you"}.`
-    : "Leave a review once the session wraps so future guests can judge the room with more confidence.";
-  const submitButton = elements.bookingReviewForm.querySelector("button[type='submit']");
-  if (submitButton) {
-    submitButton.textContent = review ? "Update review" : "Save review";
-  }
-}
-
 function renderStaffAssignments(booking) {
   if (!elements.bookingDetailStaffList) {
     return;
@@ -1431,22 +1394,6 @@ export function initBookingDetailView(actions) {
       setState({ message: error.message });
     }
   });
-  elements.bookingReviewForm?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!state.selectedBooking) {
-      return;
-    }
-
-    try {
-      const review = await api.saveBookingReview(state.selectedBooking.id, {
-        rating: Number(elements.bookingReviewForm.elements.rating.value || 5),
-        comment: elements.bookingReviewForm.elements.comment.value.trim() || null,
-      });
-      setState({ selectedBookingReview: review, message: "Review saved." });
-    } catch (error) {
-      setState({ message: error.message });
-    }
-  });
 }
 
 export function renderBookingDetailView(state) {
@@ -1464,7 +1411,6 @@ export function renderBookingDetailView(state) {
   if (!booking) {
     clearPaymentDeadlineTimer();
     clearPaymentElement();
-    reviewFormFingerprint = null;
     return;
   }
 
@@ -1528,7 +1474,6 @@ export function renderBookingDetailView(state) {
 
   renderPaymentPanel(state, booking);
   renderReschedulePanel(booking);
-  renderReviewPanel(state, booking);
   if (canPay) {
     void ensureStripePaymentSession(booking);
   }

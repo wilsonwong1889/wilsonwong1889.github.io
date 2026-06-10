@@ -3,6 +3,10 @@
   --brand-blue-soft: #f3f7fb;
   --brand-red: #d71920;
   --brand-red-deep: #9f0f16;
+  /* Unified button red — a bit lighter than the brand red. All filled
+     action buttons use this so they're one consistent shade. */
+  --button-red: #e7363c;
+  --button-red-hover: #cf2a30;
   --bg: #ffffff;
   --surface: rgba(255, 255, 255, 0.96);
   --surface-strong: #ffffff;
@@ -3338,8 +3342,8 @@ select {
 
 .primary-button {
   color: white;
-  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
-  box-shadow: 0 12px 26px rgba(215, 25, 32, 0.24);
+  background: var(--button-red);
+  box-shadow: 0 12px 26px rgba(231, 54, 60, 0.24);
 }
 
 .ghost-button,
@@ -3766,7 +3770,7 @@ body[data-page="booking"] .site-acknowledgement {
 }
 
 .reserve-slot-grid .slot-card.is-selected {
-  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  background: var(--button-red);
   border-color: transparent;
 }
 
@@ -7597,9 +7601,9 @@ body[data-page="home"] .home-flow-row strong {
 .reserve-step-item.is-active span,
 .reserve-step-item.is-complete span,
 .booking-checkout-shell.is-checkout-mode .booking-summary-primary-actions .primary-button {
-  background: var(--brand-red);
+  background: var(--button-red);
   color: #ffffff;
-  box-shadow: 0 14px 28px rgba(215, 25, 32, 0.2);
+  box-shadow: 0 14px 28px rgba(231, 54, 60, 0.2);
 }
 
 .nav-link:hover,
@@ -7840,7 +7844,7 @@ body:not([data-page="home"]) .home-top-utility {
   min-height: 36px;
   padding: 6px 18px;
   border-radius: 999px;
-  background: var(--brand-red);
+  background: var(--button-red);
   color: #ffffff;
   box-shadow: none;
   font-weight: 600;
@@ -7851,7 +7855,7 @@ body:not([data-page="home"]) .home-top-utility {
 }
 
 .home-utility-actions .home-header-book-button:hover {
-  background: #b30f15;
+  background: var(--button-red-hover);
   color: #ffffff;
 }
 
@@ -8621,7 +8625,7 @@ body[data-page] .site-header.site-header-public .nav-link:hover {
 }
 
 body[data-page] .site-header.site-header-public .nav-link.is-active {
-  background: var(--brand-red);
+  background: var(--button-red);
   color: #ffffff;
   box-shadow: none;
 }
@@ -8785,9 +8789,9 @@ body[data-page] {
 .account-submit-button,
 .room-catalog-quick-link {
   border-radius: var(--control-radius);
-  background: var(--brand-red);
+  background: var(--button-red);
   color: #ffffff;
-  box-shadow: 0 14px 28px rgba(215, 25, 32, 0.2);
+  box-shadow: 0 14px 28px rgba(231, 54, 60, 0.2);
 }
 
 .primary-button:hover,
@@ -8797,9 +8801,9 @@ body[data-page] {
 .reserve-confirm-button:hover,
 .account-submit-button:hover,
 .room-catalog-quick-link:hover {
-  background: var(--brand-red-deep);
+  background: var(--button-red-hover);
   color: #ffffff;
-  box-shadow: 0 16px 32px rgba(215, 25, 32, 0.26);
+  box-shadow: 0 16px 32px rgba(231, 54, 60, 0.26);
 }
 
 .ghost-button,
@@ -8829,6 +8833,24 @@ body[data-page] {
   background: var(--brand-blue-soft);
   color: var(--brand-blue);
   box-shadow: 0 10px 24px rgba(0, 38, 62, 0.08);
+}
+
+/* Secondary buttons (Learn more / View pricing / Read Help, etc.) read as a
+   soft light red — a pale tint of the button red with red text — so they stay
+   on brand without competing with the solid red primary buttons. */
+.ghost-button,
+.ghost-link {
+  border: 1px solid rgba(231, 54, 60, 0.3);
+  background: rgba(231, 54, 60, 0.1);
+  color: var(--brand-red);
+}
+
+.ghost-button:hover,
+.ghost-link:hover {
+  border-color: rgba(231, 54, 60, 0.45);
+  background: rgba(231, 54, 60, 0.18);
+  color: var(--brand-red);
+  box-shadow: 0 10px 24px rgba(231, 54, 60, 0.16);
 }
 
 input,
@@ -9399,6 +9421,7 @@ body[data-page="pricing"] .pricing-hero-card h1 {
 
 .pricing-cta-panel .ghost-button {
   border-color: rgba(255, 255, 255, 0.36);
+  background: transparent;
   color: #ffffff;
 }
 
@@ -10648,7 +10671,7 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
   padding: 7px 14px;
   border-radius: 10px;
   border: none;
-  background: var(--brand-red);
+  background: var(--button-red);
   color: #ffffff;
   font-size: 0.8rem;
   font-weight: 700;
@@ -10657,7 +10680,7 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
 }
 
 .staff-card-book-btn:hover {
-  background: #b91219;
+  background: var(--button-red-hover);
 }
 
 /* Profile panel (Zone 3) */
@@ -12226,43 +12249,44 @@ button.avail-cal-day:focus-visible {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Home mobile header — mirror the desktop stack on phones (top to bottom):
+   Public mobile header — mirror the desktop stack on phones (top to bottom):
      1. Blue utility bar: contact info + Log in / account / Book Now
      2. Brand row: Arts Marvels logo | centered title | BIPOC logo
-     3. Nav menu bar: horizontal, scrollable, sits between the logos & carousel
-     4. Carousel / hero
-   This is the natural DOM order (no reordering) — same as desktop. Scoped to
-   the home page; logos, buttons, and fonts are trimmed so it fits on phones.
+     3. Nav menu bar: horizontal, scrollable, sits between the logos & content
+   This is the natural DOM order (no reordering) — same as desktop. Applied to
+   every page EXCEPT the account/login splash (which keeps its own overlay
+   header). :not([data-page="account"]) also lifts specificity above the older
+   per-page mobile rules so this wins. Logos/buttons/fonts are trimmed to fit.
    ───────────────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   /* 1 ── Blue utility bar stays at the very top. Surface the login / account /
      Book Now buttons (hidden on mobile by default) and keep the bar compact. */
-  body[data-page="home"] .home-top-utility .home-utility-actions {
+  body[data-page]:not([data-page="account"]) .home-top-utility .home-utility-actions {
     display: flex;
     width: auto;
     flex-wrap: wrap;
     gap: 8px;
     justify-content: flex-start;
   }
-  body[data-page="home"] .home-utility-inner {
+  body[data-page]:not([data-page="account"]) .home-utility-inner {
     gap: 10px;
     padding: 10px 0;
   }
-  body[data-page="home"] .home-contact-list {
+  body[data-page]:not([data-page="account"]) .home-contact-list {
     gap: 6px 14px;
   }
-  body[data-page="home"] .home-contact-item,
-  body[data-page="home"] .home-contact-item span {
+  body[data-page]:not([data-page="account"]) .home-contact-item,
+  body[data-page]:not([data-page="account"]) .home-contact-item span {
     font-size: 0.78rem;
   }
-  body[data-page="home"] .home-utility-actions .ghost-button,
-  body[data-page="home"] .home-utility-actions .header-user-trigger,
-  body[data-page="home"] .home-utility-actions .home-header-book-button {
+  body[data-page]:not([data-page="account"]) .home-utility-actions .ghost-button,
+  body[data-page]:not([data-page="account"]) .home-utility-actions .header-user-trigger,
+  body[data-page]:not([data-page="account"]) .home-utility-actions .home-header-book-button {
     min-height: 34px;
     padding: 6px 14px;
     font-size: 0.8rem;
   }
-  body[data-page="home"] .home-utility-actions .header-user-trigger-label {
+  body[data-page]:not([data-page="account"]) .home-utility-actions .header-user-trigger-label {
     max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -12272,44 +12296,44 @@ button.avail-cal-day:focus-visible {
   /* 2 ── Brand row underneath: logo | centered title | logo (like desktop).
      The title sits in a flexible middle column so it wraps instead of
      overlapping the logos; the logos size to their content on either side. */
-  body[data-page="home"] .site-header-brand-row {
+  body[data-page]:not([data-page="account"]) .site-header-brand-row {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas: "am title bipoc";
     column-gap: 10px;
     row-gap: 0;
     align-items: center;
   }
-  body[data-page="home"] .header-brand-block {
+  body[data-page]:not([data-page="account"]) .header-brand-block {
     grid-area: am;
     justify-self: start;
     align-items: center;
   }
-  body[data-page="home"] .header-hub-title {
+  body[data-page]:not([data-page="account"]) .header-hub-title {
     grid-area: title;
     text-align: center;
     font-size: clamp(0.74rem, 2.6vw, 0.95rem);
     line-height: 1.18;
   }
-  body[data-page="home"] .header-bipoc-logo-link {
+  body[data-page]:not([data-page="account"]) .header-bipoc-logo-link {
     grid-area: bipoc;
     justify-self: end;
     min-height: 0;
   }
-  body[data-page="home"] .header-am-logo {
+  body[data-page]:not([data-page="account"]) .header-am-logo {
     height: 44px;
   }
-  body[data-page="home"] .header-bipoc-side-logo {
+  body[data-page]:not([data-page="account"]) .header-bipoc-side-logo {
     height: 32px;
     max-width: 80px;
   }
 
   /* 3 ── Nav menu: a visible, horizontal, scrollable strip between the brand
-     row and the carousel — no hamburger on home (matches the web version). */
-  body[data-page="home"] .mobile-nav-toggle {
+     row and the content — no hamburger (matches the web version). */
+  body[data-page]:not([data-page="account"]) .mobile-nav-toggle {
     display: none;
   }
-  body[data-page="home"] .site-header.site-header-public .site-nav,
-  body[data-page="home"] .site-header.site-header-public.nav-open .site-nav {
+  body[data-page]:not([data-page="account"]) .site-header.site-header-public .site-nav,
+  body[data-page]:not([data-page="account"]) .site-header.site-header-public.nav-open .site-nav {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
@@ -12323,11 +12347,11 @@ button.avail-cal-day:focus-visible {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
-  body[data-page="home"] .site-header.site-header-public .site-nav::-webkit-scrollbar {
+  body[data-page]:not([data-page="account"]) .site-header.site-header-public .site-nav::-webkit-scrollbar {
     display: none;
   }
-  body[data-page="home"] .site-header.site-header-public .nav-link,
-  body[data-page="home"] .site-header.site-header-public .nav-link.is-active {
+  body[data-page]:not([data-page="account"]) .site-header.site-header-public .nav-link,
+  body[data-page]:not([data-page="account"]) .site-header.site-header-public .nav-link.is-active {
     flex: 0 0 auto;
     min-height: 38px;
     padding: 0 12px;
@@ -12336,7 +12360,7 @@ button.avail-cal-day:focus-visible {
     font-size: 0.84rem;
   }
   /* The drawer-only Log in / Book Now pair isn't needed — they're on the blue bar. */
-  body[data-page="home"] .mobile-nav-cta {
+  body[data-page]:not([data-page="account"]) .mobile-nav-cta {
     display: none;
   }
 }
