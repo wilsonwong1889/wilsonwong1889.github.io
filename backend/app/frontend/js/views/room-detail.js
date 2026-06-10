@@ -34,18 +34,8 @@ function formatCategoryLabel(room) {
   return `${category.charAt(0).toUpperCase()}${category.slice(1)} studio`;
 }
 
-function getReviewTrustCopy(summary) {
-  if (!summary || !summary.review_count) {
-    return ["Reviews pending", "Deposits are non-refundable", "Plan to arrive 10-15 min early"];
-  }
-
-  const averageLabel =
-    typeof summary.average_rating === "number" ? summary.average_rating.toFixed(1) : summary.average_rating;
-  return [
-    `${summary.review_count} review${summary.review_count === 1 ? "" : "s"} · ${averageLabel}/5 average`,
-    "Deposits are non-refundable",
-    "Plan to arrive 10-15 min early",
-  ];
+function getTrustCopy() {
+  return ["Deposits are non-refundable", "Plan to arrive 10-15 min early"];
 }
 
 function renderStaffImage(photoUrl, label) {
@@ -159,41 +149,6 @@ function renderRoomStaffList(room) {
     : '<div class="empty-state">This room does not have extra staff add-ons configured yet.</div>';
 }
 
-function renderRoomReviews(currentState) {
-  if (!elements.roomDetailReviewsSummary || !elements.roomDetailReviewsList) {
-    return;
-  }
-
-  const summary = currentState.selectedRoomReviewSummary;
-  const reviews = currentState.selectedRoomReviews || [];
-  if (!summary || !summary.review_count) {
-    elements.roomDetailReviewsSummary.textContent =
-      "No public reviews yet. Completed sessions can add ratings here once the room has hosted guests.";
-    elements.roomDetailReviewsList.innerHTML =
-      '<div class="empty-state">The first finished session review will appear here.</div>';
-    return;
-  }
-
-  const averageLabel =
-    typeof summary.average_rating === "number" ? summary.average_rating.toFixed(1) : summary.average_rating;
-  elements.roomDetailReviewsSummary.textContent = `${averageLabel}/5 from ${summary.review_count} review${summary.review_count === 1 ? "" : "s"}.`;
-  elements.roomDetailReviewsList.innerHTML = reviews.length
-    ? reviews
-        .map(
-          (review) => `
-            <article class="review-card">
-              <div class="review-card-top">
-                <strong>${escapeHtml(review.reviewer_name || "Guest")}</strong>
-                <span class="pill">${"★".repeat(review.rating)}${"☆".repeat(5 - review.rating)}</span>
-              </div>
-              <p>${escapeHtml(review.comment || "Rated this room without a written comment.")}</p>
-            </article>
-          `,
-        )
-        .join("")
-    : '<div class="empty-state">Review summary is available, but no recent comments were returned.</div>';
-}
-
 export function initRoomDetailView() {}
 
 export function renderRoomDetailView(state) {
@@ -212,10 +167,6 @@ export function renderRoomDetailView(state) {
 
   elements.roomDetailTitle.textContent = room.name;
   elements.roomDetailDescription.textContent = room.description || "No description available yet.";
-  const summary = state.selectedRoomReviewSummary;
-  const reviewCountLabel = summary && summary.review_count
-    ? `${summary.review_count} review${summary.review_count === 1 ? "" : "s"}`
-    : "No public reviews yet";
   const isComingSoon = Boolean(room.coming_soon) && !room.active;
   const STATUS_LABELS = { available: "Available", in_progress: "In Progress", tbc: "TBC" };
   const STATUS_CLASSES = { available: "is-available", in_progress: "is-in-progress", tbc: "is-tbc" };
@@ -230,7 +181,6 @@ export function renderRoomDetailView(state) {
     <span class="pill room-status-pill ${statusClass}">${escapeHtml(statusLabel)}</span>
     <span class="pill">Up to ${escapeHtml(room.capacity || "n/a")} people</span>
     <span class="pill">Min 1 hour</span>
-    <span class="pill">${escapeHtml(reviewCountLabel)}</span>
   `;
   if (elements.roomDetailAmenities) {
     elements.roomDetailAmenities.innerHTML = buildAmenityList(room)
@@ -238,11 +188,10 @@ export function renderRoomDetailView(state) {
       .join("");
   }
   renderRoomStaffList(room);
-  renderRoomReviews(state);
 
   const trustStrip = document.getElementById("room-detail-trust-strip");
   if (trustStrip) {
-    trustStrip.innerHTML = getReviewTrustCopy(summary)
+    trustStrip.innerHTML = getTrustCopy()
       .map((item) => `<span class="pill">${escapeHtml(item)}</span>`)
       .join("");
   }
