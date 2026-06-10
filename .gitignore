@@ -39,3 +39,6 @@ backend/app/frontend/media/rooms/*.jpeg
 backend/app/frontend/media/staff/*.jpg
 backend/app/frontend/media/staff/*.jpeg
 !backend/app/frontend/media/staff/.gitkeep
+
+# Local backup of removed staff media (not for the repo)
+backend/_staff_media_backup/
