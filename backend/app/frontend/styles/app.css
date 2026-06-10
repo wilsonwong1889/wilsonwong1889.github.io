@@ -3770,7 +3770,7 @@ body[data-page="booking"] .site-acknowledgement {
 }
 
 .reserve-slot-grid .slot-card.is-selected {
-  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  background: var(--button-red);
   border-color: transparent;
 }
 
@@ -8625,7 +8625,7 @@ body[data-page] .site-header.site-header-public .nav-link:hover {
 }
 
 body[data-page] .site-header.site-header-public .nav-link.is-active {
-  background: var(--brand-red);
+  background: var(--button-red);
   color: #ffffff;
   box-shadow: none;
 }
