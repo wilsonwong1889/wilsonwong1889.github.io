@@ -3,6 +3,10 @@
   --brand-blue-soft: #f3f7fb;
   --brand-red: #d71920;
   --brand-red-deep: #9f0f16;
+  /* Unified button red — a bit lighter than the brand red. All filled
+     action buttons use this so they're one consistent shade. */
+  --button-red: #e7363c;
+  --button-red-hover: #cf2a30;
   --bg: #ffffff;
   --surface: rgba(255, 255, 255, 0.96);
   --surface-strong: #ffffff;
@@ -3338,8 +3342,8 @@ select {
 
 .primary-button {
   color: white;
-  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
-  box-shadow: 0 12px 26px rgba(215, 25, 32, 0.24);
+  background: var(--button-red);
+  box-shadow: 0 12px 26px rgba(231, 54, 60, 0.24);
 }
 
 .ghost-button,
@@ -7597,9 +7601,9 @@ body[data-page="home"] .home-flow-row strong {
 .reserve-step-item.is-active span,
 .reserve-step-item.is-complete span,
 .booking-checkout-shell.is-checkout-mode .booking-summary-primary-actions .primary-button {
-  background: var(--brand-red);
+  background: var(--button-red);
   color: #ffffff;
-  box-shadow: 0 14px 28px rgba(215, 25, 32, 0.2);
+  box-shadow: 0 14px 28px rgba(231, 54, 60, 0.2);
 }
 
 .nav-link:hover,
@@ -7840,7 +7844,7 @@ body:not([data-page="home"]) .home-top-utility {
   min-height: 36px;
   padding: 6px 18px;
   border-radius: 999px;
-  background: var(--brand-red);
+  background: var(--button-red);
   color: #ffffff;
   box-shadow: none;
   font-weight: 600;
@@ -7851,7 +7855,7 @@ body:not([data-page="home"]) .home-top-utility {
 }
 
 .home-utility-actions .home-header-book-button:hover {
-  background: #b30f15;
+  background: var(--button-red-hover);
   color: #ffffff;
 }
 
@@ -8785,9 +8789,9 @@ body[data-page] {
 .account-submit-button,
 .room-catalog-quick-link {
   border-radius: var(--control-radius);
-  background: var(--brand-red);
+  background: var(--button-red);
   color: #ffffff;
-  box-shadow: 0 14px 28px rgba(215, 25, 32, 0.2);
+  box-shadow: 0 14px 28px rgba(231, 54, 60, 0.2);
 }
 
 .primary-button:hover,
@@ -8797,9 +8801,9 @@ body[data-page] {
 .reserve-confirm-button:hover,
 .account-submit-button:hover,
 .room-catalog-quick-link:hover {
-  background: var(--brand-red-deep);
+  background: var(--button-red-hover);
   color: #ffffff;
-  box-shadow: 0 16px 32px rgba(215, 25, 32, 0.26);
+  box-shadow: 0 16px 32px rgba(231, 54, 60, 0.26);
 }
 
 .ghost-button,
@@ -10648,7 +10652,7 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
   padding: 7px 14px;
   border-radius: 10px;
   border: none;
-  background: var(--brand-red);
+  background: var(--button-red);
   color: #ffffff;
   font-size: 0.8rem;
   font-weight: 700;
@@ -10657,7 +10661,7 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
 }
 
 .staff-card-book-btn:hover {
-  background: #b91219;
+  background: var(--button-red-hover);
 }
 
 /* Profile panel (Zone 3) */
