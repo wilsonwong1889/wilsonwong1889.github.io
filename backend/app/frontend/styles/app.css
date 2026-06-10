@@ -8835,6 +8835,24 @@ body[data-page] {
   box-shadow: 0 10px 24px rgba(0, 38, 62, 0.08);
 }
 
+/* Secondary buttons (Learn more / View pricing / Read Help, etc.) read as a
+   soft light red — a pale tint of the button red with red text — so they stay
+   on brand without competing with the solid red primary buttons. */
+.ghost-button,
+.ghost-link {
+  border: 1px solid rgba(231, 54, 60, 0.3);
+  background: rgba(231, 54, 60, 0.1);
+  color: var(--brand-red);
+}
+
+.ghost-button:hover,
+.ghost-link:hover {
+  border-color: rgba(231, 54, 60, 0.45);
+  background: rgba(231, 54, 60, 0.18);
+  color: var(--brand-red);
+  box-shadow: 0 10px 24px rgba(231, 54, 60, 0.16);
+}
+
 input,
 textarea,
 select {
@@ -9403,6 +9421,7 @@ body[data-page="pricing"] .pricing-hero-card h1 {
 
 .pricing-cta-panel .ghost-button {
   border-color: rgba(255, 255, 255, 0.36);
+  background: transparent;
   color: #ffffff;
 }
 
