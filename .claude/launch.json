@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "-f", "backend/docker-compose.yml", "up", "api"],
+      "port": 8000,
+      "autoPort": false
+    }
+  ]
+}
