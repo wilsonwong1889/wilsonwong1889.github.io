@@ -518,6 +518,15 @@ function getDepositCents(room) {
   return Number(room?.deposit_cents ?? 2000);
 }
 
+// Customers pay the deposit (+ GST on it) up front; the rest of the total is the
+// balance owed later. Mirrors backend upfront_charge_cents (full total when no
+// deposit is configured).
+function getDepositSplit(room, totalCents) {
+  const deposit = getDepositCents(room);
+  const charge = deposit > 0 ? deposit + Math.floor(deposit * 0.05) : totalCents;
+  return { charge, balance: Math.max(0, totalCents - charge) };
+}
+
 function renderSelectedStaffBreakdown(room) {
   const selectedStaff = getSelectedStaffOptions(room);
   if (!selectedStaff.length) {
@@ -870,10 +879,12 @@ function renderSummary(currentState) {
       ${(() => {
         const subtotal = activePromo ? activePromo.final_amount_cents : estimatedTotal;
         const gst = Math.floor(subtotal * 0.05);
-        const deposit = getDepositCents(room);
+        const total = subtotal + gst;
+        const { charge: depositCharge, balance } = getDepositSplit(room, total);
         return `<div class="reserve-price-line"><span>GST (5%)</span><strong>${formatCurrency(gst)}</strong></div>
-      <div class="reserve-price-total"><span>Total</span><strong>${formatCurrency(subtotal + gst)}</strong></div>
-      <div class="reserve-price-line reserve-deposit-note"><span>Deposit due now</span><strong>${formatCurrency(deposit)}</strong></div>`;
+      <div class="reserve-price-total"><span>Total</span><strong>${formatCurrency(total)}</strong></div>
+      <div class="reserve-price-line reserve-deposit-note"><span>Deposit due now</span><strong>${formatCurrency(depositCharge)}</strong></div>
+      ${balance > 0 ? `<div class="reserve-price-line reserve-balance-note"><span>Balance due at studio</span><strong>${formatCurrency(balance)}</strong></div>` : ""}`;
       })()}
       <div class="reserve-helper-copy reserve-helper-copy-strong">Pick an available time to continue.</div>
     `;
@@ -902,10 +913,12 @@ function renderSummary(currentState) {
     ${(() => {
       const subtotal = activePromo ? activePromo.final_amount_cents : estimatedTotal;
       const gst = Math.floor(subtotal * 0.05);
-      const deposit = getDepositCents(room);
+      const total = subtotal + gst;
+      const { charge: depositCharge, balance } = getDepositSplit(room, total);
       return `<div class="reserve-price-line"><span>GST (5%)</span><strong>${formatCurrency(gst)}</strong></div>
-    <div class="reserve-price-total"><span>Total</span><strong>${formatCurrency(subtotal + gst)}</strong></div>
-    <div class="reserve-price-line reserve-deposit-note"><span>Deposit due now</span><strong>${formatCurrency(deposit)}</strong></div>`;
+    <div class="reserve-price-total"><span>Total</span><strong>${formatCurrency(total)}</strong></div>
+    <div class="reserve-price-line reserve-deposit-note"><span>Deposit due now</span><strong>${formatCurrency(depositCharge)}</strong></div>
+    ${balance > 0 ? `<div class="reserve-price-line reserve-balance-note"><span>Balance due at studio</span><strong>${formatCurrency(balance)}</strong></div>` : ""}`;
     })()}
     <div class="reserve-helper-copy reserve-helper-copy-strong">${escapeHtml(formatDateTime(selectedStart))}</div>
   `;

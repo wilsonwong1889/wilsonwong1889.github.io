@@ -46,15 +46,28 @@ function getBookingKind(booking) {
   return String(booking?.booking_kind || booking?.kind || (booking?.staff_profile_id ? "staff" : "room")).toLowerCase();
 }
 
+// Balance still owed after a deposit-only payment (mirrors backend upfront_charge_cents).
+function getDepositBalanceCents(booking) {
+  const deposit = Number(booking?.deposit_amount_cents || 0);
+  if (deposit <= 0) {
+    return 0;
+  }
+  const charge = deposit + Math.floor(deposit * 0.05);
+  return Math.max(0, Number(booking?.price_cents || 0) - charge);
+}
+
 function renderPaymentSuccessSummary(booking) {
   if (!elements.paymentSuccessSummary) {
     return;
   }
 
+  const depositBalance = getDepositBalanceCents(booking);
   const settlementLine = isAdminWaivedPayment(booking)
     ? "Booking confirmed — no payment required."
     : isAdminManualPayment(booking)
       ? "Payment confirmed by our team."
+      : booking.status === "DepositPaid" && depositBalance > 0
+        ? `Deposit paid — ${formatCurrency(depositBalance, booking.currency)} balance due at the studio.`
       : booking.confirmed_at
         ? `Payment confirmed ${formatBookingDate(booking.confirmed_at)}.`
         : "Payment received — confirming your booking now.";
@@ -96,6 +109,12 @@ function getPaymentSuccessCopy(booking, paymentSettled, paymentStillProcessing) 
   }
   if (isAdminManualPayment(booking)) {
     return "Your booking has been confirmed and marked as paid. A confirmation email is on its way.";
+  }
+  if (booking.status === "DepositPaid") {
+    const balance = getDepositBalanceCents(booking);
+    return balance > 0
+      ? `Your deposit is paid and your studio session is confirmed. The remaining ${formatCurrency(balance, booking.currency)} is due at the studio. Check your inbox for a confirmation email and calendar invite.`
+      : "Your deposit is paid and your studio session is confirmed. Check your inbox for a confirmation email and calendar invite.";
   }
   if (paymentSettled) {
     return "Your payment went through and your studio session is confirmed. Check your inbox for a confirmation email and calendar invite.";
@@ -176,10 +195,10 @@ export function renderPaymentSuccessView(state) {
     return;
   }
 
-  const paymentSettled = booking.status === "Paid" || booking.status === "Completed";
+  const paymentSettled = ["Paid", "DepositPaid", "Completed"].includes(booking.status);
   const paymentStillProcessing = booking.status === "PendingPayment";
   const bookingKind = getBookingKind(booking);
-  const canDownloadReceipt = bookingKind !== "staff" && ["Paid", "Completed", "Refunded"].includes(booking.status);
+  const canDownloadReceipt = bookingKind !== "staff" && ["Paid", "DepositPaid", "Completed", "Refunded"].includes(booking.status);
   const title = getPaymentSuccessTitle(booking, paymentSettled, paymentStillProcessing);
   const copy = getPaymentSuccessCopy(booking, paymentSettled, paymentStillProcessing);
   const bookingHref = `/booking?id=${encodeURIComponent(booking.id)}${bookingKind === "staff" ? "&kind=staff" : ""}`;

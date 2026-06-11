@@ -253,11 +253,12 @@ class PaymentTest(BaseAppTest):
             },
         )
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["status"], "Paid")
+        # Online checkout collects the deposit only → DepositPaid, balance owing.
+        self.assertEqual(resp.json()["status"], "DepositPaid")
 
         resp = self.client.get(f"/api/bookings/{pending_booking['id']}", headers=user_headers)
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["status"], "Paid")
+        self.assertEqual(resp.json()["status"], "DepositPaid")
         self.assertIsNotNone(resp.json()["confirmed_at"])
         paid_booking = resp.json()
 
@@ -275,7 +276,7 @@ class PaymentTest(BaseAppTest):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.json()), 1)
-        self.assertEqual(resp.json()[0]["status"], "Paid")
+        self.assertEqual(resp.json()[0]["status"], "DepositPaid")
 
         resp = self.client.post(
             f"/api/bookings/{pending_booking['id']}/cancel",
@@ -560,13 +561,13 @@ class PaymentTest(BaseAppTest):
             storm_statuses.append(body.get("status"))
             duplicate_flags.append(body.get("duplicate", False))
 
-        # Every delivery should report the booking as Paid (idempotent).
-        self.assertTrue(all(status == "Paid" for status in storm_statuses))
+        # Every delivery should report the booking as DepositPaid (idempotent).
+        self.assertTrue(all(status == "DepositPaid" for status in storm_statuses))
         self.assertEqual(sum(1 for is_duplicate in duplicate_flags if is_duplicate), 19)
 
         resp = self.client.get(f"/api/bookings/{booking['id']}", headers=user_headers)
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["status"], "Paid")
+        self.assertEqual(resp.json()["status"], "DepositPaid")
 
         with self.SessionLocal() as db:
             paid_audits = (

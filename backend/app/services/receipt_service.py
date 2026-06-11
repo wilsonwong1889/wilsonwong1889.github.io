@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from math import floor
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -12,7 +13,7 @@ from app.models.room import Room
 from app.staffing import normalize_staff_roles
 
 
-RECEIPT_ALLOWED_STATUSES = {"Paid", "Completed", "Refunded"}
+RECEIPT_ALLOWED_STATUSES = {"Paid", "DepositPaid", "Completed", "Refunded"}
 
 # Brand logos (shared with the website header). Aspect ratios are width / height.
 _MEDIA_DIR = Path(__file__).resolve().parent.parent / "frontend" / "media"
@@ -114,8 +115,21 @@ def _amount_paid_cents(booking: Booking) -> int:
     if booking.status in ("Paid", "Completed", "Refunded"):
         return total
     if booking.deposit_paid and booking.deposit_amount_cents:
-        return booking.deposit_amount_cents
+        # Only the deposit (+ GST on it) has been collected so far.
+        dep = booking.deposit_amount_cents
+        return dep + floor(dep * 0.05)
     return 0
+
+
+_STATUS_LABELS = {
+    "PendingPayment": "Pending Payment",
+    "DepositPaid": "Deposit Paid",
+    "NoShow": "No Show",
+}
+
+
+def _status_label(status: str | None) -> str:
+    return _STATUS_LABELS.get(status or "", status or "Unknown")
 
 
 # ── sections ─────────────────────────────────────────────────────────────────
@@ -145,7 +159,7 @@ def _booking_band(pdf: FPDF, booking: Booking, y: float) -> float:
     _fill(pdf, 0, y, PAGE_W, band_h, *_NAVY)
     _text(pdf, MX, y + 2.6, "RECEIPT", "Helvetica", "B", 13, *_WHITE, w=80)
     code = booking.booking_code or "N/A"
-    status = booking.status or "Unknown"
+    status = _status_label(booking.status)
     _text(pdf, PAGE_W - MX - 100, y + 3.5, f"Booking #{code}   |   {status}", "Helvetica", "", 8.5,
           *_WHITE, w=100, align="R")
     return y + band_h
@@ -170,7 +184,7 @@ def _bill_to(pdf: FPDF, booking: Booking, y: float) -> float:
     _text(pdf, cx, y + 19, "PAYMENT STATUS", "Helvetica", "B", 6.5, *_MID)
     status = booking.status or "Unknown"
     sc = _GREEN if status in ("Paid", "Completed") else _AMBER if status not in ("Cancelled",) else _MID
-    _text(pdf, cx + 34, y + 19, status, "Helvetica", "B", 8.5, *sc)
+    _text(pdf, cx + 34, y + 19, _status_label(status), "Helvetica", "B", 8.5, *sc)
 
     return y + 30
 
@@ -266,11 +280,6 @@ def _payment_summary(pdf: FPDF, booking: Booking, y: float) -> float:
     if balance > 0:
         y = _money_row(pdf, "Balance due", balance, y, color=_AMBER)
     y += 2
-
-    if booking.deposit_amount_cents:
-        dep_label = "Deposit paid" if booking.deposit_paid else "Deposit due"
-        dep_color = _GREEN if booking.deposit_paid else _AMBER
-        y = _money_row(pdf, dep_label, booking.deposit_amount_cents, y, color=dep_color); y += 1
 
     _text(pdf, MX + 2, y, f"Payment method:  {_payment_method(booking)}",
           "Helvetica", "", 7.5, *_MID, w=PAGE_W - 2 * MX - 4)

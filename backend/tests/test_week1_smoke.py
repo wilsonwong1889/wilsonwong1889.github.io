@@ -1960,11 +1960,12 @@ class AppSmokeTest(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(response.json()["status"], "Paid")
+        # Online checkout collects the deposit only → DepositPaid, balance owing.
+        self.assertEqual(response.json()["status"], "DepositPaid")
 
         response = self.client.get(f"/api/bookings/{pending_booking['id']}", headers=user_headers)
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(response.json()["status"], "Paid")
+        self.assertEqual(response.json()["status"], "DepositPaid")
         self.assertIsNotNone(response.json()["confirmed_at"])
         paid_booking = response.json()
 
@@ -1980,7 +1981,7 @@ class AppSmokeTest(unittest.TestCase):
         response = self.client.get("/api/admin/bookings?email=paying-user@example.com", headers=admin_headers)
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(len(response.json()), 1)
-        self.assertEqual(response.json()[0]["status"], "Paid")
+        self.assertEqual(response.json()[0]["status"], "DepositPaid")
 
         response = self.client.post(
             f"/api/bookings/{pending_booking['id']}/cancel",

@@ -1095,6 +1095,27 @@ function renderCheckoutPricingRows(booking, kind, staffTotal) {
     ? ""
     : `<div class="booking-summary-price-line"><span>Service fee</span><strong class="booking-summary-price-free">Free</strong></div>`;
 
+  // Public bookings only collect the deposit (+ GST on it) up front; the rest is
+  // owed later. Mirror backend upfront_charge_cents: fall back to the full total
+  // when no deposit is configured.
+  const depositCents = Number(booking.deposit_amount_cents || 0);
+  const depositChargeCents = depositCents > 0
+    ? depositCents + Math.floor(depositCents * 0.05)
+    : finalTotal;
+  const balanceCents = Math.max(0, finalTotal - depositChargeCents);
+  let settlementRows = "";
+  if (kind !== "staff" && depositCents > 0) {
+    if (booking.status === "PendingPayment") {
+      settlementRows = `
+        <div class="booking-summary-price-line booking-summary-due-now"><span>Deposit due now</span><strong>${formatCurrency(depositChargeCents, booking.currency)}</strong></div>
+        ${balanceCents > 0 ? `<div class="booking-summary-price-line booking-summary-balance"><span>Balance due at studio</span><strong>${formatCurrency(balanceCents, booking.currency)}</strong></div>` : ""}`;
+    } else if (booking.status === "DepositPaid") {
+      settlementRows = `
+        <div class="booking-summary-price-line booking-summary-due-now"><span>Deposit paid</span><strong class="booking-summary-price-free">${formatCurrency(depositChargeCents, booking.currency)}</strong></div>
+        ${balanceCents > 0 ? `<div class="booking-summary-price-line booking-summary-balance"><span>Balance due at studio</span><strong>${formatCurrency(balanceCents, booking.currency)}</strong></div>` : ""}`;
+    }
+  }
+
   if (discountCents > 0) {
     return `
       <div class="booking-summary-price-line"><span>${kind === "staff" ? "Staff session" : "Session subtotal"}</span><strong>${formatCurrency(originalTotal, booking.currency)}</strong></div>
@@ -1102,6 +1123,7 @@ function renderCheckoutPricingRows(booking, kind, staffTotal) {
       ${serviceFeeLine}
       ${gstLine}
       <div class="booking-summary-total"><span>Total</span><strong>${formatCurrency(finalTotal, booking.currency)}</strong></div>
+      ${settlementRows}
     `;
   }
 
@@ -1125,6 +1147,7 @@ function renderCheckoutPricingRows(booking, kind, staffTotal) {
     ${serviceFeeLine}
     ${gstLine}
     <div class="booking-summary-total"><span>Total</span><strong>${formatCurrency(finalTotal, booking.currency)}</strong></div>
+    ${settlementRows}
   `;
 }
 

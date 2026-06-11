@@ -5383,6 +5383,10 @@ textarea.booking-contact-value:focus {
   background: #d4840a;
 }
 
+.admin-legend-dot.status-depositpaid {
+  background: #0d9488;
+}
+
 .admin-legend-dot.status-completed {
   background: #126e3c;
 }
@@ -5634,6 +5638,12 @@ textarea.booking-contact-value:focus {
   box-shadow: 0 10px 22px rgba(212, 132, 10, 0.22);
 }
 
+.admin-schedule-block.status-depositpaid {
+  background: linear-gradient(145deg, rgba(13, 148, 136, 0.94), rgba(9, 102, 94, 0.92));
+  border-color: rgba(13, 148, 136, 0.3);
+  box-shadow: 0 10px 22px rgba(13, 148, 136, 0.22);
+}
+
 .admin-schedule-block.status-cancelled,
 .admin-schedule-block.status-refunded {
   background: linear-gradient(145deg, rgba(190, 30, 30, 0.88), rgba(140, 20, 20, 0.84));
@@ -5690,6 +5700,11 @@ textarea.booking-contact-value:focus {
 .admin-today-row.status-pendingpayment {
   border-left: 3px solid #d4840a;
   background: rgba(255, 251, 240, 0.7);
+}
+
+.admin-today-row.status-depositpaid {
+  border-left: 3px solid #0d9488;
+  background: rgba(240, 253, 250, 0.7);
 }
 
 .admin-today-row.status-cancelled,

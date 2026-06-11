@@ -90,7 +90,7 @@ def serialize_promo_code(db: Session, promo_code: PromoCode) -> dict:
     room_redemptions = (
         db.query(Booking)
         .filter(Booking.promo_code == promo_code.code)
-        .filter(Booking.status.in_(("PendingPayment", "Paid", "Completed", "Refunded")))
+        .filter(Booking.status.in_(("PendingPayment", "Paid", "DepositPaid", "Completed", "Refunded")))
         .count()
     )
     staff_redemptions = (
@@ -171,7 +171,7 @@ def _ensure_promo_code_is_usable(db: Session, promo_code: PromoCode, user: User 
         room_redemptions = (
             db.query(Booking)
             .filter(Booking.promo_code == promo_code.code)
-            .filter(Booking.status.in_(("PendingPayment", "Paid", "Completed", "Refunded")))
+            .filter(Booking.status.in_(("PendingPayment", "Paid", "DepositPaid", "Completed", "Refunded")))
             .count()
         )
         staff_redemptions = (

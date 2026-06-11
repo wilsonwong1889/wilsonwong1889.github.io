@@ -237,7 +237,10 @@ class BookingPaymentE2ETest(unittest.TestCase):
 
         booking_detail = self.client.get(f"/api/bookings/{booking['id']}", headers=headers)
         self.assertEqual(booking_detail.status_code, 200, booking_detail.text)
-        self.assertEqual(booking_detail.json()["status"], "Paid")
+        # Online checkout collects the deposit (+ GST on it) only, so the booking
+        # is confirmed as DepositPaid with the balance of price_cents still owed.
+        self.assertEqual(booking_detail.json()["status"], "DepositPaid")
+        self.assertTrue(booking_detail.json()["deposit_paid"])
         self.assertIsNotNone(booking_detail.json()["confirmed_at"])
 
         with self.SessionLocal() as db:
