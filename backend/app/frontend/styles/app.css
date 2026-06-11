@@ -4300,6 +4300,28 @@ textarea.booking-contact-value:focus {
   border-radius: 14px;
 }
 
+#booking-express-checkout {
+  min-height: 0;
+}
+
+.booking-payment-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #4e6275;
+  font-size: 0.86rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.booking-payment-divider::before,
+.booking-payment-divider::after {
+  content: "";
+  flex: 1 1 0;
+  height: 1px;
+  background: rgba(24, 33, 39, 0.12);
+}
+
 .booking-checkout-summary {
   position: sticky;
   top: 92px;
@@ -7168,7 +7190,8 @@ body[data-page="admin"] .site-acknowledgement {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .booking-checkout-layout {
+  .booking-checkout-layout,
+  .booking-checkout-shell.is-checkout-mode .booking-checkout-layout {
     grid-template-columns: 1fr;
   }
 
