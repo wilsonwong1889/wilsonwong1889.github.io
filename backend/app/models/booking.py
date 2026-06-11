@@ -55,7 +55,7 @@ class Booking(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     __table_args__ = (
         CheckConstraint(
-            "status IN ('PendingPayment','Paid','Completed','Cancelled','Refunded')",
+            "status IN ('PendingPayment','Paid','DepositPaid','Completed','Cancelled','Refunded')",
             name="booking_status_check",
         ),
         UniqueConstraint("payment_intent_id", name="uq_bookings_payment_intent_id"),
@@ -65,7 +65,7 @@ class Booking(Base):
         ExcludeConstraint(
             ("room_id", "="),
             (func.tstzrange(start_time, end_time, "[)"), "&&"),
-            where=text("status IN ('PendingPayment','Paid','Completed')"),
+            where=text("status IN ('PendingPayment','Paid','DepositPaid','Completed')"),
             using="gist",
             name="booking_room_time_excl",
         ),

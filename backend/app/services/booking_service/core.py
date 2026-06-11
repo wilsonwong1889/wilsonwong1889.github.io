@@ -46,7 +46,7 @@ from app.services.reservation_service import ReservationHold, create_hold, relea
 
 # Wednesday=2, Thursday=3, Friday=4, Saturday=5 (Python weekday() values)
 BOOKING_OPEN_WEEKDAYS = frozenset({2, 3, 4, 5})
-ACTIVE_BOOKING_STATUSES = ("PendingPayment", "Paid", "Completed")
+ACTIVE_BOOKING_STATUSES = ("PendingPayment", "Paid", "DepositPaid", "Completed")
 ACTIVE_STAFF_BOOKING_STATUSES = ("Requested", "AcceptedPendingPayment", "PendingPayment", "Paid", "Completed")
 BOOKABLE_ROOM_STATUS = "available"
 
@@ -192,6 +192,18 @@ def calculate_booking_total_cents(
 
 def calculate_tax_cents(subtotal_cents: int) -> int:
     return floor(subtotal_cents * GST_RATE)
+
+
+def upfront_charge_cents(booking: Booking) -> int:
+    """Amount the customer pays now for a public booking: the room deposit plus
+    GST on that deposit. The rest of ``price_cents`` becomes the balance owed.
+
+    If the booking has no deposit configured, fall back to the full total so we
+    never create a $0 charge."""
+    deposit = booking.deposit_amount_cents or 0
+    if deposit <= 0:
+        return booking.price_cents or 0
+    return deposit + calculate_tax_cents(deposit)
 
 
 def get_room_max_booking_duration_minutes(room: Room) -> int:
@@ -501,7 +513,7 @@ def build_booking_feed_item(db: Session, booking: Booking) -> dict:
         "created_at": booking.created_at,
         "updated_at": booking.updated_at,
         "location_label": "Downtown studio district",
-        "can_cancel": booking.status in ("PendingPayment", "Paid"),
+        "can_cancel": booking.status in ("PendingPayment", "Paid", "DepositPaid"),
         "can_pay": booking.status == "PendingPayment",
     }
 
@@ -741,8 +753,10 @@ def _create_booking_record(
         sync_booking_staff_assignment_guards(db, booking)
         db.flush()
         if status == "PendingPayment":
+            # Customers pay only the deposit (+ GST on it) up front; the balance
+            # of price_cents is collected later. See upfront_charge_cents.
             payment_intent = create_payment_intent(
-                amount_cents=booking.price_cents,
+                amount_cents=upfront_charge_cents(booking),
                 currency=booking.currency,
                 booking_id=str(booking.id),
                 user_email=user.email,
@@ -1086,7 +1100,7 @@ def create_audit_log(
 
 
 def cancel_booking(db: Session, booking: Booking, actor: User, reason: Optional[str] = None) -> Booking:
-    if booking.status not in {"PendingPayment", "Paid"}:
+    if booking.status not in {"PendingPayment", "Paid", "DepositPaid"}:
         raise ValueError("Only pending or paid bookings can be cancelled")
     if booking.checked_in_at:
         raise ValueError("Checked-in bookings cannot be cancelled")
@@ -1139,7 +1153,7 @@ def reschedule_booking(
 ) -> Booking:
     if booking.user_id != actor.id and not user_has_admin_access(actor):
         raise ValueError("Booking not found")
-    if booking.status not in {"PendingPayment", "Paid"}:
+    if booking.status not in {"PendingPayment", "Paid", "DepositPaid"}:
         raise ValueError("Only pending or paid bookings can be rescheduled")
     if booking.checked_in_at:
         raise ValueError("Checked-in bookings cannot be rescheduled")
@@ -1489,7 +1503,7 @@ def check_in_booking(db: Session, booking_id: str, admin: User) -> Booking:
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
         raise ValueError("Booking not found")
-    if booking.status != "Paid":
+    if booking.status not in ("Paid", "DepositPaid"):
         raise ValueError("Only paid bookings can be checked in")
     if booking.checked_in_at:
         raise ValueError("Booking is already checked in")
@@ -1521,7 +1535,7 @@ def get_booking_payment_session(db: Session, booking: Booking, user: User) -> di
 
     payment_session = get_payment_intent_session(
         payment_intent_id=booking.payment_intent_id,
-        amount_cents=booking.price_cents,
+        amount_cents=upfront_charge_cents(booking),
         currency=booking.currency,
         booking_id=str(booking.id),
         user_email=user.email,
@@ -1584,7 +1598,7 @@ def get_admin_analytics_summary(db: Session) -> dict:
 
         if booking.status == "PendingPayment":
             summary["pending_bookings"] += 1
-        elif booking.status in {"Paid", "Completed"}:
+        elif booking.status in {"Paid", "DepositPaid", "Completed"}:
             summary["paid_bookings"] += 1
         elif booking.status == "Cancelled":
             summary["cancelled_bookings"] += 1
@@ -1604,10 +1618,18 @@ def get_admin_analytics_summary(db: Session) -> dict:
         )
         room_summary["total_bookings"] += 1
 
+        # Deposit-paid bookings have only collected the deposit (+ GST) so far,
+        # so they contribute that — not the full price — to revenue.
         if booking.status in paid_statuses:
-            summary["gross_revenue_cents"] += booking.price_cents
+            collected = booking.price_cents
+        elif booking.status == "DepositPaid":
+            collected = upfront_charge_cents(booking)
+        else:
+            collected = 0
+        if collected:
+            summary["gross_revenue_cents"] += collected
             room_summary["paid_bookings"] += 1
-            room_summary["revenue_cents"] += booking.price_cents
+            room_summary["revenue_cents"] += collected
 
         for assignment in normalize_staff_roles(booking.staff_assignments):
             assignment_id = assignment["id"]
@@ -1927,7 +1949,9 @@ def get_admin_today_roster(db: Session) -> dict:
             1 for item in today_items if item.get("checked_in_at") or item["status"] == "Completed"
         ),
         "pending_arrival": sum(
-            1 for item in today_items if item["status"] == "Paid" and not item.get("checked_in_at")
+            1
+            for item in today_items
+            if item["status"] in ("Paid", "DepositPaid") and not item.get("checked_in_at")
         ),
         "cancelled": sum(
             1 for item in today_items if item["status"] in {"Cancelled", "Refunded"}
@@ -1947,10 +1971,18 @@ def get_admin_today_roster(db: Session) -> dict:
     }
 
 
-def mark_booking_paid(db: Session, booking: Booking, payment_intent_id: str) -> Booking:
+def mark_booking_paid(
+    db: Session, booking: Booking, payment_intent_id: str, *, as_deposit: bool = False
+) -> Booking:
     if booking.status != "PendingPayment":
         raise ValueError("Only pending bookings can be marked paid")
-    booking.status = "Paid"
+    if as_deposit:
+        # Customer paid the deposit (+ GST) online: booking is confirmed with a
+        # balance still owing. Free/waived and admin-manual payments stay "Paid".
+        booking.status = "DepositPaid"
+        booking.deposit_paid = True
+    else:
+        booking.status = "Paid"
     booking.payment_intent_id = payment_intent_id
     booking.confirmed_at = datetime.now(timezone.utc)
     notification_details = {
@@ -2040,7 +2072,7 @@ def handle_payment_webhook_event(db: Session, event: dict) -> dict:
         raise ValueError("Booking not found for webhook event")
 
     if event_type == "payment_intent.succeeded":
-        if booking.status == "Paid":
+        if booking.status in ("Paid", "DepositPaid"):
             return {"received": True, "booking_id": str(booking.id), "status": booking.status}
         if booking.status != "PendingPayment":
             _auto_refund_stale_payment(db, booking, payment_intent_id)
@@ -2061,7 +2093,7 @@ def handle_payment_webhook_event(db: Session, event: dict) -> dict:
                 "booking_id": str(booking.id),
                 "status": booking.status,
             }
-        updated_booking = mark_booking_paid(db, booking, payment_intent_id)
+        updated_booking = mark_booking_paid(db, booking, payment_intent_id, as_deposit=True)
         return {"received": True, "booking_id": str(updated_booking.id), "status": updated_booking.status}
 
     if event_type == "payment_intent.payment_failed":

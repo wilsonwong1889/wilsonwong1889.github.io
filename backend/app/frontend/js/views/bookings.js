@@ -100,6 +100,16 @@ function getStatusClassName(status) {
     .replace(/[^a-z0-9-]/g, "")}`;
 }
 
+// Balance still owed after a deposit-only payment (mirrors backend upfront_charge_cents).
+function getBalanceOwedCents(booking) {
+  const deposit = Number(booking.deposit_amount_cents || 0);
+  if (booking.status !== "DepositPaid" || deposit <= 0) {
+    return 0;
+  }
+  const charge = deposit + Math.floor(deposit * 0.05);
+  return Math.max(0, Number(booking.price_cents || 0) - charge);
+}
+
 function getBookingSortValue(value) {
   return parseDate(value)?.getTime() || 0;
 }
@@ -259,7 +269,7 @@ function getBookingLifecycleTimeValue(booking) {
   if (booking.status === "PendingPayment") {
     return getBookingSortValue(booking.payment_expires_at || booking.start_time || booking.created_at);
   }
-  if (booking.status === "Paid") {
+  if (booking.status === "Paid" || booking.status === "DepositPaid") {
     return getBookingSortValue(booking.confirmed_at || booking.start_time || booking.created_at);
   }
   if (booking.status === "Completed") {
@@ -280,7 +290,7 @@ function isBookingUpcoming(booking) {
   if (["PendingPayment", "Requested", "AcceptedPendingPayment"].includes(booking.status)) {
     return true;
   }
-  if (booking.status !== "Paid") {
+  if (booking.status !== "Paid" && booking.status !== "DepositPaid") {
     return false;
   }
   return getBookingSortValue(booking.end_time || booking.start_time) > Date.now();
@@ -299,7 +309,7 @@ function getUpcomingBookings(bookings) {
 
 function getHistoryBookings(bookings) {
   return bookings
-    .filter((booking) => !isBookingUpcoming(booking) && ["Paid", "Completed", "Cancelled", "Refunded", "Declined", "Expired"].includes(booking.status))
+    .filter((booking) => !isBookingUpcoming(booking) && ["Paid", "DepositPaid", "Completed", "Cancelled", "Refunded", "Declined", "Expired"].includes(booking.status))
     .sort((left, right) => getBookingLifecycleTimeValue(right) - getBookingLifecycleTimeValue(left));
 }
 
@@ -338,7 +348,7 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
     : formatCurrency(booking.price_cents);
   const actionLabel = pendingPayment ? "Finish payment" : upcoming ? "Manage booking" : "View details";
   const actionClass = pendingPayment ? "primary-button primary-link" : "ghost-button ghost-link";
-  const canCancel = upcoming && ["PendingPayment", "Paid", "Requested", "AcceptedPendingPayment"].includes(booking.status);
+  const canCancel = upcoming && ["PendingPayment", "Paid", "DepositPaid", "Requested", "AcceptedPendingPayment"].includes(booking.status);
   const detailHref = getBookingDetailHref(booking);
   const hasLiveCountdown = pendingPayment && booking.payment_expires_at;
   const supportCopy = pendingPayment
@@ -353,6 +363,10 @@ function renderBookingCard(booking, { upcoming = false } = {}) {
       ? `${bookingTitle} accepted your request — confirm to lock in your session.`
       : isRequested
         ? `Waiting for ${bookingTitle} to accept your request.`
+        : booking.status === "DepositPaid"
+          ? (getBalanceOwedCents(booking) > 0
+              ? `Deposit paid — ${formatCurrency(getBalanceOwedCents(booking))} balance due at the studio`
+              : "Deposit paid")
         : upcoming
           ? "Deposits are non-refundable"
           : booking.status === "Declined"

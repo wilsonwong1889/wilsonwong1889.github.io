@@ -95,3 +95,45 @@ class RoomDepositTest(BaseAppTest):
         )
         self.assertEqual(resp.status_code, 201, resp.text)
         self.assertEqual(resp.json()["deposit_amount_cents"], 3500)
+
+    def test_06_checkout_charges_deposit_plus_gst_not_full_total(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        admin_headers = self._admin_headers()
+        room = self._create_room(admin_headers, name="Deposit Charge Room", deposit_cents=3500)
+        booker = self._register_and_login("deposit-charge@example.com")
+        start = self._future_time(day=2, hour=10).isoformat()
+
+        reservation = self.client.post(
+            "/api/bookings/reservations",
+            headers=booker,
+            json={"room_id": room["id"], "start_time": start, "duration_minutes": 60},
+        )
+        self.assertEqual(reservation.status_code, 201, reservation.text)
+
+        with patch(
+            "app.services.booking_service.core.create_payment_intent",
+            return_value=SimpleNamespace(intent_id="pi_deposit_test", client_secret="sec_test"),
+        ) as mock_intent:
+            resp = self.client.post(
+                "/api/bookings",
+                headers=booker,
+                json={
+                    "room_id": room["id"],
+                    "start_time": start,
+                    "duration_minutes": 60,
+                    "reservation_token": reservation.json()["token"],
+                },
+            )
+
+        self.assertEqual(resp.status_code, 201, resp.text)
+        booking = resp.json()
+        # The full total is recorded (10000 room + 5% GST)...
+        self.assertEqual(booking["price_cents"], 10500)
+        # ...but checkout only charges the deposit (3500) + 5% GST on the deposit (175).
+        mock_intent.assert_called_once()
+        charged = mock_intent.call_args.kwargs["amount_cents"]
+        self.assertEqual(charged, 3675)
+        # The remainder is the balance owed later.
+        self.assertEqual(booking["price_cents"] - charged, 6825)
