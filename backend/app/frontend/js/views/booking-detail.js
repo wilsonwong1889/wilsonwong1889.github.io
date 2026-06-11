@@ -14,6 +14,7 @@ import {
 let stripeClient = null;
 let stripeElements = null;
 let paymentElement = null;
+let expressCheckoutElement = null;
 let activePaymentSession = null;
 let paymentDeadlineTimer = null;
 let reloadBookingDetailAction = null;
@@ -602,6 +603,14 @@ function clearPaymentElement() {
     paymentElement.unmount();
     paymentElement = null;
   }
+  if (expressCheckoutElement) {
+    expressCheckoutElement.unmount();
+    expressCheckoutElement = null;
+  }
+  const expressContainer = document.getElementById("booking-express-checkout");
+  const expressDivider = document.getElementById("booking-express-divider");
+  expressContainer?.classList.add("hidden");
+  expressDivider?.classList.add("hidden");
   stripeElements = null;
   stripeClient = null;
   activePaymentSession = null;
@@ -736,6 +745,82 @@ async function mountStripePaymentForm(session) {
   activePaymentSession = session;
   paymentSessionStatus = "ready";
   paymentSessionMessage = "Secure Stripe payment is ready.";
+  mountExpressCheckout(nextStripeElements);
+}
+
+function mountExpressCheckout(elementsInstance) {
+  const container = document.getElementById("booking-express-checkout");
+  const divider = document.getElementById("booking-express-divider");
+  if (!container) {
+    return;
+  }
+
+  const nextExpressCheckout = elementsInstance.create("expressCheckout", {
+    buttonHeight: 48,
+    paymentMethods: {
+      link: "never",
+      paypal: "never",
+      amazonPay: "never",
+      klarna: "never",
+    },
+  });
+
+  nextExpressCheckout.on("ready", (event) => {
+    // Wallet buttons only render on eligible device/browser combos
+    // (e.g. Apple Pay in Safari with a Wallet card).
+    const hasWallet = Boolean(event?.availablePaymentMethods);
+    toggleHidden(container, !hasWallet);
+    if (divider) {
+      toggleHidden(divider, !hasWallet);
+    }
+  });
+
+  nextExpressCheckout.on("confirm", async () => {
+    if (confirmPaymentInFlight) {
+      return;
+    }
+    confirmPaymentInFlight = true;
+    clearBookingPaymentAlert();
+    try {
+      await performPaymentConfirmation({ skipElementsSubmit: true });
+    } catch (error) {
+      showBookingPaymentAlert(humanizePaymentError(error?.message));
+      setState({ message: error?.message || "Payment confirmation failed" });
+    } finally {
+      confirmPaymentInFlight = false;
+    }
+  });
+
+  nextExpressCheckout.mount(container);
+  expressCheckoutElement = nextExpressCheckout;
+}
+
+async function performPaymentConfirmation({ skipElementsSubmit = false } = {}) {
+  await saveBookingIntakeToNote();
+  await saveBookingContactDetails({ silent: true });
+  setState({ message: "Confirming payment..." });
+  const successUrl = buildPaymentSuccessUrl(
+    activePaymentSession.booking_id,
+    getBookingKind(state.selectedBooking),
+  );
+  if (!skipElementsSubmit) {
+    const submitResult = await stripeElements.submit();
+    if (submitResult?.error) {
+      throw new Error(submitResult.error.message || "Payment details are incomplete");
+    }
+  }
+  const result = await stripeClient.confirmPayment({
+    elements: stripeElements,
+    clientSecret: activePaymentSession.payment_client_secret,
+    confirmParams: {
+      return_url: successUrl.toString(),
+    },
+    redirect: "if_required",
+  });
+  if (result.error) {
+    throw new Error(result.error.message || "Payment confirmation failed");
+  }
+  window.location.assign(successUrl.toString());
 }
 
 async function ensureStripePaymentSession(booking) {
@@ -1228,26 +1313,7 @@ export function initBookingDetailView(actions) {
         payButton.textContent = "Processing payment…";
         clearBookingPaymentAlert();
         try {
-          await saveBookingIntakeToNote();
-          await saveBookingContactDetails({ silent: true });
-          setState({ message: "Confirming payment..." });
-          const successUrl = buildPaymentSuccessUrl(activePaymentSession.booking_id, getBookingKind(state.selectedBooking));
-          const submitResult = await stripeElements.submit();
-          if (submitResult?.error) {
-            throw new Error(submitResult.error.message || "Payment details are incomplete");
-          }
-          const result = await stripeClient.confirmPayment({
-            elements: stripeElements,
-            clientSecret: activePaymentSession.payment_client_secret,
-            confirmParams: {
-              return_url: successUrl.toString(),
-            },
-            redirect: "if_required",
-          });
-          if (result.error) {
-            throw new Error(result.error.message || "Payment confirmation failed");
-          }
-          window.location.assign(successUrl.toString());
+          await performPaymentConfirmation();
           return;
         } catch (error) {
           showBookingPaymentAlert(humanizePaymentError(error?.message));
