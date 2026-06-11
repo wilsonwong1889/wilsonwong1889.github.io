@@ -1106,7 +1106,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
             )
 
             with patch(
-                "app.services.booking_service.get_payment_intent_session",
+                "app.services.booking_service.core.get_payment_intent_session",
                 return_value=SimpleNamespace(
                     intent_id="pi_live_123",
                     client_secret="pi_client_secret_live_123",
@@ -1132,7 +1132,7 @@ class BookingServiceMatrixTest(unittest.TestCase):
             )
 
             with patch(
-                "app.services.booking_service.create_payment_intent",
+                "app.services.booking_service.core.create_payment_intent",
                 side_effect=self.PaymentConfigurationError("Stripe checkout is not configured."),
             ):
                 with self.assertRaises(self.PaymentConfigurationError):
