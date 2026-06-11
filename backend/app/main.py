@@ -128,6 +128,19 @@ if FRONTEND_DIR.exists():
         app.add_api_route(route_path, build_frontend_handler(filename), methods=["GET"], include_in_schema=False)
 
 
+WELL_KNOWN_DIR = Path(__file__).resolve().parent / "well_known"
+
+
+# Stripe fetches this file to verify the domain for Apple Pay (payment method
+# domains). Re-register domains with Stripe after switching to live keys.
+@app.get("/.well-known/apple-developer-merchantid-domain-association", include_in_schema=False)
+def apple_pay_domain_association():
+    return FileResponse(
+        WELL_KNOWN_DIR / "apple-developer-merchantid-domain-association",
+        media_type="application/octet-stream",
+    )
+
+
 @app.get("/metrics", include_in_schema=False)
 def metrics():
     return PlainTextResponse(render_metrics())
