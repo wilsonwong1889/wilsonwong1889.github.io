@@ -3,6 +3,11 @@
 Branded to match the website header / receipt (Arts Marvels × BIPOC Foundation).
 Content is kept in sync with the live FAQ, Pricing, Reserve and Staff pages.
 
+The booking walkthrough uses annotated screenshots of the live site, stored in
+media/guide/ (step1-rooms.png … step9-receipt.png). They were captured with
+Playwright against production and annotated with red arrows/badges; regenerate
+them with scripts/guide_capture.py + scripts/guide_annotate.py if the UI changes.
+
 Usage:
     python -m scripts.build_user_guide            # writes the default output
     python -m scripts.build_user_guide out.pdf    # custom path
@@ -18,6 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fpdf import FPDF
+from PIL import Image  # bundled with fpdf2; used to read screenshot dimensions
 
 # ── paths & brand ─────────────────────────────────────────────────────────────
 _FRONTEND = Path(__file__).resolve().parent.parent / "app" / "frontend"
@@ -26,6 +32,19 @@ _AM_LOGO = _MEDIA / "arts-marvels-logo.png"
 _AM_ASPECT = 2710 / 1447
 _BIPOC_LOGO = _MEDIA / "bipoc-foundation-logo.png"
 _BIPOC_ASPECT = 4500 / 1539
+
+# Annotated screenshots of the live booking site. Regenerate with the Playwright
+# capture + annotate scripts, then copy the PNGs into media/guide/.
+_SHOTS = _MEDIA / "guide"
+_SHOT_ROOMS = _SHOTS / "step1-rooms.png"
+_SHOT_STUDIOS = _SHOTS / "step2-studios.png"
+_SHOT_RESERVE = _SHOTS / "step3-reserve.png"
+_SHOT_DETAILS = _SHOTS / "step4-details.png"
+_SHOT_PAYMENT = _SHOTS / "step5-payment.png"
+_SHOT_STAFF = _SHOTS / "step6-staff.png"
+_SHOT_STAFFBOOK = _SHOTS / "step7-staff-booking.png"
+_SHOT_APPLY = _SHOTS / "step8-apply.png"
+_SHOT_RECEIPT = _SHOTS / "step9-receipt.png"
 
 _DEFAULT_OUT = _MEDIA / "studio-user-guide.pdf"
 
@@ -103,6 +122,79 @@ def _para(pdf: Guide, text: str, *, size: float = 9.5, color=_DARK, style: str =
     pdf.set_x(MX + indent)
     pdf.multi_cell(CONTENT_W - indent, lh, text, align="L")
     _space(pdf, gap)
+
+
+# ── imagery & flow diagrams ───────────────────────────────────────────────────
+def _shot(pdf: Guide, src: Path, caption: str | None = None,
+          width: float = 158.0, max_h: float = 116.0) -> None:
+    """Place a website screenshot centered, preserving aspect ratio.
+
+    Slightly narrower than the text column so two landscape shots pair on a page.
+    """
+    if not src.exists():
+        return
+    iw, ih = Image.open(src).size
+    w = width
+    h = w * ih / iw
+    if h > max_h:
+        h = max_h
+        w = h * iw / ih
+    if pdf.get_y() + h + (9 if caption else 5) > PAGE_H - 18:
+        pdf.add_page()
+    x = MX + (CONTENT_W - w) / 2
+    y = pdf.get_y()
+    pdf.image(str(src), x=x, y=y, w=w, h=h)
+    pdf.set_y(y + h)
+    if caption:
+        _space(pdf, 1.8)
+        _set(pdf, "Helvetica", "I", 7.8, _MID)
+        pdf.set_x(MX)
+        pdf.multi_cell(CONTENT_W, 4, caption, align="C")
+        _space(pdf, 5)
+    else:
+        _space(pdf, 5)
+
+
+def _arrow(pdf: Guide, x: float, yc: float, length: float,
+           color: tuple[int, int, int] = _RED) -> None:
+    """Short horizontal arrow pointing right, vertically centered on `yc`."""
+    pdf.set_draw_color(*color)
+    pdf.set_fill_color(*color)
+    pdf.set_line_width(0.8)
+    pdf.line(x, yc, x + length, yc)
+    head = 2.6
+    pdf.polygon(
+        [(x + length, yc - 1.9), (x + length + head, yc), (x + length, yc + 1.9)],
+        style="F",
+    )
+
+
+def _flow_strip(pdf: Guide, steps: list[str]) -> None:
+    """Horizontal step boxes connected by red arrows (the on-screen booking flow)."""
+    n = len(steps)
+    gap = 9.5
+    box_h = 15.0
+    box_w = (CONTENT_W - gap * (n - 1)) / n
+    if pdf.get_y() > PAGE_H - box_h - 18:
+        pdf.add_page()
+    y = pdf.get_y()
+    x = MX
+    for i, label in enumerate(steps):
+        pdf.set_fill_color(*_NAVY)
+        pdf.rect(x, y, box_w, box_h, "F")
+        pdf.set_fill_color(*_RED)
+        pdf.rect(x, y, box_w, 1.4, "F")  # red cap
+        _set(pdf, "Helvetica", "B", 7, (167, 183, 204))
+        pdf.set_xy(x, y + 3.4)
+        pdf.cell(box_w, 3, f"STEP {i + 1}", align="C")
+        _set(pdf, "Helvetica", "B", 10.5, _WHITE)
+        pdf.set_xy(x, y + 6.7)
+        pdf.cell(box_w, 6, label, align="C")
+        if i < n - 1:
+            _arrow(pdf, x + box_w + 1.6, y + box_h / 2, gap - 4.6)
+        x += box_w + gap
+    pdf.set_y(y + box_h)
+    _space(pdf, 7)
 
 
 def _section_title(pdf: Guide, number: str, title: str) -> None:
@@ -391,27 +483,28 @@ def _content(pdf: Guide) -> None:
     # 2 — Book a room
     _section_title(pdf, "2", "How to Book a Studio Room")
     _para(pdf, "From the home page or the Rooms page, start a booking and follow the "
-               "four-step flow shown along the top of the screen: Date → Time → "
-               "Details → Checkout.", gap=4)
-    _step(pdf, 1, "Choose a room",
-          "Open the Rooms page and pick the space that fits your project. Each room "
-          "page shows the best use case, capacity, photos, and whether engineer "
-          "support is available.")
-    _step(pdf, 2, "Pick a date",
-          "Use the calendar to choose an operating day. Only Wednesday–Saturday show "
-          "open slots; closed days are not selectable.")
-    _step(pdf, 3, "Pick a time",
-          "Select your start time and length in 1-hour blocks — up to 5 hours per day. "
-          "Taken slots are greyed out so you only see what is actually open.")
-    _step(pdf, 4, "Enter your details",
-          "Choose your user category (this sets your hourly rate), then continue as a "
-          "guest with your name and phone number, or sign in. Add any notes for the team.")
-    _step(pdf, 5, "Review the price breakdown",
-          "Confirm the room, date, time, any staff support, and the price — including "
-          "GST and your deposit — before you commit.")
-    _step(pdf, 6, "Check out",
-          "Pay the $20 deposit securely by card, Apple Pay, or Google Pay. You will get "
-          "a booking record and can download a PDF receipt.")
+               "four-step flow shown along the top of the screen:", gap=5)
+    _flow_strip(pdf, ["Date", "Time", "Details", "Checkout"])
+    _para(pdf, "Here is the whole process on the live site. On each screenshot, the red "
+               "number and arrow show exactly what to do next.", size=9, color=_MID, gap=5)
+    _shot(pdf, _SHOT_ROOMS,
+          "1 · On the Rooms page, click any green (open) day. Only Wednesday–Saturday "
+          "have openings — closed days are greyed out.")
+    _shot(pdf, _SHOT_STUDIOS,
+          "2 · Each available studio lists its open start times for that day. Pick the "
+          "studio and the start time you want.")
+    _shot(pdf, _SHOT_RESERVE,
+          "3 · The reserve page tracks your progress along the top: "
+          "Date → Time → Details → Checkout.")
+    _shot(pdf, _SHOT_DETAILS,
+          "4 · Confirm your start time and length (1-hour blocks, up to 5 hours per day), "
+          "then enter your name and phone. Continuing as a guest is fine.")
+    _shot(pdf, _SHOT_PAYMENT,
+          "5 · Review the price breakdown and pay only the deposit now — by card, Apple "
+          "Pay, or Google Pay. The balance is due at the studio.")
+    _shot(pdf, _SHOT_RECEIPT,
+          "6 · Your booking is confirmed, and you can download a PDF receipt like this "
+          "one at any time.")
     _callout(pdf, "Why a phone number?",
              "It gives the team a reliable way to confirm details, reach you if a timing "
              "issue comes up, and help with your booking faster. Guest bookings still "
@@ -452,17 +545,14 @@ def _content(pdf: Guide) -> None:
                "(including the engineer) appears before you confirm.", indent=0)
     _sub(pdf, "Option B — Start from the Staff page")
     _para(pdf, "Open the Staff page, browse the team, and select an engineer to book "
-               "them directly. This uses a four-step flow:", gap=4)
-    _step(pdf, 1, "Staff",
-          "Choose the engineer from the team catalog. You can search by name, skill, "
-          "or role.")
-    _step(pdf, 2, "Time",
-          "Pick a date and an available time block from that engineer's calendar.")
-    _step(pdf, 3, "Details",
-          "Confirm the room, your user category, and contact details — guest or "
-          "signed-in.")
-    _step(pdf, 4, "Checkout",
-          "Review the combined price and pay your $20 deposit to confirm.")
+               "them directly. This uses a four-step flow:", gap=5)
+    _flow_strip(pdf, ["Staff", "Time", "Details", "Checkout"])
+    _shot(pdf, _SHOT_STAFF,
+          "Browse the team on the Staff page — search by name, skill, or role, or filter "
+          "by discipline.")
+    _shot(pdf, _SHOT_STAFFBOOK,
+          "Select an engineer, then pick a date and time from their calendar. The same "
+          "Staff → Time → Details → Checkout flow takes your $20 deposit to confirm.")
     _callout(pdf, "Good to know",
              "A booking with an engineer uses the same $20 deposit as a space-only "
              "booking. The engineer's support is reflected in the session price you "
@@ -493,6 +583,9 @@ def _content(pdf: Guide) -> None:
           "Are you an audio, video, or production engineer who wants to work out of the "
           "Hub? You can apply right from the website. Open the Staff page and scroll to "
           "“Apply to be a studio engineer,” then fill out the short form.")
+    _shot(pdf, _SHOT_APPLY,
+          "The application form on the Staff page. Required fields are marked; the red "
+          "numbers point out the two that matter most.")
     _sub(pdf, "What the form asks — and what to put")
     _form_field(pdf, "Name", True,
                 "Your full name, e.g. “Jane Doe.”")
