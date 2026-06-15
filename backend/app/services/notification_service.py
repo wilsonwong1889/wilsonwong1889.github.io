@@ -156,6 +156,77 @@ def send_email(
     if settings.EMAIL_BACKEND == "disabled":
         return {"backend": "disabled", "status_code": 204, "message": "Email delivery disabled"}
 
+    if settings.EMAIL_BACKEND == "resend":
+        if not settings.RESEND_API_KEY or "placeholder" in settings.RESEND_API_KEY.lower():
+            raise ValueError("RESEND_API_KEY is not configured")
+        payload: dict = {
+            "from": settings.EMAIL_FROM,
+            "to": [to_email],
+            "subject": subject,
+            "text": plain_text_content,
+        }
+        if html_content:
+            payload["html"] = html_content
+        if settings.EMAIL_REPLY_TO:
+            payload["reply_to"] = settings.EMAIL_REPLY_TO
+        if ics_bytes:
+            payload["attachments"] = [{
+                "filename": "studio-booking.ics",
+                "content": base64.b64encode(ics_bytes).decode(),
+                "content_type": "text/calendar",
+            }]
+        request = Request(
+            url="https://api.resend.com/emails",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urlopen(request, timeout=settings.SMTP_TIMEOUT_SECONDS) as response:
+            return {"backend": "resend", "status_code": response.status}
+
+    if settings.EMAIL_BACKEND == "supabase":
+        # POST to the Supabase Edge Function, which holds the Resend key as a
+        # Supabase secret and performs the actual send. We authenticate with a
+        # shared secret header (the function runs with verify_jwt disabled).
+        function_url = settings.SUPABASE_EMAIL_FUNCTION_URL or (
+            f"{settings.SUPABASE_URL.rstrip('/')}/functions/v1/send-email"
+            if settings.SUPABASE_URL
+            else ""
+        )
+        if not function_url:
+            raise ValueError(
+                "SUPABASE_EMAIL_FUNCTION_URL or SUPABASE_URL must be set for the supabase email backend"
+            )
+        if not settings.EMAIL_FUNCTION_SECRET:
+            raise ValueError("EMAIL_FUNCTION_SECRET is not configured")
+        payload = {
+            "from": settings.EMAIL_FROM,
+            "to": to_email,
+            "subject": subject,
+            "text": plain_text_content,
+        }
+        if html_content:
+            payload["html"] = html_content
+        if settings.EMAIL_REPLY_TO:
+            payload["reply_to"] = settings.EMAIL_REPLY_TO
+        if ics_bytes:
+            payload["ics_base64"] = base64.b64encode(ics_bytes).decode()
+            payload["ics_filename"] = "studio-booking.ics"
+        request = Request(
+            url=function_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "x-email-secret": settings.EMAIL_FUNCTION_SECRET,
+            },
+            method="POST",
+        )
+        with urlopen(request, timeout=settings.SMTP_TIMEOUT_SECONDS) as response:
+            return {"backend": "supabase", "status_code": response.status}
+
     if settings.EMAIL_BACKEND == "sendgrid":
         if not settings.SENDGRID_API_KEY or "placeholder" in settings.SENDGRID_API_KEY.lower():
             raise ValueError("SENDGRID_API_KEY is not configured")
