@@ -37,6 +37,12 @@ function inferCategory(room) {
 }
 
 function getFeaturePhoto(room) {
+  // Prefer the room's own uploaded photo (same as the /rooms page); fall back
+  // to a category placeholder only when a room has no image yet.
+  const uploaded = Array.isArray(room.photos) && room.photos.length ? room.photos[0] : null;
+  if (uploaded) {
+    return uploaded;
+  }
   const category = inferCategory(room);
   return REAL_STUDIO_VISUALS[category] || REAL_STUDIO_VISUALS.Recording;
 }
