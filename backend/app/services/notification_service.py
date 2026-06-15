@@ -181,6 +181,9 @@ def send_email(
             headers={
                 "Authorization": f"Bearer {settings.RESEND_API_KEY}",
                 "Content-Type": "application/json",
+                # Resend sits behind Cloudflare, which 403s the default
+                # "Python-urllib" agent (error 1010); send a real UA.
+                "User-Agent": "StudioBooking-Notifier/1.0",
             },
             method="POST",
         )
@@ -221,6 +224,7 @@ def send_email(
             headers={
                 "Content-Type": "application/json",
                 "x-email-secret": settings.EMAIL_FUNCTION_SECRET,
+                "User-Agent": "StudioBooking-Notifier/1.0",
             },
             method="POST",
         )
