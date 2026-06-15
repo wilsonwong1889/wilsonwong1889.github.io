@@ -80,11 +80,6 @@ const EXPECTATIONS = [
 
 const BUILDING_GALLERY = [
   {
-    title: "Full building exterior",
-    image: "/assets/media/studio-building-exterior.jpg",
-    copy: "Use this card for the main exterior shot so guests can recognize the building instantly.",
-  },
-  {
     title: "Lobby and reception",
     image: "/assets/media/studio-building-lobby.jpg",
     copy: "Our front desk and reception — the first stop when you arrive to check in for your booking.",

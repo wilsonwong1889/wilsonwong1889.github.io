@@ -1,11 +1,11 @@
 const AUTOPLAY_INTERVAL_MS = 6000;
 const REAL_STUDIO_VISUALS = {
-  Recording: "/assets/media/studio-hero-premium.png",
-  Podcast: "/assets/media/studio-lounge-premium.png",
-  Photography: "/assets/media/studio-production-premium.png",
-  Film: "/assets/media/studio-production-premium.png",
-  Dance: "/assets/media/studio-production-premium.png",
-  Production: "/assets/media/studio-hero-premium.png",
+  Recording: "/assets/media/placeholder-carousel-3.jpg",
+  Podcast: "/assets/media/placeholder-carousel-2.jpg",
+  Photography: "/assets/media/placeholder-carousel-1.jpg",
+  Film: "/assets/media/studio-photo-editing.jpg",
+  Dance: "/assets/media/studio-conference-room.jpg",
+  Production: "/assets/media/placeholder-carousel-3.jpg",
 };
 
 function formatCurrency(cents) {
