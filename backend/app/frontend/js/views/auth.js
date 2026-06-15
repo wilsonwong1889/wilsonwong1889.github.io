@@ -268,10 +268,21 @@ async function requestJson(path, payload) {
     body: JSON.stringify(payload),
   });
 
+  // Read the body as text first. Some endpoints (e.g. reset-password) return
+  // 204 with a JSON content-type but an EMPTY body; calling response.json() on
+  // an empty body throws a SyntaxError — which Safari/WebKit surfaces as
+  // "The string did not match the expected pattern.", making a successful
+  // password reset look like a failure. Only parse when there's a body.
   const contentType = response.headers.get("content-type") || "";
-  const data = contentType.includes("application/json")
-    ? await response.json()
-    : null;
+  const raw = await response.text();
+  let data = null;
+  if (raw && contentType.includes("application/json")) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = null;
+    }
+  }
 
   if (!response.ok) {
     const detail =
