@@ -185,6 +185,7 @@ export const elements = {
   reserveRoomPhotos: document.getElementById("reserve-room-photos"),
   reserveRoomMeta: document.getElementById("reserve-room-meta"),
   reserveRoomAmenities: document.getElementById("reserve-room-amenities"),
+  reserveRoomMedia: document.getElementById("reserve-room-media"),
   reserveRoomTitle: document.getElementById("reserve-room-title"),
   reserveRoomCopy: document.getElementById("reserve-room-copy"),
   reserveDateInput: document.getElementById("reserve-date-input"),
