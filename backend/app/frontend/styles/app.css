@@ -585,39 +585,6 @@ body[data-auth-pending="true"] .site-header .header-actions > * {
   overflow: hidden;
 }
 
-/* Disclaimer ribbon: makes it unmistakable the hero images are placeholders.
-   Sits above the slides container, full-width, brand red. */
-.home-carousel-placeholder-ribbon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 8px;
-  padding: 8px 14px;
-  border-radius: 10px;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--brand-red, #d71920),
-    var(--brand-red, #d71920) 14px,
-    #b30f15 14px,
-    #b30f15 28px
-  );
-  color: #ffffff;
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-align: center;
-}
-
-@media (max-width: 720px) {
-  .home-carousel-placeholder-ribbon {
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    padding: 6px 10px;
-  }
-}
-
 .home-carousel-slide {
   position: absolute;
   top: 0;

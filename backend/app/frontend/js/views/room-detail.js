@@ -1,11 +1,11 @@
 import { elements } from "../dom.js";
 const ROOM_CATEGORY_VISUALS = {
-  recording: "/assets/media/studio-room-2.png",
-  podcast: "/assets/media/studio-lobby-2.png",
-  production: "/assets/media/studio-room-2.png",
-  photography: "/assets/media/studio-room-2.png",
-  dance: "/assets/media/studio-exterior-2.png",
-  film: "/assets/media/studio-exterior-2.png",
+  recording: "/assets/media/placeholder-carousel-3.jpg",
+  podcast: "/assets/media/placeholder-carousel-2.jpg",
+  production: "/assets/media/placeholder-carousel-3.jpg",
+  photography: "/assets/media/placeholder-carousel-1.jpg",
+  dance: "/assets/media/studio-conference-room.jpg",
+  film: "/assets/media/studio-photo-editing.jpg",
 };
 
 function formatCurrency(cents) {
@@ -89,18 +89,18 @@ function getRoomGallery(room) {
   }
 
   const category = getRoomCategory(room);
-  const fallback = ROOM_CATEGORY_VISUALS[category] || "/assets/media/studio-room-2.png";
+  const fallback = ROOM_CATEGORY_VISUALS[category] || "/assets/media/studio-building-lobby.jpg";
   if (category === "podcast") {
     return [
-      "/assets/media/studio-lobby-2.png",
-      "/assets/media/studio-exterior-2.png",
-      "/assets/media/studio-room-2.png",
+      "/assets/media/placeholder-carousel-2.jpg",
+      "/assets/media/studio-conference-room.jpg",
+      "/assets/media/studio-building-lobby.jpg",
     ];
   }
   return [
     fallback,
-    "/assets/media/studio-lobby-2.png",
-    "/assets/media/studio-exterior-2.png",
+    "/assets/media/placeholder-carousel-2.jpg",
+    "/assets/media/studio-conference-room.jpg",
   ];
 }
 

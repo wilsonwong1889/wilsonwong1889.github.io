@@ -6,12 +6,12 @@ let bookingHistoryTab = "upcoming";
 let bookingHistoryKind = "all";
 
 const BOOKING_VISUALS = {
-  recording: "/assets/media/studio-room-2.png",
-  podcast: "/assets/media/studio-lobby-2.png",
-  photography: "/assets/media/studio-room-2.png",
-  film: "/assets/media/studio-exterior-2.png",
-  dance: "/assets/media/studio-exterior-2.png",
-  production: "/assets/media/studio-room-2.png",
+  recording: "/assets/media/placeholder-carousel-3.jpg",
+  podcast: "/assets/media/placeholder-carousel-2.jpg",
+  photography: "/assets/media/placeholder-carousel-1.jpg",
+  film: "/assets/media/studio-photo-editing.jpg",
+  dance: "/assets/media/studio-conference-room.jpg",
+  production: "/assets/media/placeholder-carousel-3.jpg",
 };
 
 function escapeHtml(value) {
