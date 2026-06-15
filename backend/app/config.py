@@ -13,6 +13,8 @@ SENSITIVE_SETTING_NAMES = (
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
     "SENDGRID_API_KEY",
+    "RESEND_API_KEY",
+    "EMAIL_FUNCTION_SECRET",
     "SMTP_PASSWORD",
     "TWILIO_AUTH_TOKEN",
     "SUITEDASH_SECRET_KEY",
@@ -54,9 +56,15 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_TOLERANCE_SECONDS: int = 300
 
     SENDGRID_API_KEY: str = Field(default="SG.placeholder", repr=False)
+    RESEND_API_KEY: str = Field(default="", repr=False)
     EMAIL_FROM: str = "noreply@yourstudio.com"
     EMAIL_REPLY_TO: str = ""
     EMAIL_BACKEND: str = "console"
+    # Supabase Edge Function email path (EMAIL_BACKEND=supabase). The function
+    # itself calls Resend; the Resend key lives as a Supabase secret, never here.
+    # URL defaults to {SUPABASE_URL}/functions/v1/send-email when left blank.
+    SUPABASE_EMAIL_FUNCTION_URL: str = ""
+    EMAIL_FUNCTION_SECRET: str = Field(default="", repr=False)
     STUDIO_ADMIN_EMAIL: str = "lethsmakeithappen@bipocfoundation.org"
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
@@ -215,8 +223,8 @@ def validate_runtime_configuration(settings_obj: Optional[Settings] = None) -> N
         errors.append("APP_BASE_URL must use https in production")
     if current.PAYMENT_BACKEND != "stripe":
         errors.append("PAYMENT_BACKEND must be stripe in production")
-    if current.EMAIL_BACKEND not in {"disabled", "sendgrid", "smtp"}:
-        errors.append("EMAIL_BACKEND must be disabled, sendgrid, or smtp in production")
+    if current.EMAIL_BACKEND not in {"disabled", "sendgrid", "smtp", "resend", "supabase"}:
+        errors.append("EMAIL_BACKEND must be disabled, sendgrid, smtp, resend, or supabase in production")
     if current.CELERY_TASK_ALWAYS_EAGER and not getattr(current, "ALLOW_INLINE_TASKS_IN_PRODUCTION", False):
         errors.append(
             "CELERY_TASK_ALWAYS_EAGER must be false in production unless ALLOW_INLINE_TASKS_IN_PRODUCTION is true"
@@ -240,6 +248,17 @@ def validate_runtime_configuration(settings_obj: Optional[Settings] = None) -> N
     if current.EMAIL_BACKEND == "sendgrid":
         if _looks_placeholder(current.SENDGRID_API_KEY):
             errors.append("SENDGRID_API_KEY must be configured in production")
+    if current.EMAIL_BACKEND == "resend":
+        if not current.RESEND_API_KEY or _looks_placeholder(current.RESEND_API_KEY):
+            errors.append("RESEND_API_KEY must be configured when EMAIL_BACKEND is resend")
+    if current.EMAIL_BACKEND == "supabase":
+        function_url = current.SUPABASE_EMAIL_FUNCTION_URL or current.SUPABASE_URL
+        if not function_url or _looks_placeholder(function_url):
+            errors.append(
+                "SUPABASE_EMAIL_FUNCTION_URL or SUPABASE_URL must be configured when EMAIL_BACKEND is supabase"
+            )
+        if not current.EMAIL_FUNCTION_SECRET or _looks_placeholder(current.EMAIL_FUNCTION_SECRET):
+            errors.append("EMAIL_FUNCTION_SECRET must be configured when EMAIL_BACKEND is supabase")
     if current.EMAIL_BACKEND == "smtp":
         if not current.SMTP_HOST or _looks_placeholder(current.SMTP_HOST):
             errors.append("SMTP_HOST must be configured when EMAIL_BACKEND is smtp")
