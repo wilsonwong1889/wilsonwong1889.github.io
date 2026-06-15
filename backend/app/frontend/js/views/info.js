@@ -86,13 +86,38 @@ const BUILDING_GALLERY = [
   },
   {
     title: "Lobby and reception",
-    image: "/assets/media/studio-building-lobby.svg",
-    copy: "A good spot for the front desk, entry lounge, or the first impression people see when they walk in.",
+    image: "/assets/media/studio-building-lobby.jpg",
+    copy: "Our front desk and reception — the first stop when you arrive to check in for your booking.",
   },
   {
-    title: "Signature studio room",
-    image: "/assets/media/studio-building-signature-room.svg",
-    copy: "Feature the room or branded corner that best represents the studio atmosphere and lighting.",
+    title: "Podcast studio",
+    image: "/assets/media/studio-building-signature-room.jpg",
+    copy: "A warm, sound-treated room with lounge seating and dual broadcast mics, ready for interviews and conversations.",
+  },
+  {
+    title: "Music production room",
+    image: "/assets/media/placeholder-carousel-3.jpg",
+    copy: "Studio monitors, a mixing desk, and acoustic treatment for recording, producing, and mixing sessions.",
+  },
+  {
+    title: "Conference room",
+    image: "/assets/media/studio-conference-room.jpg",
+    copy: "A boardroom-style space for meetings, workshops, and team sessions with seating for six.",
+  },
+  {
+    title: "Photo editing suite",
+    image: "/assets/media/studio-photo-editing.jpg",
+    copy: "A focused editing station with a large display for reviewing, retouching, and finishing your shoot.",
+  },
+  {
+    title: "Photography backdrop",
+    image: "/assets/media/placeholder-carousel-1.jpg",
+    copy: "A seamless paper backdrop with lighting stands for portraits, product shots, and content creation.",
+  },
+  {
+    title: "Administration office",
+    image: "/assets/media/studio-admin-office.jpg",
+    copy: "Our on-site administration and front-of-house area supporting bookings and day-to-day operations.",
   },
 ];
 
