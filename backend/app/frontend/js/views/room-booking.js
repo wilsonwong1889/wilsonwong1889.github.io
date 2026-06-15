@@ -617,8 +617,14 @@ async function loadDayAvailability(roomId, date) {
 
     dayAvailability = availability;
     const starts = availability.available_start_times || [];
-    selectedStart = starts.find((startTime) => startMatchesPreference(startTime, preferredStartFromUrl)) || starts[0] || "";
-    preferredStartFromUrl = "";
+    // Keep honouring the URL's preferred start on every (re)load of this date.
+    // It's cleared only when the user picks a different time or date (see the
+    // slot/select handlers and selectDate), so a second availability load can't
+    // clobber the exact slot the user clicked on the room card with starts[0].
+    const preferredMatch = preferredStartFromUrl
+      ? starts.find((startTime) => startMatchesPreference(startTime, preferredStartFromUrl))
+      : "";
+    selectedStart = preferredMatch || starts[0] || "";
     syncReserveDurationToSelectedStart(state.selectedRoom);
     clearReservePromoState("");
     setState({ message: "Day availability loaded." });
@@ -1189,6 +1195,7 @@ export function initRoomBookingView() {
 
   elements.reserveStartSelect?.addEventListener("change", () => {
     selectedStart = elements.reserveStartSelect.value;
+    preferredStartFromUrl = "";
     renderSlotList();
     invalidateReservePromoIfNeeded(state.selectedRoom);
     renderReservePromoFeedback();
@@ -1255,6 +1262,7 @@ export function initRoomBookingView() {
       return;
     }
     selectedStart = button.dataset.reserveSlot;
+    preferredStartFromUrl = "";
     elements.reserveStartSelect.value = selectedStart;
     renderSlotList();
     invalidateReservePromoIfNeeded(state.selectedRoom);
