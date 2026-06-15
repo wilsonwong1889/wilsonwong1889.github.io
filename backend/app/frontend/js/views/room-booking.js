@@ -469,6 +469,15 @@ function renderRoomVisuals(room) {
       .map((item) => `<span class="room-detail-amenity">${escapeHtml(item)}</span>`)
       .join("");
   }
+
+  if (elements.reserveRoomMedia) {
+    const gallery = getReserveGallery(room);
+    const primary = gallery[0];
+    const fallback = ROOM_CATEGORY_VISUALS[getRoomCategory(room)] || "/assets/media/studio-building-lobby.jpg";
+    elements.reserveRoomMedia.innerHTML = primary
+      ? `<img class="reserve-room-media-image" src="${escapeHtml(primary)}" alt="${escapeHtml(room.name)}" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(fallback)}';" />`
+      : "";
+  }
 }
 
 function renderTagGroup(label, values = []) {
