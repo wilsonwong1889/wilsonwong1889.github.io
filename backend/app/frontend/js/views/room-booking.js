@@ -636,6 +636,7 @@ async function loadDayAvailability(roomId, date) {
       ? starts.find((startTime) => startMatchesPreference(startTime, preferred))
       : "";
     selectedStart = preferredMatch || starts[0] || "";
+    console.log("[RB-LDA]", JSON.stringify({ date, preferredStartFromUrl, userChoseStart, preferred, preferredMatch, selectedStart, starts }));
     syncReserveDurationToSelectedStart(state.selectedRoom);
     clearReservePromoState("");
     setState({ message: "Day availability loaded." });
@@ -1178,6 +1179,7 @@ async function refreshReserveHold() {
 }
 
 async function selectDate(roomId, date) {
+  console.log("[RB-selectDate]", date, new Error().stack);
   selectedDate = clampBookingDate(date);
   selectedStart = "";
   preferredStartFromUrl = "";
@@ -1554,6 +1556,7 @@ export function renderRoomBookingView(currentState) {
     selectedStart = "";
     preferredStartFromUrl = urlSelection.start || "";
     userChoseStart = false;
+    console.log("[RB-INIT]", JSON.stringify({ selectedDate, preferredStartFromUrl, urlSelection, search: window.location.search }));
     preferredDurationFromUrl = urlSelection.duration;
     selectedStaffIds = new Set();
     clearReservePromoState("");
