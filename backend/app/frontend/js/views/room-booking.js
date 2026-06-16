@@ -50,6 +50,9 @@ let reserveHoldRefreshTimer = null;
 let reserveHoldRefreshToken = 0;
 let preferredStartFromUrl = "";
 let preferredDurationFromUrl = null;
+// True once the user actively picks a start time (slot button or select), so
+// we stop auto-applying the URL's preferred start on subsequent reloads.
+let userChoseStart = false;
 
 function getReserveGuestFields() {
   return document.getElementById("reserve-guest-fields");
@@ -617,12 +620,20 @@ async function loadDayAvailability(roomId, date) {
 
     dayAvailability = availability;
     const starts = availability.available_start_times || [];
-    // Keep honouring the URL's preferred start on every (re)load of this date.
-    // It's cleared only when the user picks a different time or date (see the
-    // slot/select handlers and selectDate), so a second availability load can't
-    // clobber the exact slot the user clicked on the room card with starts[0].
-    const preferredMatch = preferredStartFromUrl
-      ? starts.find((startTime) => startMatchesPreference(startTime, preferredStartFromUrl))
+    // Honour the start time clicked on the room card. We re-read it straight
+    // from the URL (not just the module var) because an interleaved reload
+    // during initial load can clear the module var before this runs — re-deriving
+    // makes the match robust. Applies only until the user actively picks a time,
+    // and only when the loaded day still matches the URL's date.
+    let preferred = preferredStartFromUrl;
+    if (!preferred && !userChoseStart) {
+      const urlSelection = getReserveUrlSelection();
+      if (urlSelection.start && urlSelection.date && urlSelection.date === date) {
+        preferred = urlSelection.start;
+      }
+    }
+    const preferredMatch = preferred
+      ? starts.find((startTime) => startMatchesPreference(startTime, preferred))
       : "";
     selectedStart = preferredMatch || starts[0] || "";
     syncReserveDurationToSelectedStart(state.selectedRoom);
@@ -1196,6 +1207,7 @@ export function initRoomBookingView() {
   elements.reserveStartSelect?.addEventListener("change", () => {
     selectedStart = elements.reserveStartSelect.value;
     preferredStartFromUrl = "";
+    userChoseStart = true;
     renderSlotList();
     invalidateReservePromoIfNeeded(state.selectedRoom);
     renderReservePromoFeedback();
@@ -1263,6 +1275,7 @@ export function initRoomBookingView() {
     }
     selectedStart = button.dataset.reserveSlot;
     preferredStartFromUrl = "";
+    userChoseStart = true;
     elements.reserveStartSelect.value = selectedStart;
     renderSlotList();
     invalidateReservePromoIfNeeded(state.selectedRoom);
@@ -1540,6 +1553,7 @@ export function renderRoomBookingView(currentState) {
     monthAvailability = {};
     selectedStart = "";
     preferredStartFromUrl = urlSelection.start || "";
+    userChoseStart = false;
     preferredDurationFromUrl = urlSelection.duration;
     selectedStaffIds = new Set();
     clearReservePromoState("");
