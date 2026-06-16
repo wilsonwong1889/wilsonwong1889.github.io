@@ -780,6 +780,8 @@ function renderSlotList() {
     .map((startTime) => `<option value="${escapeHtml(startTime)}">${escapeHtml(formatDateTime(startTime))}</option>`)
     .join("");
 
+  const rsBranch = starts.includes(selectedStart) ? "keep" : "reset";
+  console.log("[RB-SLOT]", JSON.stringify({ selectedStart, starts, branch: rsBranch }), new Error().stack);
   if (starts.includes(selectedStart)) {
     elements.reserveStartSelect.value = selectedStart;
   } else {
