@@ -636,7 +636,10 @@ async function loadDayAvailability(roomId, date) {
       ? starts.find((startTime) => startMatchesPreference(startTime, preferred))
       : "";
     selectedStart = preferredMatch || starts[0] || "";
-    console.log("[RB-LDA]", JSON.stringify({ date, preferredStartFromUrl, userChoseStart, preferred, preferredMatch, selectedStart, starts }));
+    // Clear the loading flag BEFORE setState below. setState renders synchronously,
+    // and while loadingDay is true renderSlotList wipes selectedStart (loading branch),
+    // which would clobber the start time we just resolved from the URL.
+    loadingDay = false;
     syncReserveDurationToSelectedStart(state.selectedRoom);
     clearReservePromoState("");
     setState({ message: "Day availability loaded." });
@@ -780,8 +783,6 @@ function renderSlotList() {
     .map((startTime) => `<option value="${escapeHtml(startTime)}">${escapeHtml(formatDateTime(startTime))}</option>`)
     .join("");
 
-  const rsBranch = starts.includes(selectedStart) ? "keep" : "reset";
-  console.log("[RB-SLOT]", JSON.stringify({ selectedStart, starts, branch: rsBranch }), new Error().stack);
   if (starts.includes(selectedStart)) {
     elements.reserveStartSelect.value = selectedStart;
   } else {
@@ -1181,7 +1182,6 @@ async function refreshReserveHold() {
 }
 
 async function selectDate(roomId, date) {
-  console.log("[RB-selectDate]", date, new Error().stack);
   selectedDate = clampBookingDate(date);
   selectedStart = "";
   preferredStartFromUrl = "";
@@ -1558,7 +1558,6 @@ export function renderRoomBookingView(currentState) {
     selectedStart = "";
     preferredStartFromUrl = urlSelection.start || "";
     userChoseStart = false;
-    console.log("[RB-INIT]", JSON.stringify({ selectedDate, preferredStartFromUrl, urlSelection, search: window.location.search }));
     preferredDurationFromUrl = urlSelection.duration;
     selectedStaffIds = new Set();
     clearReservePromoState("");
