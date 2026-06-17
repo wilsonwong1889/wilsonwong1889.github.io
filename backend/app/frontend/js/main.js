@@ -171,16 +171,16 @@ document.querySelectorAll("img").forEach((img) => {
   });
 }());
 
-// Fade-up reveal on scroll (home page). Additive and accessibility-aware:
-// no-op when the user prefers reduced motion, and content can never stay
+// Fade-up reveal on scroll (all public pages). Additive and accessibility-
+// aware: no-op when the user prefers reduced motion, and content can never stay
 // invisible — the hidden state is gated on the .js-reveal class this adds, and
 // a scroll/resize fallback reveals panels even if IntersectionObserver misfires.
+// Targets the top-level .panel sections, which every content page stacks.
 (function initScrollReveal() {
-  if (document.body.getAttribute("data-page") !== "home") return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
   const panels = Array.prototype.slice.call(
-    document.querySelectorAll(".home-layout > .panel"),
+    document.querySelectorAll("main > .panel"),
   );
   if (!panels.length) return;
 
