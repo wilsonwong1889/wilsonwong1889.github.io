@@ -71,11 +71,15 @@
           <a class="nav-link" href="/">Home</a>
           <a class="nav-link" href="/staff">Staff</a>
           <a class="nav-link is-active" href="/rooms" aria-current="page">Rooms</a>
-          <a class="nav-link" href="/pricing">Pricing</a>
-          <a class="nav-link" href="/services">Services</a>
-          <a class="nav-link" href="/programming">Community</a>
-          <a class="nav-link" href="/bookings">Bookings</a>
-          <a class="nav-link" href="/faq">Help</a>
+          <div class="nav-group" data-nav-group>
+            <button type="button" class="nav-link nav-group-trigger" aria-haspopup="true" aria-expanded="false">More<span class="nav-group-caret" aria-hidden="true">&#9662;</span></button>
+            <div class="nav-group-menu" role="menu" aria-label="More navigation">
+              <a class="nav-link nav-group-item" href="/pricing" role="menuitem">Pricing</a>
+              <a class="nav-link nav-group-item" href="/services" role="menuitem">Services</a>
+              <a class="nav-link nav-group-item" href="/programming" role="menuitem">Community</a>
+              <a class="nav-link nav-group-item" href="/faq" role="menuitem">Help</a>
+            </div>
+          </div>
           <div class="mobile-nav-cta">
             <a id="mobile-nav-account-link" class="ghost-button" href="/account">Log in</a>
             <a class="home-header-book-button" href="/rooms">Book Now</a>

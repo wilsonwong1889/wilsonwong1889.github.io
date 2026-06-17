@@ -107,8 +107,46 @@ document.querySelectorAll("img").forEach((img) => {
     if (header.classList.contains("nav-open")) closeNav(); else openNav();
   });
 
-  nav.querySelectorAll(".nav-link").forEach((link) => {
+  // Tapping a real destination link closes the drawer. The "More" trigger is
+  // excluded — it expands/collapses its sub-section instead (see initNavGroup).
+  nav.querySelectorAll(".nav-link:not(.nav-group-trigger)").forEach((link) => {
     link.addEventListener("click", closeNav);
+  });
+}());
+
+// "More" nav dropdown — a desktop popover and a collapsible mobile sub-section,
+// sharing one .is-open class on the group.
+(function initNavGroup() {
+  const group = document.querySelector("[data-nav-group]");
+  if (!group) return;
+  const trigger = group.querySelector(".nav-group-trigger");
+  const menu = group.querySelector(".nav-group-menu");
+  if (!trigger || !menu) return;
+
+  function open() {
+    group.classList.add("is-open");
+    trigger.setAttribute("aria-expanded", "true");
+  }
+  function close() {
+    group.classList.remove("is-open");
+    trigger.setAttribute("aria-expanded", "false");
+  }
+
+  trigger.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (group.classList.contains("is-open")) close(); else open();
+  });
+
+  // Close when clicking anywhere outside the group (desktop popover behavior).
+  document.addEventListener("click", (event) => {
+    if (!group.classList.contains("is-open")) return;
+    if (event.target instanceof Node && group.contains(event.target)) return;
+    close();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") close();
   });
 }());
 

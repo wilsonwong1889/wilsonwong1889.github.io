@@ -8663,6 +8663,76 @@ body[data-page] .site-header.site-header-public .nav-link.is-active::after {
   display: none;
 }
 
+/* "More" nav dropdown — desktop popover. Mobile/drawer overrides live in the
+   max-width:768px block. */
+.nav-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.nav-group-trigger {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.nav-group-caret {
+  font-size: 0.7rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.nav-group.is-open .nav-group-caret {
+  transform: rotate(180deg);
+}
+
+.nav-group-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 196px;
+  padding: 8px;
+  border: 1px solid rgba(0, 38, 62, 0.1);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 18px 34px rgba(0, 38, 62, 0.16);
+}
+
+.nav-group.is-open .nav-group-menu {
+  display: flex;
+}
+
+/* Highlight the trigger when the current page lives inside the dropdown. */
+body[data-page] .site-header.site-header-public .nav-group-trigger.is-active-parent {
+  background: var(--button-red);
+  color: #ffffff;
+}
+
+body[data-page] .site-header.site-header-public .nav-group-trigger.is-active-parent svg {
+  stroke: #ffffff;
+}
+
+/* Items inside the dropdown render as full-width rows, not centered pills. */
+body[data-page] .site-header.site-header-public .nav-group-menu .nav-link,
+body[data-page] .site-header.site-header-public .nav-group-menu .nav-link.is-active {
+  width: 100%;
+  min-height: 42px;
+  justify-content: flex-start;
+  border-radius: 10px;
+}
+
+/* The nav clips overflow on tablet widths; let the open popover escape. */
+body[data-page] .site-header.site-header-public .site-nav:has(.nav-group.is-open) {
+  overflow: visible;
+}
+
 body[data-page] .studio-footer,
 body[data-page] .studio-footer.studio-footer-compact,
 body[data-page] .site-acknowledgement {
@@ -12386,5 +12456,32 @@ button.avail-cal-day:focus-visible {
   /* The drawer-only Log in / Book Now pair isn't needed — they're on the blue bar. */
   body[data-page]:not([data-page="account"]) .mobile-nav-cta {
     display: none;
+  }
+
+  /* "More" dropdown on the horizontal mobile nav strip: stay a popover (the
+     strip is horizontal, so an inline expansion would break the row). Anchor it
+     to the trigger's right edge so it can't run off the small screen, and let
+     it escape the strip's horizontal-scroll clipping while open. */
+  body[data-page] .site-header.site-header-public .nav-group-menu {
+    top: calc(100% + 8px);
+    right: 0;
+    left: auto;
+    transform: none;
+    min-width: 184px;
+  }
+  body[data-page] .site-header.site-header-public .site-nav:has(.nav-group.is-open) {
+    overflow: visible;
+  }
+  /* The mobile header uses `contain: paint` for drawer-repaint perf, which
+     clips the popover. Drop the paint clip (keep layout containment) while the
+     dropdown is open; the header's own z-index keeps it above the content. */
+  body[data-page] .site-header.site-header-public:has(.nav-group.is-open) {
+    contain: layout;
+  }
+  body[data-page] .site-header.site-header-public .nav-group-menu .nav-link,
+  body[data-page] .site-header.site-header-public .nav-group-menu .nav-link.is-active {
+    width: 100%;
+    justify-content: flex-start;
+    border-radius: 10px;
   }
 }
