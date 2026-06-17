@@ -12488,3 +12488,48 @@ button.avail-cal-day:focus-visible {
     border-radius: 10px;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Home page motion & rhythm (additive trial): alternating section
+   backgrounds, fade-up reveal on scroll, and hover lift on cards. Degrades
+   gracefully without JS and honors prefers-reduced-motion.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* 2 — Alternating section backgrounds: tint every other panel so the blocks
+   read as distinct. Wins over the base home panel surface via higher specificity. */
+body[data-page="home"] .home-layout > .panel:nth-of-type(even) {
+  background: rgba(246, 241, 234, 0.94);
+}
+
+/* 1 — Fade-up reveal on scroll. The hidden state only applies once JS adds
+   .js-reveal to <body>, so without JS everything stays visible. Replaces the
+   default rise-in load animation for these panels. */
+@media (prefers-reduced-motion: no-preference) {
+  body[data-page="home"].js-reveal .reveal-on-scroll {
+    animation: none;
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    will-change: opacity, transform;
+  }
+  body[data-page="home"].js-reveal .reveal-on-scroll.is-revealed {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 3 — Hover lift on home cards (pointer devices, motion-allowed only). */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  body[data-page="home"] .home-collab-org-card,
+  body[data-page="home"] .home-studio-card,
+  body[data-page="home"] .room-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  body[data-page="home"] .home-collab-org-card:hover,
+  body[data-page="home"] .home-studio-card:hover,
+  body[data-page="home"] .room-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 44px rgba(0, 38, 62, 0.14);
+    border-color: rgba(215, 25, 32, 0.32);
+  }
+}
