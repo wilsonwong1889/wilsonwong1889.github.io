@@ -12581,33 +12581,45 @@ body[data-page="home"] .home-layout > .panel:nth-of-type(even) {
   background: rgba(246, 241, 234, 0.94);
 }
 
-/* 1 — Fade-up reveal on scroll. The hidden state only applies once JS adds
-   .js-reveal to <body>, so without JS everything stays visible. Replaces the
-   default rise-in load animation for these panels. */
+/* 1 — Fade-up reveal on scroll (all public pages). The hidden state only
+   applies once JS adds .js-reveal to <body>, so without JS everything stays
+   visible. Replaces the default rise-in load animation for revealed panels. */
 @media (prefers-reduced-motion: no-preference) {
-  body[data-page="home"].js-reveal .reveal-on-scroll {
+  .js-reveal .reveal-on-scroll {
     animation: none;
     opacity: 0;
     transform: translateY(22px);
     transition: opacity 0.6s ease, transform 0.6s ease;
     will-change: opacity, transform;
   }
-  body[data-page="home"].js-reveal .reveal-on-scroll.is-revealed {
+  .js-reveal .reveal-on-scroll.is-revealed {
     opacity: 1;
     transform: none;
   }
 }
 
-/* 3 — Hover lift on home cards (pointer devices, motion-allowed only). */
+/* 3 — Hover lift on content cards across pages (pointer + motion-allowed only).
+   rooms (.room-catalog-card) and staff (.staff-card) already have their own
+   hover lift, so they're intentionally not listed here. */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  body[data-page="home"] .home-collab-org-card,
-  body[data-page="home"] .home-studio-card,
-  body[data-page="home"] .room-card {
+  .home-collab-org-card,
+  .home-studio-card,
+  .room-card,
+  .story-card,
+  .detail-card,
+  .community-image-card,
+  .event-card,
+  .pricing-launch-card {
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   }
-  body[data-page="home"] .home-collab-org-card:hover,
-  body[data-page="home"] .home-studio-card:hover,
-  body[data-page="home"] .room-card:hover {
+  .home-collab-org-card:hover,
+  .home-studio-card:hover,
+  .room-card:hover,
+  .story-card:hover,
+  .detail-card:hover,
+  .community-image-card:hover,
+  .event-card:hover,
+  .pricing-launch-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 20px 44px rgba(0, 38, 62, 0.14);
     border-color: rgba(215, 25, 32, 0.32);
