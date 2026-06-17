@@ -27,7 +27,7 @@ import { initStaffDashboardView, renderStaffDashboardView } from "./views/staff-
 import { renderStatus } from "./views/status.js";
 
 const PAGE_DATA_REQUIREMENTS = {
-  home: { rooms: true, bookings: false, admin: false, selectedRoom: false, selectedBooking: false },
+  home: { rooms: true, bookings: false, admin: false, selectedRoom: false, selectedBooking: false, publicStaff: true },
   account: { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: false },
   contact: { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: false, publicStaff: false },
   faq: { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: false, publicStaff: false },

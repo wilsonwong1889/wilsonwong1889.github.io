@@ -248,38 +248,24 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function renderHomeStaffStrip(currentState) {
-  const container = document.getElementById("home-staff-strip");
-  if (!container) return;
-
-  const profiles = (currentState.publicStaffProfiles || [])
-    .filter((p) => p.active !== false)
-    .slice(0, 3);
-
-  if (!profiles.length) {
-    container.innerHTML = "";
-    return;
-  }
-
-  container.innerHTML = profiles
-    .map((p) => {
-      const initials = escapeHtml(
-        (p.name || "?")
-          .split(" ")
-          .map((w) => w[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase(),
-      );
-      const avatar = p.photo_url
-        ? `<img class="home-staff-card-avatar" src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" loading="lazy" />`
-        : `<div class="home-staff-card-avatar home-staff-avatar-fallback">${initials}</div>`;
-      const services = (p.service_types || []).slice(0, 2).map(escapeHtml).join(" · ");
-      const rate = p.booking_rate_cents
-        ? `$${Math.round(p.booking_rate_cents / 100)}/hr`
-        : "";
-      return `
-        <a class="home-staff-card" href="/staff?id=${escapeHtml(p.id)}">
+function staffCardMarkup(p, isActive) {
+  const initials = escapeHtml(
+    (p.name || "?")
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase(),
+  );
+  const avatar = p.photo_url
+    ? `<img class="home-staff-card-avatar" src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" loading="lazy" />`
+    : `<div class="home-staff-card-avatar home-staff-avatar-fallback">${initials}</div>`;
+  const services = (p.service_types || []).slice(0, 2).map(escapeHtml).join(" · ");
+  const rate = p.booking_rate_cents
+    ? `$${Math.round(p.booking_rate_cents / 100)}/hr`
+    : "";
+  return `
+        <a class="home-staff-card${isActive ? " is-active" : ""}" href="/staff?id=${escapeHtml(p.id)}">
           ${avatar}
           <div class="home-staff-card-body">
             <strong class="home-staff-card-name">${escapeHtml(p.name)}</strong>
@@ -287,8 +273,103 @@ function renderHomeStaffStrip(currentState) {
             ${rate ? `<span class="home-staff-card-rate">${rate}</span>` : ""}
           </div>
         </a>`;
-    })
-    .join("");
+}
+
+// One-at-a-time staff carousel. Cycles through every active profile, auto-
+// advancing (unless prefers-reduced-motion), pausing on hover, with prev/next
+// and dots. Wires up listeners + the timer once per profile set.
+function initStaffCarousel(container) {
+  const cards = Array.prototype.slice.call(
+    container.querySelectorAll(".home-staff-card"),
+  );
+  const dots = Array.prototype.slice.call(
+    container.querySelectorAll("[data-staff-dot]"),
+  );
+  if (cards.length < 2) return;
+
+  const carousel = container.querySelector("[data-staff-carousel]");
+  const prev = container.querySelector("[data-staff-prev]");
+  const next = container.querySelector("[data-staff-next]");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let idx = 0;
+
+  function show(n) {
+    idx = (n + cards.length) % cards.length;
+    cards.forEach((c, i) => c.classList.toggle("is-active", i === idx));
+    dots.forEach((d, i) => {
+      d.classList.toggle("is-active", i === idx);
+      d.setAttribute("aria-current", i === idx ? "true" : "false");
+    });
+  }
+  function stop() {
+    if (container._staffTimer) {
+      window.clearInterval(container._staffTimer);
+      container._staffTimer = null;
+    }
+  }
+  function start() {
+    stop();
+    if (reduce) return;
+    container._staffTimer = window.setInterval(() => show(idx + 1), 4500);
+  }
+
+  prev?.addEventListener("click", () => { show(idx - 1); start(); });
+  next?.addEventListener("click", () => { show(idx + 1); start(); });
+  dots.forEach((d, i) => d.addEventListener("click", () => { show(i); start(); }));
+  carousel?.addEventListener("mouseenter", stop);
+  carousel?.addEventListener("mouseleave", start);
+
+  show(0);
+  start();
+}
+
+function renderHomeStaffStrip(currentState) {
+  const container = document.getElementById("home-staff-strip");
+  if (!container) return;
+
+  const profiles = (currentState.publicStaffProfiles || []).filter(
+    (p) => p.active !== false,
+  );
+  const sig = profiles.map((p) => p.id).join(",");
+  // renderHomeView runs on every setState; only rebuild (and re-init the
+  // carousel) when the actual profile set changes.
+  if (container.dataset.staffSig === sig) return;
+  container.dataset.staffSig = sig;
+  if (container._staffTimer) {
+    window.clearInterval(container._staffTimer);
+    container._staffTimer = null;
+  }
+
+  if (!profiles.length) {
+    container.innerHTML = "";
+    return;
+  }
+
+  const slides = profiles.map((p, i) => staffCardMarkup(p, i === 0)).join("");
+  const controls =
+    profiles.length > 1
+      ? `
+        <div class="home-staff-controls">
+          <button class="home-staff-nav" type="button" data-staff-prev aria-label="Previous team member">&#8249;</button>
+          <div class="home-staff-dots">
+            ${profiles
+              .map(
+                (_, i) =>
+                  `<button class="home-staff-dot${i === 0 ? " is-active" : ""}" type="button" data-staff-dot aria-current="${i === 0 ? "true" : "false"}" aria-label="Show team member ${i + 1}"></button>`,
+              )
+              .join("")}
+          </div>
+          <button class="home-staff-nav" type="button" data-staff-next aria-label="Next team member">&#8250;</button>
+        </div>`
+      : "";
+
+  container.innerHTML = `
+    <div class="home-staff-carousel" data-staff-carousel>
+      <div class="home-staff-track">${slides}</div>
+      ${controls}
+    </div>`;
+
+  initStaffCarousel(container);
 }
 
 export function renderHomeView(currentState) {
