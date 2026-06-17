@@ -248,29 +248,25 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+const STAFF_PLACEHOLDER_IMAGE = "/assets/media/staff/staff-placeholder.svg";
+
 function staffCardMarkup(p, isActive) {
-  const initials = escapeHtml(
-    (p.name || "?")
-      .split(" ")
-      .map((w) => w[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase(),
-  );
-  const avatar = p.photo_url
-    ? `<img class="home-staff-card-avatar" src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" loading="lazy" />`
-    : `<div class="home-staff-card-avatar home-staff-avatar-fallback">${initials}</div>`;
+  const name = escapeHtml(p.name || "Team member");
+  const photoSrc = escapeHtml(p.photo_url || STAFF_PLACEHOLDER_IMAGE);
   const services = (p.service_types || []).slice(0, 2).map(escapeHtml).join(" · ");
   const rate = p.booking_rate_cents
     ? `$${Math.round(p.booking_rate_cents / 100)}/hr`
     : "";
   return `
         <a class="home-staff-card${isActive ? " is-active" : ""}" href="/staff?id=${escapeHtml(p.id)}">
-          ${avatar}
-          <div class="home-staff-card-body">
-            <strong class="home-staff-card-name">${escapeHtml(p.name)}</strong>
-            ${services ? `<span class="home-staff-card-role">${services}</span>` : ""}
-            ${rate ? `<span class="home-staff-card-rate">${rate}</span>` : ""}
+          <div class="home-staff-card-photo">
+            <img class="home-staff-card-img" src="${photoSrc}" alt="${name}" loading="lazy" onerror="this.onerror=null;this.src='${STAFF_PLACEHOLDER_IMAGE}';" />
+            <div class="home-staff-card-scrim"></div>
+            <div class="home-staff-card-info">
+              <strong class="home-staff-card-name">${name}</strong>
+              ${services ? `<span class="home-staff-card-role">${services}</span>` : ""}
+              ${rate ? `<span class="home-staff-card-rate">${rate}</span>` : ""}
+            </div>
           </div>
         </a>`;
 }
