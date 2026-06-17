@@ -11199,9 +11199,80 @@ button.is-disabled {
 
 /* Home page — staff showcase strip */
 .home-staff-strip {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem;
+  margin-top: 1.5rem;
+}
+
+/* One-at-a-time staff carousel inside the team panel. */
+.home-staff-carousel {
+  position: relative;
+  max-width: 480px;
+  margin: 0 auto;
+}
+.home-staff-track {
+  position: relative;
+}
+.home-staff-track .home-staff-card {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}
+.home-staff-track .home-staff-card.is-active {
+  position: relative;
+  opacity: 1;
+  pointer-events: auto;
+}
+.home-staff-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+.home-staff-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.home-staff-nav:hover {
+  border-color: var(--brand-red);
+  background: rgba(215, 25, 32, 0.06);
+}
+.home-staff-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.home-staff-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 38, 62, 0.2);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.home-staff-dot.is-active {
+  background: var(--brand-red);
+  transform: scale(1.25);
+}
+.home-team-cta {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.5rem;
 }
 
 /* ── Public availability calendar ─────────────────────────────────────── */
