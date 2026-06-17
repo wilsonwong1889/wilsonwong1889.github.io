@@ -171,6 +171,63 @@ document.querySelectorAll("img").forEach((img) => {
   });
 }());
 
+// Fade-up reveal on scroll (home page). Additive and accessibility-aware:
+// no-op when the user prefers reduced motion, and content can never stay
+// invisible — the hidden state is gated on the .js-reveal class this adds, and
+// a scroll/resize fallback reveals panels even if IntersectionObserver misfires.
+(function initScrollReveal() {
+  if (document.body.getAttribute("data-page") !== "home") return;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  const panels = Array.prototype.slice.call(
+    document.querySelectorAll(".home-layout > .panel"),
+  );
+  if (!panels.length) return;
+
+  document.body.classList.add("js-reveal");
+  panels.forEach((panel) => panel.classList.add("reveal-on-scroll"));
+
+  let pending = panels.slice();
+  let io = null;
+
+  function teardown() {
+    window.removeEventListener("scroll", onScroll);
+    window.removeEventListener("resize", onScroll);
+    if (io) io.disconnect();
+  }
+  function reveal(panel) {
+    panel.classList.add("is-revealed");
+    pending = pending.filter((p) => p !== panel);
+    if (!pending.length) teardown();
+  }
+  function checkAll() {
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    pending.slice().forEach((panel) => {
+      const rect = panel.getBoundingClientRect();
+      if (rect.top < vh * 0.92 && rect.bottom > 0) reveal(panel);
+    });
+  }
+  function onScroll() {
+    checkAll();
+  }
+
+  if ("IntersectionObserver" in window) {
+    io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) reveal(entry.target);
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+    );
+    panels.forEach((panel) => io.observe(panel));
+  }
+
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll);
+  checkAll();
+}());
+
 function getBookingKind(booking, fallbackKind = null) {
   const explicitKind = String(booking?.booking_kind || booking?.kind || fallbackKind || "").toLowerCase();
   if (explicitKind === "staff") {
