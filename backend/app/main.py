@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from app.config import (
@@ -78,6 +79,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Compress text responses (HTML/CSS/JS/JSON). app.css alone is ~250 KB and
+# drops to ~40 KB gzipped — a big cut to egress bandwidth on every request.
+app.add_middleware(GZipMiddleware, minimum_size=600)
+
 
 @app.middleware("http")
 async def request_metrics_middleware(request, call_next):
@@ -99,27 +104,43 @@ app.include_router(staff_application.router)
 app.include_router(admin.router)
 app.include_router(webhooks.router)
 
-class NoCacheStaticFiles(StaticFiles):
+# Long-lived media (images/fonts/video/pdf) rarely change and aren't versioned;
+# cache them hard so repeat visits don't re-download. Code (css/js) is cached
+# briefly so a browsing session reuses one copy while staying fresh; bump the
+# ?v= query string in the HTML when shipping a css/js change for instant busting.
+# Everything still carries ETag/Last-Modified, so post-expiry requests revalidate
+# to a tiny 304 instead of re-sending the body.
+_MEDIA_SUFFIXES = (
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico",
+    ".woff", ".woff2", ".ttf", ".otf",
+    ".mp4", ".mov", ".webm", ".pdf", ".heic",
+)
+_CODE_SUFFIXES = (".css", ".js", ".mjs")
+
+
+class CachingStaticFiles(StaticFiles):
     async def get_response(self, path, scope):
         response = await super().get_response(path, scope)
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        lowered = path.lower()
+        if lowered.endswith(_MEDIA_SUFFIXES):
+            response.headers["Cache-Control"] = "public, max-age=2592000"
+        elif lowered.endswith(_CODE_SUFFIXES):
+            response.headers["Cache-Control"] = "public, max-age=3600"
+        else:
+            response.headers["Cache-Control"] = "public, max-age=300"
         return response
 
 
 if FRONTEND_DIR.exists():
-    app.mount("/assets", NoCacheStaticFiles(directory=FRONTEND_DIR), name="frontend-assets")
+    app.mount("/assets", CachingStaticFiles(directory=FRONTEND_DIR), name="frontend-assets")
 
     def build_frontend_handler(filename: str):
         def handler():
+            # HTML must revalidate so updated ?v= asset references are picked up;
+            # ETag means unchanged pages come back as a tiny 304, not a re-send.
             return FileResponse(
                 FRONTEND_DIR / filename,
-                headers={
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Pragma": "no-cache",
-                    "Expires": "0",
-                },
+                headers={"Cache-Control": "no-cache"},
             )
 
         return handler
