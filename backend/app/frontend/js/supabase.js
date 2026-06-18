@@ -42,10 +42,20 @@ export async function startGoogleSignIn() {
     throw new Error("Google sign-in is not configured yet.");
   }
 
+  // Carry a same-site ?next= target through the OAuth round-trip. The "create
+  // your engineer profile" flow links to /account?...&next=/staff-dashboard;
+  // without this, Google's redirect drops next and finalizeGoogleSignIn sends
+  // people to the home page / regular profile instead of the staff dashboard.
+  let redirectTo = `${window.location.origin}/account?mode=login&google_auth=1`;
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (next && next.startsWith("/") && !next.startsWith("//")) {
+    redirectTo += `&next=${encodeURIComponent(next)}`;
+  }
+
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${window.location.origin}/account?mode=login&google_auth=1`,
+      redirectTo,
     },
   });
 
