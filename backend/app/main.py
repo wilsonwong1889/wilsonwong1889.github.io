@@ -1,7 +1,7 @@
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
@@ -170,6 +170,27 @@ if FRONTEND_DIR.exists():
     for route_path, filename in FRONTEND_PAGES.items():
         app.add_api_route(route_path, build_frontend_handler(filename), methods=["GET"], include_in_schema=False)
 
+    # Browsers and crawlers auto-request these at the site root; without routes
+    # they 404 on every visit. Serve the brand icons with a long cache.
+    _ICON_ROUTES = {
+        "/favicon.ico": ("media/favicon.ico", "image/x-icon"),
+        "/apple-touch-icon.png": ("media/apple-touch-icon.png", "image/png"),
+        "/apple-touch-icon-precomposed.png": ("media/apple-touch-icon.png", "image/png"),
+    }
+
+    def build_icon_handler(rel_path: str, media_type: str):
+        def handler():
+            return FileResponse(
+                FRONTEND_DIR / rel_path,
+                media_type=media_type,
+                headers={"Cache-Control": "public, max-age=2592000"},
+            )
+
+        return handler
+
+    for route_path, (rel_path, media_type) in _ICON_ROUTES.items():
+        app.add_api_route(route_path, build_icon_handler(rel_path, media_type), methods=["GET"], include_in_schema=False)
+
 
 WELL_KNOWN_DIR = Path(__file__).resolve().parent / "well_known"
 
@@ -190,7 +211,10 @@ def metrics():
 
 
 @app.get("/api/public/config", include_in_schema=False)
-def public_config():
+def public_config(response: Response):
+    # Rarely changes; let the browser/CDN reuse it across page navigations
+    # instead of re-fetching on every load.
+    response.headers["Cache-Control"] = "public, max-age=300"
     stripe_status = get_stripe_configuration_status()
     supabase_status = get_supabase_configuration_status()
     return {
@@ -212,7 +236,8 @@ def public_config():
 
 
 @app.get("/api/public/features", include_in_schema=False)
-def public_features():
+def public_features(response: Response):
+    response.headers["Cache-Control"] = "public, max-age=300"
     return {
         "opening_discount": settings.FEATURE_OPENING_DISCOUNT,
         "venture_tiers": settings.FEATURE_VENTURE_TIERS,
