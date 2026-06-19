@@ -116,18 +116,40 @@ _MEDIA_SUFFIXES = (
     ".mp4", ".mov", ".webm", ".pdf", ".heic",
 )
 _CODE_SUFFIXES = (".css", ".js", ".mjs")
+_WEBP_SOURCE_SUFFIXES = (".jpg", ".jpeg", ".png")
 
 
 class CachingStaticFiles(StaticFiles):
     async def get_response(self, path, scope):
-        response = await super().get_response(path, scope)
         lowered = path.lower()
+        serve_path = path
+        served_webp = False
+        # Transparent WebP: if the browser accepts webp and a "<file>.webp" twin
+        # exists, serve that instead — same URL, ~60% fewer bytes. The original
+        # JPEG/PNG stays the fallback for clients that don't send image/webp.
+        if lowered.endswith(_WEBP_SOURCE_SUFFIXES):
+            accept = b""
+            for key, value in scope.get("headers", []):
+                if key == b"accept":
+                    accept = value
+                    break
+            if b"image/webp" in accept and (Path(self.directory) / f"{path}.webp").is_file():
+                serve_path = f"{path}.webp"
+                served_webp = True
+
+        response = await super().get_response(serve_path, scope)
+
         if lowered.endswith(_MEDIA_SUFFIXES):
             response.headers["Cache-Control"] = "public, max-age=2592000"
         elif lowered.endswith(_CODE_SUFFIXES):
             response.headers["Cache-Control"] = "public, max-age=3600"
         else:
             response.headers["Cache-Control"] = "public, max-age=300"
+
+        if served_webp:
+            response.headers["Content-Type"] = "image/webp"
+            # Shared caches must key on Accept so non-webp clients still get JPEG.
+            response.headers["Vary"] = "Accept"
         return response
 
 
