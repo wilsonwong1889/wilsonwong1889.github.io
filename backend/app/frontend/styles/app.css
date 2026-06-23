@@ -9902,6 +9902,19 @@ body[data-page="account"] #account-profile-panel {
   margin-bottom: 28px;
   border-bottom: 1px solid rgba(24, 33, 39, 0.1);
 }
+/* Wide photo band between the intro and the partner cards (Option C). */
+.home-collab-media {
+  margin: 0 0 28px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.home-collab-media img {
+  display: block;
+  width: 100%;
+  height: clamp(200px, 34vw, 340px);
+  object-fit: cover;
+  object-position: center;
+}
 .home-collective-title {
   margin: 0;
   max-width: 720px;
