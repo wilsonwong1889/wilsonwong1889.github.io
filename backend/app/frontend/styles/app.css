@@ -12517,7 +12517,10 @@ button.avail-cal-day:focus-visible {
     align-items: center;
     justify-content: flex-start;
     gap: 2px;
-    width: calc(100% - 24px);
+    /* Hug the pills and center the bar so there's no dead space to the right of
+       "More". max-width keeps it scrollable if it ever outgrows the screen. */
+    width: fit-content;
+    max-width: calc(100% - 24px);
     margin: 0 auto 10px;
     padding: 5px;
     overflow-x: auto;
