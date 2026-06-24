@@ -12641,3 +12641,11 @@ body[data-page="home"] .home-layout > .panel:nth-of-type(even) {
     border-color: rgba(215, 25, 32, 0.32);
   }
 }
+
+/* Room cards: keep every card font one colour (navy) — drop the red accent on
+   the podcast title and the rating so room text reads consistently. */
+.room-catalog-title.is-accent,
+.room-catalog-rating,
+.room-catalog-rating span[aria-hidden="true"] {
+  color: #00263e;
+}
