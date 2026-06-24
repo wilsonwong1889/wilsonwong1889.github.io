@@ -9915,6 +9915,16 @@ body[data-page="account"] #account-profile-panel {
   object-fit: cover;
   object-position: center;
 }
+/* On wider screens the band is much wider than tall, so a centered crop slices
+   through the group's heads. Give it more height and anchor the crop to the top
+   so every head stays in frame (the floor is cropped instead). Mobile keeps the
+   gentler centered crop above. */
+@media (min-width: 769px) {
+  .home-collab-media img {
+    height: clamp(420px, 44vw, 560px);
+    object-position: center top;
+  }
+}
 .home-collective-title {
   margin: 0;
   max-width: 720px;
