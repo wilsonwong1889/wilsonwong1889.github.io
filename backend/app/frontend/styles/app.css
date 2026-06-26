@@ -9921,7 +9921,7 @@ body[data-page="account"] #account-profile-panel {
    gentler centered crop above. */
 @media (min-width: 769px) {
   .home-collab-media img {
-    height: clamp(420px, 44vw, 560px);
+    height: clamp(560px, 52vw, 760px);
     object-position: center top;
   }
 }
