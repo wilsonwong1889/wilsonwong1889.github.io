@@ -36,16 +36,16 @@ with sync_playwright() as p:
         log("save", e)
     pg.wait_for_timeout(2500)
     try:
-        pg.wait_for_selector("iframe[src*='js.stripe.com']", timeout=20000, state="attached")
+        pg.wait_for_selector("#booking-payment-element iframe, iframe[src*='paypal.com']", timeout=20000, state="attached")
     except Exception as e:
-        log("stripe", e)
+        log("paypal", e)
     pg.wait_for_timeout(7000)
 
-    # Position so the card form + sidebar Pay now are both in frame
-    pay_now = pg.locator("button:has-text('Pay now')").first
-    pay_now.scroll_into_view_if_needed()
+    # Position so the PayPal buttons and sidebar deposit summary are both in frame
+    payment_buttons = pg.locator("#booking-payment-element").first
+    payment_buttons.scroll_into_view_if_needed()
     pg.wait_for_timeout(800)
-    # nudge up a little so the card form above is also visible
+    # nudge up a little so the payment details above are also visible
     pg.mouse.wheel(0, -260)
     pg.wait_for_timeout(800)
 
@@ -53,23 +53,23 @@ with sync_playwright() as p:
 
     anns = []
     try:
-        b = bb(pay_now)
-        if b: anns.append({"n": 5, "label": "Pay your deposit to confirm", "bbox": b, "side": "left"})
+        b = bb(payment_buttons)
+        if b: anns.append({"n": 5, "label": "Pay your deposit with PayPal", "bbox": b, "side": "left"})
     except Exception as e:
-        log("paynow bbox", e)
+        log("payment buttons bbox", e)
     try:
         dep = pg.locator("text=Deposit due now").first
         b = bb(dep)
         if b: anns.append({"n": None, "label": "Only the deposit is due now", "bbox": b, "side": "left"})
     except Exception as e:
         log("dep bbox", e)
-    # card iframe (Payment element)
+    # PayPal checkout buttons, including eligible wallets such as Apple Pay.
     try:
-        cardframe = pg.locator("iframe[title*='payment' i], iframe[name^='__privateStripeFrame']").first
-        b = bb(cardframe)
-        if b: anns.append({"n": None, "label": "Enter card - or use Apple Pay / Google Pay", "bbox": b, "side": "top"})
+        paypal_frame = pg.locator("#booking-payment-element iframe, iframe[src*='paypal.com']").first
+        b = bb(paypal_frame)
+        if b: anns.append({"n": None, "label": "Use PayPal or eligible wallets like Apple Pay", "bbox": b, "side": "top"})
     except Exception as e:
-        log("card bbox", e)
+        log("paypal bbox", e)
 
     meta = json.load(open(f"{OUT}/meta.json"))
     meta["an_05_payment"] = {"size": [2800, 2000], "anns": anns}

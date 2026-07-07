@@ -29,6 +29,7 @@ from app.services.booking_service import (
     BookingConflictError,
     DailyBookingLimitError,
     cancel_booking,
+    capture_booking_payment,
     create_or_update_booking_review,
     create_booking,
     create_guest_booking,
@@ -293,6 +294,24 @@ def get_my_booking_payment_session(
         raise HTTPException(status_code=404, detail="Booking not found")
     try:
         return get_booking_payment_session(db, booking, current_user)
+    except PaymentBackendError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except PaymentSessionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/bookings/{booking_id}/capture-payment")
+def capture_my_booking_payment(
+    booking_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(booking_rate_limit),
+):
+    booking = get_booking_for_user(db, booking_id, current_user)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    try:
+        return capture_booking_payment(db, booking, current_user)
     except PaymentBackendError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except PaymentSessionError as exc:

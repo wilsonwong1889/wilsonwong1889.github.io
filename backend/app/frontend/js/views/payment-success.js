@@ -152,7 +152,7 @@ function renderPollTimeoutEscalation() {
   banner.className = "payment-success-escalation";
   banner.innerHTML = `
     <strong>Still confirming.</strong>
-    <span>Stripe or our worker may be running slow. Try refreshing — if your booking still isn't confirmed in a few minutes, call <a href="tel:+14033938857">403-393-8857</a> and quote your booking code.</span>
+    <span>PayPal or our worker may be running slow. Try refreshing — if your booking still isn't confirmed in a few minutes, call <a href="tel:+14033938857">403-393-8857</a> and quote your booking code.</span>
   `;
   const actions = elements.paymentSuccessActions;
   actions.parentNode?.insertBefore(banner, actions);

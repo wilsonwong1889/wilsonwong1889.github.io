@@ -35,6 +35,7 @@ from app.schemas.review import ReviewCreate
 from app.staffing import normalize_staff_roles, resolve_staff_assignments, staff_add_on_total_cents
 from app.services.payment_service import (
     PaymentBackendError,
+    capture_payment_order,
     create_payment_intent,
     create_refund,
     get_payment_intent_session,
@@ -1264,9 +1265,10 @@ def process_refund(db: Session, booking_id: str, admin: User, payload: RefundCre
     if payload.amount_cents <= 0 or payload.amount_cents > booking.price_cents:
         raise ValueError("Refund amount must be between 1 and the booking total")
 
-    stripe_refund_id = create_refund(
+    provider_refund_id = create_refund(
         payment_intent_id=booking.payment_intent_id,
         amount_cents=payload.amount_cents,
+        currency=booking.currency,
     )
     refund = Refund(
         booking_id=booking.id,
@@ -1274,7 +1276,7 @@ def process_refund(db: Session, booking_id: str, admin: User, payload: RefundCre
         amount_cents=payload.amount_cents,
         currency=booking.currency,
         status="Processed",
-        stripe_refund_id=stripe_refund_id,
+        stripe_refund_id=provider_refund_id,
         reason=payload.reason,
     )
     full_refund = booking.status == "Cancelled" or payload.amount_cents == booking.price_cents
@@ -1452,7 +1454,7 @@ def waive_booking_payment(db: Session, booking_id: str, admin: User) -> Booking:
     if not booking:
         raise ValueError("Booking not found")
     if booking.status != "PendingPayment":
-        raise ValueError("Only pending bookings can skip Stripe payment")
+        raise ValueError("Only pending bookings can skip payment")
 
     original_price_cents = booking.price_cents
     booking.price_cents = 0
@@ -1466,7 +1468,7 @@ def waive_booking_payment(db: Session, booking_id: str, admin: User) -> Booking:
         details={
             "original_price_cents": original_price_cents,
             "payment_intent_id": waived_payment_reference,
-            "reason": "Admin skipped Stripe payment for testing",
+            "reason": "Admin skipped payment for testing",
         },
     )
     db.commit()
@@ -1491,7 +1493,7 @@ def mark_booking_paid_manually(db: Session, booking_id: str, admin: User) -> Boo
         details={
             "price_cents": booking.price_cents,
             "payment_intent_id": manual_payment_reference,
-            "reason": "Admin marked booking paid without Stripe checkout",
+            "reason": "Admin marked booking paid without online checkout",
         },
     )
     db.commit()
@@ -1551,10 +1553,49 @@ def get_booking_payment_session(db: Session, booking: Booking, user: User) -> di
         "payment_intent_id": payment_session.intent_id,
         "payment_client_secret": payment_session.client_secret,
         "payment_backend": settings.PAYMENT_BACKEND,
-        "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY or None,
+        "paypal_client_id": settings.PAYPAL_CLIENT_ID or None,
         "payment_expires_at": booking.payment_expires_at,
         "payment_seconds_remaining": booking.payment_seconds_remaining,
     }
+
+
+def capture_booking_payment(db: Session, booking: Booking, user: User) -> dict:
+    """Capture the customer's approved PayPal order, then run the payment
+    through the same idempotent webhook pipeline the async PayPal webhook uses."""
+    if booking.user_id != user.id and not user_has_admin_access(user):
+        raise PaymentSessionError("Booking not found")
+    if booking.status in ("Paid", "DepositPaid", "Completed"):
+        return {"received": True, "booking_id": str(booking.id), "status": booking.status}
+    if expire_pending_booking(db, booking):
+        db.commit()
+        raise PaymentSessionError("Payment window expired for this booking")
+    if booking.status != "PendingPayment":
+        raise PaymentSessionError("Payment is only available for pending bookings")
+    if not booking.payment_intent_id:
+        raise PaymentSessionError("No payment order exists for this booking yet")
+
+    capture = capture_payment_order(booking.payment_intent_id)
+    if capture.status != "COMPLETED":
+        raise PaymentSessionError(
+            f"PayPal did not complete the payment (status: {capture.status or 'unknown'}). Please try again."
+        )
+
+    event = {
+        "id": f"paypal_capture_{capture.capture_id or uuid4().hex}",
+        "type": "payment_intent.succeeded",
+        "data": {
+            "object": {
+                "id": booking.payment_intent_id,
+                "metadata": {"booking_id": str(booking.id)},
+            }
+        },
+    }
+    from app.tasks import process_webhook_event_task
+
+    result = process_webhook_event_task.delay(event)
+    if getattr(result, "inline", False) or settings.CELERY_TASK_ALWAYS_EAGER:
+        return result.get()
+    return {"queued": True, "booking_id": str(booking.id), "capture_status": capture.status}
 
 
 def get_admin_analytics_summary(db: Session) -> dict:
@@ -2037,6 +2078,7 @@ def _auto_refund_stale_payment(
             refund_id = create_refund(
                 payment_intent_id=payment_intent_id,
                 amount_cents=refund_amount,
+                currency=booking.currency,
             )
         except Exception as exc:  # noqa: BLE001
             failure_message = str(exc)
@@ -2142,8 +2184,7 @@ def handle_payment_webhook_event(db: Session, event: dict) -> dict:
         full_refund = (
             booking.status == "Cancelled"
             or amount_refunded is None
-            or charge_amount is None
-            or int(amount_refunded) >= int(charge_amount)
+            or (charge_amount is not None and int(amount_refunded) >= int(charge_amount))
             or int(amount_refunded) >= int(booking.price_cents or 0)
         )
         if full_refund:

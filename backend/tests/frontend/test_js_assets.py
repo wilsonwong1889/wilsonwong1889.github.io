@@ -75,11 +75,13 @@ class JsAssetTest(BaseAppTest):
     def test_04_booking_detail_js(self) -> None:
         resp = self.client.get("/assets/js/views/booking-detail.js")
         self.assertEqual(resp.status_code, 200)
-        self.assertIn("stripeElements.submit()", resp.text)
+        self.assertIn("paypal.Buttons({", resp.text)
+        self.assertIn("https://www.paypal.com/sdk/js", resp.text)
+        self.assertIn("api.captureBookingPayment(session.booking_id)", resp.text)
         self.assertIn('new URL("/payment-success"', resp.text)
         self.assertIn("bookingReschedulePanel", resp.text)
         self.assertIn("api.rescheduleBooking(state.selectedBooking.id", resp.text)
-        self.assertIn("Skip Stripe as admin", resp.text)
+        self.assertIn("Skip payment as admin", resp.text)
         self.assertIn('api.adminWaiveBookingPayment(button.dataset.bookingId)', resp.text)
         self.assertIn("Mark paid manually as admin", resp.text)
         self.assertIn('api.adminMarkBookingPaid(button.dataset.bookingId)', resp.text)
@@ -141,7 +143,7 @@ class JsAssetTest(BaseAppTest):
         self.assertIn("const updatedAccount = await api.adminUpdateUserRole", resp.text)
         self.assertIn("...updatedAccount", resp.text)
         self.assertIn("Process a ${amountLabel} refund? This changes payment records.", resp.text)
-        self.assertIn('window.confirm("Skip Stripe and mark this booking free?")', resp.text)
+        self.assertIn('window.confirm("Skip payment and mark this booking free?")', resp.text)
         self.assertIn('window.confirm("Mark this booking paid manually?")', resp.text)
         self.assertIn(
             'window.confirm(`Delete ${profileName}? This will also remove the profile from any rooms.`)',

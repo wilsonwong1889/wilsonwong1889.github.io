@@ -240,16 +240,16 @@ class PaymentTest(BaseAppTest):
         payload = json.dumps(event)
         timestamp = str(int(time.time()))
         signature = hmac.new(
-            settings.STRIPE_WEBHOOK_SECRET.encode("utf-8"),
+            settings.SECRET_KEY.encode("utf-8"),
             f"{timestamp}.{payload}".encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
         resp = self.client.post(
-            "/api/webhooks/stripe",
+            "/api/webhooks/paypal",
             data=payload,
             headers={
                 "Content-Type": "application/json",
-                "Stripe-Signature": f"t={timestamp},v1={signature}",
+                "Webhook-Signature": f"t={timestamp},v1={signature}",
             },
         )
         self.assertEqual(resp.status_code, 200)
@@ -293,9 +293,9 @@ class PaymentTest(BaseAppTest):
 
         refund_context = (
             __import__("unittest.mock", fromlist=["patch"]).patch(
-                "app.services.booking_service.create_refund", return_value="re_smoke_stripe"
+                "app.services.booking_service.create_refund", return_value="re_smoke_paypal"
             )
-            if settings.PAYMENT_BACKEND == "stripe"
+            if settings.PAYMENT_BACKEND == "paypal"
             else nullcontext()
         )
 
@@ -539,7 +539,7 @@ class PaymentTest(BaseAppTest):
         payload = json.dumps(event)
         timestamp = str(int(time.time()))
         signature = hmac.new(
-            settings.STRIPE_WEBHOOK_SECRET.encode("utf-8"),
+            settings.SECRET_KEY.encode("utf-8"),
             f"{timestamp}.{payload}".encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
@@ -549,11 +549,11 @@ class PaymentTest(BaseAppTest):
         storm_statuses = []
         for _ in range(20):
             r = self.client.post(
-                "/api/webhooks/stripe",
+                "/api/webhooks/paypal",
                 data=payload,
                 headers={
                     "Content-Type": "application/json",
-                    "Stripe-Signature": f"t={timestamp},v1={signature}",
+                    "Webhook-Signature": f"t={timestamp},v1={signature}",
                 },
             )
             self.assertEqual(r.status_code, 200)

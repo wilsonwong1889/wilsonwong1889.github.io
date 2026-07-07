@@ -127,13 +127,13 @@ class BookingPaymentE2ETest(unittest.TestCase):
         payload = json.dumps(event)
         timestamp = str(int(time.time()))
         signature = hmac.new(
-            settings.STRIPE_WEBHOOK_SECRET.encode("utf-8"),
+            settings.SECRET_KEY.encode("utf-8"),
             f"{timestamp}.{payload}".encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
         return payload, {
             "Content-Type": "application/json",
-            "Stripe-Signature": f"t={timestamp},v1={signature}",
+            "Webhook-Signature": f"t={timestamp},v1={signature}",
         }
 
     def test_10_booking_payment_confirmation_e2e(self) -> None:
@@ -229,7 +229,7 @@ class BookingPaymentE2ETest(unittest.TestCase):
         }
         payload, webhook_headers = self._sign_webhook(event)
         webhook_response = self.client.post(
-            "/api/webhooks/stripe",
+            "/api/webhooks/paypal",
             data=payload,
             headers=webhook_headers,
         )
@@ -307,7 +307,7 @@ class BookingPaymentE2ETest(unittest.TestCase):
         }
         payload, webhook_headers = self._sign_webhook(event)
         webhook_response = self.client.post(
-            "/api/webhooks/stripe",
+            "/api/webhooks/paypal",
             data=payload,
             headers=webhook_headers,
         )

@@ -99,14 +99,14 @@ with sync_playwright() as p:
             log("save", e)
         pg.wait_for_timeout(2000)
         try:
-            pg.wait_for_selector("iframe[src*='js.stripe.com']", timeout=20000)
+            pg.wait_for_selector("#booking-payment-element iframe, iframe[src*='paypal.com']", timeout=20000)
         except Exception as e:
-            log("stripe wait", e)
+            log("paypal wait", e)
         pg.wait_for_timeout(6000)
         pg.evaluate("[...document.querySelectorAll('*')].find(e=>/Payment details/.test(e.textContent)&&e.children.length<3)?.scrollIntoView({block:'start'})")
         pg.wait_for_timeout(1500)
         shot(pg, "an_05_payment", [
-            {"n": 5, "sel": "button", "has_text": "Pay now", "label": "Pay the deposit to confirm", "side": "left"},
+            {"n": 5, "sel": "#booking-payment-element", "label": "Pay the deposit with PayPal or an eligible wallet", "side": "left"},
         ])
     except Exception as e:
         log("STEP5 FAIL", e)

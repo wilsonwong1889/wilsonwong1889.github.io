@@ -11,10 +11,8 @@ import {
   state,
 } from "../state.js";
 
-let stripeClient = null;
-let stripeElements = null;
-let paymentElement = null;
-let expressCheckoutElement = null;
+let paypalButtonsInstance = null;
+let paypalSdkPromise = null;
 let activePaymentSession = null;
 let paymentDeadlineTimer = null;
 let reloadBookingDetailAction = null;
@@ -25,7 +23,6 @@ let rescheduleLoading = false;
 let rescheduleStatusMessage = "";
 let rescheduleRequestToken = 0;
 let autoLoadingPaymentBookingId = null;
-let publicConfigPromise = null;
 let confirmPaymentInFlight = false;
 
 function getBookingPaymentAlertEl() {
@@ -599,20 +596,18 @@ async function saveBookingContactDetails({ silent = false } = {}) {
 }
 
 function clearPaymentElement() {
-  if (paymentElement) {
-    paymentElement.unmount();
-    paymentElement = null;
+  if (paypalButtonsInstance) {
+    try {
+      paypalButtonsInstance.close();
+    } catch (error) {
+      // The buttons may already be detached; nothing to clean up.
+    }
+    paypalButtonsInstance = null;
   }
-  if (expressCheckoutElement) {
-    expressCheckoutElement.unmount();
-    expressCheckoutElement = null;
+  const paymentContainer = elements.bookingPaymentElement || document.getElementById("booking-payment-element");
+  if (paymentContainer) {
+    paymentContainer.innerHTML = "";
   }
-  const expressContainer = document.getElementById("booking-express-checkout");
-  const expressDivider = document.getElementById("booking-express-divider");
-  expressContainer?.classList.add("hidden");
-  expressDivider?.classList.add("hidden");
-  stripeElements = null;
-  stripeClient = null;
   activePaymentSession = null;
   autoLoadingPaymentBookingId = null;
   paymentSessionStatus = "idle";
@@ -653,19 +648,13 @@ function renderPaymentDeadline(booking) {
     deadlineElement.className = "panel-copy payment-deadline-note";
 
     const PAY_DISABLE_BUFFER_SECONDS = 30;
-    const payButton = document.querySelector(
-      '[data-booking-detail-action="confirm-payment"]',
-    );
-    if (payButton) {
-      if (secondsRemaining > 0 && secondsRemaining <= PAY_DISABLE_BUFFER_SECONDS) {
-        payButton.disabled = true;
-        payButton.dataset.expiryLocked = "true";
-        payButton.textContent = "Refreshing booking…";
-      } else if (payButton.dataset.expiryLocked === "true" && secondsRemaining > PAY_DISABLE_BUFFER_SECONDS) {
-        delete payButton.dataset.expiryLocked;
-        payButton.disabled = false;
-        payButton.textContent = booking.price_cents > 0 ? "Pay now" : "Confirm booking";
-      }
+    // Lock the PayPal buttons just before the hold expires so the customer
+    // doesn't start a payment that lands after the booking is released.
+    const paymentContainer = elements.bookingPaymentElement || document.getElementById("booking-payment-element");
+    if (paymentContainer) {
+      const shouldLock = secondsRemaining > 0 && secondsRemaining <= PAY_DISABLE_BUFFER_SECONDS;
+      paymentContainer.style.pointerEvents = shouldLock ? "none" : "";
+      paymentContainer.style.opacity = shouldLock ? "0.5" : "";
     }
 
     if (secondsRemaining <= PAY_DISABLE_BUFFER_SECONDS) {
@@ -697,133 +686,101 @@ async function loadPaymentSession(booking) {
   return session;
 }
 
-async function getPublicConfig() {
-  if (!publicConfigPromise) {
-    publicConfigPromise = fetch("/api/public/config").then(async (response) => {
-      if (!response.ok) {
-        throw new Error("Unable to load payment configuration");
-      }
-      return response.json();
+function loadPayPalSdk(clientId, currency) {
+  if (window.paypal?.Buttons) {
+    return Promise.resolve(window.paypal);
+  }
+  if (!paypalSdkPromise) {
+    paypalSdkPromise = new Promise((resolve, reject) => {
+      const params = new URLSearchParams({
+        "client-id": clientId,
+        currency: (currency || "CAD").toUpperCase(),
+        intent: "capture",
+      });
+      const script = document.createElement("script");
+      script.src = `https://www.paypal.com/sdk/js?${params.toString()}`;
+      script.onload = () => {
+        if (window.paypal?.Buttons) {
+          resolve(window.paypal);
+        } else {
+          reject(new Error("PayPal checkout failed to initialise"));
+        }
+      };
+      script.onerror = () => {
+        paypalSdkPromise = null;
+        reject(new Error("Unable to load PayPal checkout. Check your connection and try again."));
+      };
+      document.head.appendChild(script);
     });
   }
-  return publicConfigPromise;
+  return paypalSdkPromise;
 }
 
-async function mountStripePaymentForm(session) {
+async function capturePaymentAfterApproval(session) {
+  // Persist intake + contact details first so the confirmation email and the
+  // staff notification carry them, mirroring the old pre-payment save.
+  await saveBookingIntakeToNote().catch(() => {});
+  await saveBookingContactDetails({ silent: true }).catch(() => {});
+  setState({ message: "Confirming payment..." });
+  const kind = getBookingKind(state.selectedBooking);
+  if (kind === "staff") {
+    await api.captureStaffBookingPayment(session.booking_id);
+  } else {
+    await api.captureBookingPayment(session.booking_id);
+  }
+  window.location.assign(buildPaymentSuccessUrl(session.booking_id, kind).toString());
+}
+
+async function mountPayPalButtons(session, booking) {
   const paymentContainer = elements.bookingPaymentElement || document.getElementById("booking-payment-element");
   if (!paymentContainer) {
     throw new Error("Payment form container is missing");
   }
-  if (!session?.payment_client_secret) {
-    throw new Error("Stripe payment client secret is missing");
+  if (!session?.payment_intent_id) {
+    throw new Error("PayPal order is missing for this booking");
   }
-  if (!window.Stripe || !session.stripe_publishable_key) {
-    throw new Error("Stripe publishable key is not configured");
+  if (!session.paypal_client_id) {
+    throw new Error("PayPal is not configured on the server");
   }
 
+  const paypal = await loadPayPalSdk(session.paypal_client_id, booking?.currency);
   clearPaymentElement();
   toggleHidden(paymentContainer, false);
-  const nextStripeClient = window.Stripe(session.stripe_publishable_key);
-  const nextStripeElements = nextStripeClient.elements({
-    clientSecret: session.payment_client_secret,
-    appearance: {
-      theme: "stripe",
-      variables: {
-        colorPrimary: "#d71920",
-        colorText: "#00263e",
-        colorDanger: "#b3261e",
-        borderRadius: "8px",
-        fontFamily: "Inter, Avenir Next, Segoe UI, sans-serif",
-      },
+
+  const buttons = paypal.Buttons({
+    style: { layout: "vertical", label: "pay", height: 48 },
+    // The order is created server-side when the payment session loads.
+    createOrder: () => session.payment_intent_id,
+    onApprove: async () => {
+      if (confirmPaymentInFlight) {
+        return;
+      }
+      confirmPaymentInFlight = true;
+      clearBookingPaymentAlert();
+      try {
+        await capturePaymentAfterApproval(session);
+      } catch (error) {
+        showBookingPaymentAlert(humanizePaymentError(error?.message));
+        setState({ message: error?.message || "Payment confirmation failed" });
+      } finally {
+        confirmPaymentInFlight = false;
+      }
+    },
+    onCancel: () => {
+      setState({ message: "PayPal checkout was cancelled — you can try again whenever you're ready." });
+    },
+    onError: (error) => {
+      showBookingPaymentAlert(humanizePaymentError(error?.message || String(error || "")));
     },
   });
-  const nextPaymentElement = nextStripeElements.create("payment", { layout: "tabs" });
-  nextPaymentElement.mount(paymentContainer);
-  stripeClient = nextStripeClient;
-  stripeElements = nextStripeElements;
-  paymentElement = nextPaymentElement;
+  await buttons.render(paymentContainer);
+  paypalButtonsInstance = buttons;
   activePaymentSession = session;
   paymentSessionStatus = "ready";
-  paymentSessionMessage = "Secure Stripe payment is ready.";
-  mountExpressCheckout(nextStripeElements);
+  paymentSessionMessage = "Secure PayPal checkout is ready.";
 }
 
-function mountExpressCheckout(elementsInstance) {
-  const container = document.getElementById("booking-express-checkout");
-  const divider = document.getElementById("booking-express-divider");
-  if (!container) {
-    return;
-  }
-
-  const nextExpressCheckout = elementsInstance.create("expressCheckout", {
-    buttonHeight: 48,
-    paymentMethods: {
-      link: "never",
-      paypal: "never",
-      amazonPay: "never",
-      klarna: "never",
-    },
-  });
-
-  nextExpressCheckout.on("ready", (event) => {
-    // Wallet buttons only render on eligible device/browser combos
-    // (e.g. Apple Pay in Safari with a Wallet card).
-    const hasWallet = Boolean(event?.availablePaymentMethods);
-    toggleHidden(container, !hasWallet);
-    if (divider) {
-      toggleHidden(divider, !hasWallet);
-    }
-  });
-
-  nextExpressCheckout.on("confirm", async () => {
-    if (confirmPaymentInFlight) {
-      return;
-    }
-    confirmPaymentInFlight = true;
-    clearBookingPaymentAlert();
-    try {
-      await performPaymentConfirmation({ skipElementsSubmit: true });
-    } catch (error) {
-      showBookingPaymentAlert(humanizePaymentError(error?.message));
-      setState({ message: error?.message || "Payment confirmation failed" });
-    } finally {
-      confirmPaymentInFlight = false;
-    }
-  });
-
-  nextExpressCheckout.mount(container);
-  expressCheckoutElement = nextExpressCheckout;
-}
-
-async function performPaymentConfirmation({ skipElementsSubmit = false } = {}) {
-  await saveBookingIntakeToNote();
-  await saveBookingContactDetails({ silent: true });
-  setState({ message: "Confirming payment..." });
-  const successUrl = buildPaymentSuccessUrl(
-    activePaymentSession.booking_id,
-    getBookingKind(state.selectedBooking),
-  );
-  if (!skipElementsSubmit) {
-    const submitResult = await stripeElements.submit();
-    if (submitResult?.error) {
-      throw new Error(submitResult.error.message || "Payment details are incomplete");
-    }
-  }
-  const result = await stripeClient.confirmPayment({
-    elements: stripeElements,
-    clientSecret: activePaymentSession.payment_client_secret,
-    confirmParams: {
-      return_url: successUrl.toString(),
-    },
-    redirect: "if_required",
-  });
-  if (result.error) {
-    throw new Error(result.error.message || "Payment confirmation failed");
-  }
-  window.location.assign(successUrl.toString());
-}
-
-async function ensureStripePaymentSession(booking) {
+async function ensurePaymentSession(booking) {
   if (
     !booking ||
     !isCheckoutMode(booking) ||
@@ -835,36 +792,18 @@ async function ensureStripePaymentSession(booking) {
 
   autoLoadingPaymentBookingId = booking.id;
   paymentSessionStatus = "loading";
-  paymentSessionMessage = "Preparing the secure Stripe checkout...";
+  paymentSessionMessage = "Preparing the secure PayPal checkout...";
   let nextMessage = "";
   try {
-    if (booking.payment_client_secret) {
-      const publicConfig = await getPublicConfig().catch(() => null);
-      if (publicConfig?.stripe_publishable_key) {
-        const draftSession = {
-          booking_id: booking.id,
-          payment_intent_id: booking.payment_intent_id || String(booking.id),
-          payment_client_secret: booking.payment_client_secret,
-          payment_backend: "stripe",
-          stripe_publishable_key: publicConfig.stripe_publishable_key,
-          payment_expires_at: booking.payment_expires_at || null,
-          payment_seconds_remaining: booking.payment_seconds_remaining || null,
-        };
-        await mountStripePaymentForm(draftSession);
-        nextMessage = "Secure payment is ready.";
-        return;
-      }
-    }
-
     const session = await loadPaymentSession(booking);
-    if (session.payment_backend === "stripe") {
-      await mountStripePaymentForm(session);
+    if (session.payment_backend === "paypal") {
+      await mountPayPalButtons(session, booking);
       nextMessage = "Secure payment is ready.";
     } else {
       toggleHidden(elements.bookingPaymentElement, true);
       paymentSessionStatus = "stub";
       paymentSessionMessage =
-        "Stripe is not active for this running server. Start the API with PAYMENT_BACKEND=stripe and configured Stripe keys to show the secure payment form.";
+        "Online payment is not active for this running server. Start the API with PAYMENT_BACKEND=paypal and configured PayPal credentials to show the PayPal checkout.";
       nextMessage = paymentSessionMessage;
     }
   } catch (error) {
@@ -895,23 +834,23 @@ function renderPaymentPanel(state, booking) {
     return;
   }
 
-  const hasStripeSession =
-    idsMatch(activePaymentSession?.booking_id, booking.id) && activePaymentSession.payment_backend === "stripe";
+  const hasPayPalSession =
+    idsMatch(activePaymentSession?.booking_id, booking.id) && activePaymentSession.payment_backend === "paypal";
   const isPaymentLoading = idsMatch(autoLoadingPaymentBookingId, booking.id) || paymentSessionStatus === "loading";
-  elements.bookingPaymentCopy.textContent = hasStripeSession
-    ? "Enter your payment details below to secure your studio session."
+  elements.bookingPaymentCopy.textContent = hasPayPalSession
+    ? "Pay securely with PayPal below — you can use your PayPal balance or a card."
     : isPaymentLoading
       ? "Loading secure payment..."
       : paymentSessionMessage || "Complete payment to confirm your studio session.";
-  const primaryAction =
-    hasStripeSession ? "confirm-payment" : "load-payment";
-  const primaryLabel =
-    hasStripeSession && booking.price_cents > 0 ? "Pay now" : "Confirm booking";
   const primaryDisabled = isPaymentLoading ? "disabled" : "";
   elements.bookingPaymentControls.innerHTML = `
-    <button class="primary-button" type="button" data-booking-detail-action="${primaryAction}" data-booking-id="${booking.id}" ${primaryDisabled}>
-      ${primaryLabel}
-    </button>
+    ${
+      hasPayPalSession
+        ? ""
+        : `<button class="primary-button" type="button" data-booking-detail-action="load-payment" data-booking-id="${booking.id}" ${primaryDisabled}>
+      ${booking.price_cents > 0 ? "Pay now" : "Confirm booking"}
+    </button>`
+    }
     ${
       canAdminMarkPaid
         ? `<button class="ghost-button" type="button" data-booking-detail-action="mark-paid" data-booking-id="${booking.id}" data-booking-kind="${bookingKind}">
@@ -922,17 +861,17 @@ function renderPaymentPanel(state, booking) {
     ${
       canAdminWaivePayment
         ? `<button class="ghost-button" type="button" data-booking-detail-action="waive-payment" data-booking-id="${booking.id}" data-booking-kind="${bookingKind}">
-      Skip Stripe as admin
+      Skip payment as admin
     </button>`
         : ""
     }
   `;
 
   if (idsMatch(activePaymentSession?.booking_id, booking.id)) {
-    if (activePaymentSession.payment_backend !== "stripe") {
+    if (activePaymentSession.payment_backend !== "paypal") {
       elements.bookingPaymentCopy.textContent =
         paymentSessionMessage ||
-        "Stripe is not active for this running server. Start the API with PAYMENT_BACKEND=stripe and configured Stripe keys to show the secure payment form.";
+        "Online payment is not active for this running server. Start the API with PAYMENT_BACKEND=paypal and configured PayPal credentials to show the PayPal checkout.";
     }
   } else {
     toggleHidden(elements.bookingPaymentElement, true);
@@ -1315,45 +1254,19 @@ export function initBookingDetailView(actions) {
           state.selectedBooking && String(state.selectedBooking.id) === String(button.dataset.bookingId)
             ? state.selectedBooking
             : await api.getBooking(button.dataset.bookingId);
-        await ensureStripePaymentSession(booking);
+        await ensurePaymentSession(booking);
         if (actions?.reloadBookingDetail) {
           await actions.reloadBookingDetail("Payment session ready.");
         }
         return;
       }
 
-      if (action === "confirm-payment") {
-        if (!stripeClient || !stripeElements || !activePaymentSession) {
-          throw new Error("Load the payment session first");
-        }
-        if (confirmPaymentInFlight) {
-          return;
-        }
-        confirmPaymentInFlight = true;
-        const payButton = button;
-        const originalLabel = payButton.textContent;
-        payButton.disabled = true;
-        payButton.textContent = "Processing payment…";
-        clearBookingPaymentAlert();
-        try {
-          await performPaymentConfirmation();
-          return;
-        } catch (error) {
-          showBookingPaymentAlert(humanizePaymentError(error?.message));
-          payButton.disabled = false;
-          payButton.textContent = originalLabel;
-          throw error; // re-throw so the outer catch still logs
-        } finally {
-          confirmPaymentInFlight = false;
-        }
-      }
-
       if (action === "waive-payment") {
-        const confirmed = window.confirm("Skip Stripe and mark this booking free?");
+        const confirmed = window.confirm("Skip payment and mark this booking free?");
         if (!confirmed) {
           return;
         }
-        setState({ message: "Skipping Stripe and marking booking free..." });
+        setState({ message: "Skipping payment and marking booking free..." });
         const booking =
           button.dataset.bookingKind === "staff"
             ? await api.adminWaiveStaffBookingPayment(button.dataset.bookingId)
@@ -1564,6 +1477,6 @@ export function renderBookingDetailView(state) {
   renderPaymentPanel(state, booking);
   renderReschedulePanel(booking);
   if (canPay) {
-    void ensureStripePaymentSession(booking);
+    void ensurePaymentSession(booking);
   }
 }
