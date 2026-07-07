@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from app.config import (
     RuntimeConfigurationError,
+    get_payment_backend,
     get_paypal_configuration_status,
     get_supabase_configuration_status,
     mask_secret,
@@ -59,6 +60,38 @@ class RuntimeConfigurationTest(unittest.TestCase):
 
         with self.assertRaises(RuntimeConfigurationError):
             validate_runtime_configuration(settings_obj)
+
+    def test_payment_backend_is_normalized(self) -> None:
+        settings_obj = SimpleNamespace(PAYMENT_BACKEND=" PayPal ")
+
+        self.assertEqual(get_payment_backend(settings_obj), "paypal")
+
+    def test_production_accepts_normalized_paypal_backend(self) -> None:
+        settings_obj = SimpleNamespace(
+            APP_ENV="production",
+            SECRET_KEY="super-long-live-secret-with-entropy-1234567890",
+            APP_BASE_URL="https://studio.example.ca",
+            PAYMENT_BACKEND=" PayPal ",
+            EMAIL_BACKEND="disabled",
+            SMTP_HOST="",
+            SMTP_PORT=587,
+            SMTP_USERNAME="",
+            SMTP_PASSWORD="",
+            CELERY_TASK_ALWAYS_EAGER=False,
+            cors_origins=["https://studio.example.ca"],
+            PAYPAL_CLIENT_ID="AeRealisticLiveClientId1234567890",
+            PAYPAL_CLIENT_SECRET="EeRealisticLiveSecret1234567890",
+            PAYPAL_WEBHOOK_ID="4JH86294D6297924G",
+            PAYPAL_ENV="live",
+            SENDGRID_API_KEY="SG.change-me",
+            EMAIL_FROM="bookings@studio.example.ca",
+            SMS_BACKEND="console",
+            TWILIO_ACCOUNT_SID="",
+            TWILIO_AUTH_TOKEN="",
+            TWILIO_FROM_NUMBER="",
+        )
+
+        validate_runtime_configuration(settings_obj)
 
     def test_production_accepts_realistic_settings(self) -> None:
         settings_obj = SimpleNamespace(
@@ -141,8 +174,9 @@ class RuntimeConfigurationTest(unittest.TestCase):
             TWILIO_FROM_NUMBER="",
         )
 
-        with self.assertRaises(RuntimeConfigurationError):
+        with self.assertRaises(RuntimeConfigurationError) as context:
             validate_runtime_configuration(settings_obj)
+        self.assertIn("PAYMENT_BACKEND must be paypal in production (current: stub)", str(context.exception))
 
     def test_production_rejects_missing_paypal_webhook_id(self) -> None:
         settings_obj = SimpleNamespace(

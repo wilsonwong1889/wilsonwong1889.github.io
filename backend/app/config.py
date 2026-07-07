@@ -179,9 +179,14 @@ def _is_configured(value: str) -> bool:
     return bool(value.strip()) and not _looks_placeholder(value)
 
 
+def get_payment_backend(settings_obj: Optional[Settings] = None) -> str:
+    current = settings_obj or settings
+    return str(getattr(current, "PAYMENT_BACKEND", "") or "").strip().lower()
+
+
 def get_paypal_configuration_status(settings_obj: Optional[Settings] = None) -> dict[str, bool]:
     current = settings_obj or settings
-    paypal_requested = current.PAYMENT_BACKEND == "paypal"
+    paypal_requested = get_payment_backend(current) == "paypal"
     client_id_ready = _is_configured(current.PAYPAL_CLIENT_ID)
     client_secret_ready = _is_configured(current.PAYPAL_CLIENT_SECRET)
     webhook_id_ready = _is_configured(current.PAYPAL_WEBHOOK_ID)
@@ -218,13 +223,15 @@ def validate_runtime_configuration(settings_obj: Optional[Settings] = None) -> N
         return
 
     errors: list[str] = []
+    payment_backend = get_payment_backend(current)
 
     if len(current.SECRET_KEY) < 32 or _looks_placeholder(current.SECRET_KEY):
         errors.append("SECRET_KEY must be a strong non-placeholder value in production")
     if not current.APP_BASE_URL.startswith("https://"):
         errors.append("APP_BASE_URL must use https in production")
-    if current.PAYMENT_BACKEND != "paypal":
-        errors.append("PAYMENT_BACKEND must be paypal in production")
+    if payment_backend != "paypal":
+        current_backend = str(getattr(current, "PAYMENT_BACKEND", "") or "").strip() or "unset"
+        errors.append(f"PAYMENT_BACKEND must be paypal in production (current: {current_backend})")
     if current.EMAIL_BACKEND not in {"disabled", "sendgrid", "smtp", "resend", "supabase"}:
         errors.append("EMAIL_BACKEND must be disabled, sendgrid, smtp, resend, or supabase in production")
     if current.CELERY_TASK_ALWAYS_EAGER and not getattr(current, "ALLOW_INLINE_TASKS_IN_PRODUCTION", False):
@@ -240,7 +247,7 @@ def validate_runtime_configuration(settings_obj: Optional[Settings] = None) -> N
             errors.append("SUPABASE_URL must be configured when Supabase auth is enabled")
         if not supabase_publishable_key or _looks_placeholder(supabase_publishable_key):
             errors.append("SUPABASE_PUBLISHABLE_KEY must be configured when Supabase auth is enabled")
-    if current.PAYMENT_BACKEND == "paypal":
+    if payment_backend == "paypal":
         if not current.PAYPAL_CLIENT_ID or _looks_placeholder(current.PAYPAL_CLIENT_ID):
             errors.append("PAYPAL_CLIENT_ID must be configured when PAYMENT_BACKEND is paypal")
         if not current.PAYPAL_CLIENT_SECRET or _looks_placeholder(current.PAYPAL_CLIENT_SECRET):

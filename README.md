@@ -101,7 +101,7 @@ If you changed seed env vars, use those values instead.
 
 Startup validates that at least one active `AdminManager` account exists after migrations and optional seeding.
 
-## Stripe Webhooks
+## Payments And Webhooks
 
 ### Current default
 
@@ -112,16 +112,17 @@ The project defaults to local-safe stub mode:
 
 That is enough for local development and automated tests.
 
-### Switch to real Stripe test mode
+### Production PayPal settings
 
-Update [backend/.env](/Users/wilson/Desktop/StudioBookingSoftware/backend/.env) or your runtime env:
+Update [backend/.env](/Users/wilson/Desktop/StudioBookingSoftware/backend/.env) for local testing, or your Render service environment variables for production:
 
 ```env
 APP_ENV=production
-PAYMENT_BACKEND=stripe
-STRIPE_PUBLISHABLE_KEY=pk_test_your_key
-STRIPE_SECRET_KEY=sk_test_your_key
-STRIPE_WEBHOOK_SECRET=whsec_your_secret
+PAYMENT_BACKEND=paypal
+PAYPAL_CLIENT_ID=your_paypal_rest_client_id
+PAYPAL_CLIENT_SECRET=your_paypal_rest_client_secret
+PAYPAL_WEBHOOK_ID=your_paypal_webhook_id
+PAYPAL_ENV=sandbox
 EMAIL_BACKEND=sendgrid
 SMS_BACKEND=twilio
 SENDGRID_API_KEY=SG.your_key
@@ -131,6 +132,8 @@ TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_FROM_NUMBER=+14035551234
 ```
+
+`PAYPAL_ENV=sandbox` is allowed on the production site while the studio is still taking test-mode payments. Switch it to `live` only when the PayPal app and webhook were created in live mode.
 
 You can also use Gmail SMTP instead of SendGrid:
 
@@ -147,19 +150,9 @@ SMTP_USE_TLS=true
 
 When `APP_ENV=production`, the app now validates launch-critical settings at startup and will fail fast if you try to run with placeholder secrets, stub payments, console email, eager Celery tasks, insecure `APP_BASE_URL`, or localhost CORS origins.
 
-### Local webhook forwarding with Stripe CLI
+### PayPal webhook endpoint
 
-```bash
-stripe listen --forward-to http://127.0.0.1:8000/api/webhooks/stripe
-```
-
-Copy the webhook secret from Stripe CLI output into `STRIPE_WEBHOOK_SECRET`.
-
-### Trigger a test webhook
-
-```bash
-stripe trigger payment_intent.succeeded
-```
+Register the PayPal webhook URL as `{APP_BASE_URL}/api/webhooks/paypal` and copy the webhook id into `PAYPAL_WEBHOOK_ID`.
 
 ## Running Tests
 
@@ -184,9 +177,12 @@ The suite includes:
 - `PENDING_BOOKING_CLEANUP_INTERVAL_MINUTES=10`: how often the scheduler checks for expired pending bookings
 - `PENDING_BOOKING_EXPIRY_MINUTES=15`: when an unpaid pending booking should be cancelled automatically
 - `ALLOWED_CORS_ORIGINS=...`: comma-separated frontend origins for browser access
-- `STRIPE_PUBLISHABLE_KEY=pk_test_...`: required for browser checkout in Stripe mode
-- `STRIPE_WEBHOOK_TOLERANCE_SECONDS=300`: webhook signature timestamp tolerance
-- `PAYMENT_BACKEND=stub|stripe`
+- `PAYMENT_BACKEND=stub|paypal`: local tests use `stub`; production must use `paypal`
+- `PAYPAL_CLIENT_ID=...`: required for browser checkout in PayPal mode
+- `PAYPAL_CLIENT_SECRET=...`: required for PayPal Orders API calls
+- `PAYPAL_WEBHOOK_ID=...`: required for PayPal webhook signature verification
+- `PAYPAL_ENV=sandbox|live`: selects the PayPal API environment
+- `WEBHOOK_TOLERANCE_SECONDS=300`: stub-mode webhook signature timestamp tolerance
 - `EMAIL_REPLY_TO=...`: optional support address for email replies
 - `EMAIL_BACKEND=console|sendgrid|smtp`
 - `SMTP_HOST=...`: required when `EMAIL_BACKEND=smtp`

@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import httpx
 
-from app.config import get_paypal_configuration_status, redact_sensitive_text, settings
+from app.config import get_payment_backend, get_paypal_configuration_status, redact_sensitive_text, settings
 
 
 PAYPAL_API_BASE_URLS = {
@@ -48,7 +48,7 @@ class PaymentProviderError(PaymentBackendError):
 
 
 def _is_paypal_backend() -> bool:
-    return settings.PAYMENT_BACKEND == "paypal"
+    return get_payment_backend(settings) == "paypal"
 
 
 def paypal_api_base_url() -> str:

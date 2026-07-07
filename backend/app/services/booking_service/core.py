@@ -12,7 +12,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.config import get_payment_backend, settings
 from app.core.security import create_access_token, hash_password
 from app.models.booking import AuditLog, Booking, BookingSlot, BookingStaffAssignment, NotificationLog, Refund, Review
 from app.models.room import Room
@@ -1552,7 +1552,7 @@ def get_booking_payment_session(db: Session, booking: Booking, user: User) -> di
         "booking_id": booking.id,
         "payment_intent_id": payment_session.intent_id,
         "payment_client_secret": payment_session.client_secret,
-        "payment_backend": settings.PAYMENT_BACKEND,
+        "payment_backend": get_payment_backend(settings),
         "paypal_client_id": settings.PAYPAL_CLIENT_ID or None,
         "payment_expires_at": booking.payment_expires_at,
         "payment_seconds_remaining": booking.payment_seconds_remaining,

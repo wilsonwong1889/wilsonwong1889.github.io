@@ -7,6 +7,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from app.config import (
+    get_payment_backend,
     get_paypal_configuration_status,
     get_supabase_configuration_status,
     settings,
@@ -217,7 +218,7 @@ def public_config(response: Response):
     supabase_status = get_supabase_configuration_status()
     return {
         "app_env": settings.APP_ENV,
-        "payment_backend": settings.PAYMENT_BACKEND,
+        "payment_backend": get_payment_backend(settings),
         "paypal_client_id": settings.PAYPAL_CLIENT_ID if paypal_status["paypal_checkout_ready"] else None,
         "paypal_env": settings.PAYPAL_ENV,
         "paypal_checkout_ready": paypal_status["paypal_checkout_ready"],

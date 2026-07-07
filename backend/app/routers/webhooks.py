@@ -5,7 +5,7 @@ import time
 
 from fastapi import APIRouter, Header, HTTPException, Request
 
-from app.config import redact_sensitive_text, settings
+from app.config import get_payment_backend, redact_sensitive_text, settings
 from app.services.payment_service import (
     PaymentConfigurationError,
     PaymentProviderError,
@@ -62,7 +62,7 @@ async def paypal_webhook(
     except (ValueError, UnicodeDecodeError) as exc:
         raise HTTPException(status_code=400, detail="Invalid webhook payload") from exc
 
-    if settings.PAYMENT_BACKEND == "paypal":
+    if get_payment_backend(settings) == "paypal":
         try:
             verified = verify_paypal_webhook_signature(event, request.headers)
         except PaymentConfigurationError as exc:

@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.config import get_payment_backend, settings
 from app.core.security import create_access_token, hash_password
 from app.models.booking import Booking
 from app.models.staff_booking import StaffBooking
@@ -856,7 +856,7 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
         "booking_id": booking.id,
         "payment_intent_id": payment_session.intent_id,
         "payment_client_secret": payment_session.client_secret,
-        "payment_backend": settings.PAYMENT_BACKEND,
+        "payment_backend": get_payment_backend(settings),
         "paypal_client_id": settings.PAYPAL_CLIENT_ID or None,
         "payment_expires_at": booking.payment_expires_at,
         "payment_seconds_remaining": booking.payment_seconds_remaining,
