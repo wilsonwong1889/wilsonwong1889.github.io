@@ -56,14 +56,20 @@ class StableFrontendContractTest(unittest.TestCase):
                 f"{html_file.name} should use the BIPOC Creative Innovation Studio footer copyright, not stale media arts collective copy.",
             )
 
-    def test_checkout_page_keeps_stripe_checkout_contract(self) -> None:
+    def test_checkout_page_keeps_paypal_checkout_contract(self) -> None:
         booking_page = (self.frontend_dir / "booking.html").read_text(encoding="utf-8")
 
-        self.assertIn(
+        self.assertNotIn(
             'https://js.stripe.com/v3/',
             booking_page,
-            "booking.html should load Stripe.js for checkout.",
+            "booking.html must not load Stripe.js — checkout moved to PayPal.",
         )
+        self.assertIn(
+            'id="booking-payment-element"',
+            booking_page,
+            "booking.html should keep the container the PayPal buttons mount into.",
+        )
+        self.assertIn("PayPal securely handles the payment", booking_page)
         self.assertIn("booking-detail-card", booking_page)
         self.assertIn("Booking summary", booking_page)
         self.assertIn("Payment details", booking_page)

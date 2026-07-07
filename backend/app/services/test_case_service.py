@@ -159,7 +159,7 @@ TEST_CASE_CATALOG = [
         "area": "Payments",
         "health": "working",
         "status": "Automated",
-        "summary": "Exercises booking creation, payment session creation, Stripe webhook success, and notification persistence.",
+        "summary": "Exercises booking creation, payment session creation, payment webhook success, and notification persistence.",
         "source_file": "backend/tests/test_e2e_booking_payment.py",
         "source_test": "test_10_booking_payment_confirmation_e2e",
         "commands": [
@@ -168,7 +168,7 @@ TEST_CASE_CATALOG = [
         "covered_paths": [
             "/api/bookings",
             "/api/bookings/{booking_id}/payment-session",
-            "/api/webhooks/stripe",
+            "/api/webhooks/paypal",
             "/booking",
         ],
     },
@@ -178,7 +178,7 @@ TEST_CASE_CATALOG = [
         "area": "Payments",
         "health": "working",
         "status": "Automated",
-        "summary": "Verifies a failed Stripe webhook cancels the booking with the expected fallback reason.",
+        "summary": "Verifies a failed payment webhook cancels the booking with the expected fallback reason.",
         "source_file": "backend/tests/test_e2e_booking_payment.py",
         "source_test": "test_20_booking_payment_failure_e2e",
         "commands": [
@@ -186,7 +186,7 @@ TEST_CASE_CATALOG = [
         ],
         "covered_paths": [
             "/api/bookings",
-            "/api/webhooks/stripe",
+            "/api/webhooks/paypal",
             "/booking",
         ],
     },
@@ -289,7 +289,7 @@ TEST_CASE_CATALOG = [
         "area": "Launch",
         "health": "working",
         "status": "Automated",
-        "summary": "Ensures production startup rejects placeholder Stripe, SendGrid, and app secrets before the app can boot.",
+        "summary": "Ensures production startup rejects placeholder PayPal, SendGrid, and app secrets before the app can boot.",
         "source_file": "backend/tests/test_runtime_config.py",
         "source_test": "test_production_rejects_placeholder_settings",
         "commands": [
@@ -342,12 +342,12 @@ TEST_CASE_CATALOG = [
         "area": "Payments",
         "health": "working",
         "status": "Automated",
-        "summary": "Floods /api/webhooks/stripe with 20 duplicate payment_intent.succeeded events and asserts exactly one paid-audit entry plus one confirmation-email notification log.",
+        "summary": "Floods /api/webhooks/paypal with 20 duplicate payment_intent.succeeded events and asserts exactly one paid-audit entry plus one confirmation-email notification log.",
         "source_file": "backend/tests/backend/test_payments.py",
         "source_test": "test_31_webhook_duplicate_storm_is_idempotent",
         "commands": [],
         "covered_paths": [
-            "/api/webhooks/stripe",
+            "/api/webhooks/paypal",
             "payment webhook idempotency",
         ],
     },

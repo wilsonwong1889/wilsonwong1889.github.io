@@ -234,7 +234,7 @@ export function renderRoomDetailView(state) {
     elements.roomDetailBookingCopy.textContent = isComingSoon
       ? "This studio is opening soon. Check back here to book once it launches."
       : room.active
-        ? "Move into reserve to choose a time, confirm availability, and finish payment with Stripe."
+        ? "Move into reserve to choose a time, confirm availability, and finish payment with PayPal."
         : "This studio is not currently available for booking."
   }
 }

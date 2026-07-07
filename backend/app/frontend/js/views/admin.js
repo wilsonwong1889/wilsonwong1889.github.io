@@ -390,7 +390,7 @@ function getAdminBookingFilterOptions(bookings) {
     {
       key: "pending_payment",
       label: "Pending payment",
-      description: "Waiting on Stripe or an admin override.",
+      description: "Waiting on PayPal or an admin override.",
     },
     {
       key: "ready_for_arrival",
@@ -1434,7 +1434,7 @@ function renderAdminAccountDetail(account, currentUser) {
 
       <section class="admin-account-section">
         <h4>Billing</h4>
-        <p class="field-help">Card details are handled by Stripe and are not stored in this app.</p>
+        <p class="field-help">Payment details are handled by PayPal and are not stored in this app.</p>
         <div class="admin-detail-grid">
           ${renderAccountField("Billing address", null, { valueHtml: formatAddress(account.billing_address) })}
         </div>
@@ -1715,7 +1715,7 @@ function renderAdminBookingCard(booking) {
       : "";
   const waivePaymentButton =
     booking.status === "PendingPayment"
-      ? `<button class="ghost-button admin-booking-action" type="button" data-admin-action="waive-payment" data-booking-kind="${escapeAttribute(bookingKind)}" data-booking-id="${escapeAttribute(booking.id)}">Skip Stripe and mark free</button>`
+      ? `<button class="ghost-button admin-booking-action" type="button" data-admin-action="waive-payment" data-booking-kind="${escapeAttribute(bookingKind)}" data-booking-id="${escapeAttribute(booking.id)}">Skip payment and mark free</button>`
       : "";
   const checkInButton =
     !isStaffBooking && booking.status === "Paid" && !booking.checked_in_at
@@ -2663,7 +2663,7 @@ export function initAdminView(actions) {
 
     try {
       if (button.dataset.adminAction === "waive-payment") {
-        const confirmed = window.confirm("Skip Stripe and mark this booking free?");
+        const confirmed = window.confirm("Skip payment and mark this booking free?");
         if (!confirmed) {
           return;
         }
@@ -2675,7 +2675,7 @@ export function initAdminView(actions) {
         }
         adminSearchResults = null;
         setActiveAdminSubpage("bookings", "queue");
-        await actions.refreshAll("Booking marked paid without Stripe.");
+        await actions.refreshAll("Booking marked free without payment.");
         return;
       }
 

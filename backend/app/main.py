@@ -7,7 +7,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from app.config import (
-    get_stripe_configuration_status,
+    get_paypal_configuration_status,
     get_supabase_configuration_status,
     settings,
     validate_runtime_configuration,
@@ -192,19 +192,6 @@ if FRONTEND_DIR.exists():
         app.add_api_route(route_path, build_icon_handler(rel_path, media_type), methods=["GET"], include_in_schema=False)
 
 
-WELL_KNOWN_DIR = Path(__file__).resolve().parent / "well_known"
-
-
-# Stripe fetches this file to verify the domain for Apple Pay (payment method
-# domains). Re-register domains with Stripe after switching to live keys.
-@app.get("/.well-known/apple-developer-merchantid-domain-association", include_in_schema=False)
-def apple_pay_domain_association():
-    return FileResponse(
-        WELL_KNOWN_DIR / "apple-developer-merchantid-domain-association",
-        media_type="application/octet-stream",
-    )
-
-
 @app.get("/metrics", include_in_schema=False)
 def metrics():
     return PlainTextResponse(render_metrics())
@@ -215,15 +202,16 @@ def public_config(response: Response):
     # Rarely changes; let the browser/CDN reuse it across page navigations
     # instead of re-fetching on every load.
     response.headers["Cache-Control"] = "public, max-age=300"
-    stripe_status = get_stripe_configuration_status()
+    paypal_status = get_paypal_configuration_status()
     supabase_status = get_supabase_configuration_status()
     return {
         "app_env": settings.APP_ENV,
         "payment_backend": settings.PAYMENT_BACKEND,
-        "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY if stripe_status["stripe_checkout_ready"] else None,
-        "stripe_checkout_ready": stripe_status["stripe_checkout_ready"],
-        "stripe_webhooks_ready": stripe_status["stripe_webhooks_ready"],
-        "stripe_fully_ready": stripe_status["stripe_fully_ready"],
+        "paypal_client_id": settings.PAYPAL_CLIENT_ID if paypal_status["paypal_checkout_ready"] else None,
+        "paypal_env": settings.PAYPAL_ENV,
+        "paypal_checkout_ready": paypal_status["paypal_checkout_ready"],
+        "paypal_webhooks_ready": paypal_status["paypal_webhooks_ready"],
+        "paypal_fully_ready": paypal_status["paypal_fully_ready"],
         "supabase_url": settings.SUPABASE_URL if supabase_status["supabase_fully_ready"] else None,
         "supabase_publishable_key": (
             settings.SUPABASE_PUBLISHABLE_KEY if supabase_status["supabase_fully_ready"] else None
@@ -266,8 +254,8 @@ def ready():
         redis.Redis.from_url(settings.REDIS_URL, decode_responses=True).ping()
         checks["redis"] = True
 
-    stripe_status = get_stripe_configuration_status()
-    checks["stripe"] = True if not stripe_status["stripe_requested"] else stripe_status["stripe_fully_ready"]
+    paypal_status = get_paypal_configuration_status()
+    checks["paypal"] = True if not paypal_status["paypal_requested"] else paypal_status["paypal_fully_ready"]
 
     status = "ready" if all(checks.values()) else "degraded"
     return {"status": status, "checks": checks}

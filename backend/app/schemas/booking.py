@@ -176,11 +176,11 @@ class BookingRescheduleIn(BaseModel):
 class PaymentSessionOut(BaseModel):
     booking_id: UUID
     # Null for free bookings (payment_backend == "free"), where there is no
-    # Stripe intent to pay — the customer confirms at $0 instead.
+    # PayPal order to pay — the customer confirms at $0 instead.
     payment_intent_id: Optional[str] = None
     payment_client_secret: Optional[str] = None
     payment_backend: str
-    stripe_publishable_key: Optional[str] = None
+    paypal_client_id: Optional[str] = None
     payment_expires_at: Optional[datetime] = None
     payment_seconds_remaining: Optional[int] = None
 

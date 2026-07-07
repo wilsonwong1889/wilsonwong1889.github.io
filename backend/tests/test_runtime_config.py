@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from app.config import (
     RuntimeConfigurationError,
-    get_stripe_configuration_status,
+    get_paypal_configuration_status,
     get_supabase_configuration_status,
     mask_secret,
     redact_sensitive_text,
@@ -22,9 +22,10 @@ class RuntimeConfigurationTest(unittest.TestCase):
             EMAIL_BACKEND="console",
             CELERY_TASK_ALWAYS_EAGER=True,
             cors_origins=["http://localhost:3000"],
-            STRIPE_PUBLISHABLE_KEY="pk_test_change_me",
-            STRIPE_SECRET_KEY="sk_test_change_me",
-            STRIPE_WEBHOOK_SECRET="whsec_change_me",
+            PAYPAL_CLIENT_ID="",
+            PAYPAL_CLIENT_SECRET="",
+            PAYPAL_WEBHOOK_ID="",
+            PAYPAL_ENV="sandbox",
             SENDGRID_API_KEY="SG.change-me",
             EMAIL_FROM="noreply@example.com",
             SMS_BACKEND="console",
@@ -44,9 +45,10 @@ class RuntimeConfigurationTest(unittest.TestCase):
             EMAIL_BACKEND="console",
             CELERY_TASK_ALWAYS_EAGER=True,
             cors_origins=["http://localhost:3000"],
-            STRIPE_PUBLISHABLE_KEY="pk_test_change_me",
-            STRIPE_SECRET_KEY="sk_test_change_me",
-            STRIPE_WEBHOOK_SECRET="whsec_change_me",
+            PAYPAL_CLIENT_ID="change_me",
+            PAYPAL_CLIENT_SECRET="change_me",
+            PAYPAL_WEBHOOK_ID="change_me",
+            PAYPAL_ENV="sandbox",
             SENDGRID_API_KEY="SG.change-me",
             EMAIL_FROM="noreply@example.com",
             SMS_BACKEND="console",
@@ -63,7 +65,7 @@ class RuntimeConfigurationTest(unittest.TestCase):
             APP_ENV="production",
             SECRET_KEY="super-long-live-secret-with-entropy-1234567890",
             APP_BASE_URL="https://studio.example.ca",
-            PAYMENT_BACKEND="stripe",
+            PAYMENT_BACKEND="paypal",
             EMAIL_BACKEND="sendgrid",
             SMTP_HOST="",
             SMTP_PORT=587,
@@ -71,9 +73,10 @@ class RuntimeConfigurationTest(unittest.TestCase):
             SMTP_PASSWORD="",
             CELERY_TASK_ALWAYS_EAGER=False,
             cors_origins=["https://studio.example.ca"],
-            STRIPE_PUBLISHABLE_KEY="pk_live_realistic_value",
-            STRIPE_SECRET_KEY="sk_live_realistic_value",
-            STRIPE_WEBHOOK_SECRET="whsec_live_realistic_value",
+            PAYPAL_CLIENT_ID="AeRealisticLiveClientId1234567890",
+            PAYPAL_CLIENT_SECRET="EeRealisticLiveSecret1234567890",
+            PAYPAL_WEBHOOK_ID="4JH86294D6297924G",
+            PAYPAL_ENV="live",
             SENDGRID_API_KEY="SG.realistic_key_value",
             EMAIL_FROM="bookings@studio.example.ca",
             SMS_BACKEND="twilio",
@@ -84,12 +87,14 @@ class RuntimeConfigurationTest(unittest.TestCase):
 
         validate_runtime_configuration(settings_obj)
 
-    def test_production_accepts_disabled_email_backend(self) -> None:
+    def test_production_accepts_sandbox_paypal_for_test_mode(self) -> None:
+        # The live site intentionally runs test-mode payments until real
+        # payouts start, so sandbox credentials must pass validation.
         settings_obj = SimpleNamespace(
             APP_ENV="production",
             SECRET_KEY="super-long-live-secret-with-entropy-1234567890",
             APP_BASE_URL="https://studio.example.ca",
-            PAYMENT_BACKEND="stripe",
+            PAYMENT_BACKEND="paypal",
             EMAIL_BACKEND="disabled",
             SMTP_HOST="",
             SMTP_PORT=587,
@@ -97,9 +102,10 @@ class RuntimeConfigurationTest(unittest.TestCase):
             SMTP_PASSWORD="",
             CELERY_TASK_ALWAYS_EAGER=False,
             cors_origins=["https://studio.example.ca"],
-            STRIPE_PUBLISHABLE_KEY="pk_live_realistic_value",
-            STRIPE_SECRET_KEY="sk_live_realistic_value",
-            STRIPE_WEBHOOK_SECRET="whsec_live_realistic_value",
+            PAYPAL_CLIENT_ID="AeRealisticSandboxClientId1234567890",
+            PAYPAL_CLIENT_SECRET="EeRealisticSandboxSecret1234567890",
+            PAYPAL_WEBHOOK_ID="4JH86294D6297924G",
+            PAYPAL_ENV="sandbox",
             SENDGRID_API_KEY="SG.change-me",
             EMAIL_FROM="bookings@studio.example.ca",
             SMS_BACKEND="console",
@@ -123,9 +129,38 @@ class RuntimeConfigurationTest(unittest.TestCase):
             SMTP_PASSWORD="",
             CELERY_TASK_ALWAYS_EAGER=False,
             cors_origins=["https://studio.example.ca"],
-            STRIPE_PUBLISHABLE_KEY="",
-            STRIPE_SECRET_KEY="sk_test_change_me",
-            STRIPE_WEBHOOK_SECRET="whsec_change_me",
+            PAYPAL_CLIENT_ID="",
+            PAYPAL_CLIENT_SECRET="",
+            PAYPAL_WEBHOOK_ID="",
+            PAYPAL_ENV="sandbox",
+            SENDGRID_API_KEY="SG.change-me",
+            EMAIL_FROM="bookings@studio.example.ca",
+            SMS_BACKEND="console",
+            TWILIO_ACCOUNT_SID="",
+            TWILIO_AUTH_TOKEN="",
+            TWILIO_FROM_NUMBER="",
+        )
+
+        with self.assertRaises(RuntimeConfigurationError):
+            validate_runtime_configuration(settings_obj)
+
+    def test_production_rejects_missing_paypal_webhook_id(self) -> None:
+        settings_obj = SimpleNamespace(
+            APP_ENV="production",
+            SECRET_KEY="super-long-live-secret-with-entropy-1234567890",
+            APP_BASE_URL="https://studio.example.ca",
+            PAYMENT_BACKEND="paypal",
+            EMAIL_BACKEND="disabled",
+            SMTP_HOST="",
+            SMTP_PORT=587,
+            SMTP_USERNAME="",
+            SMTP_PASSWORD="",
+            CELERY_TASK_ALWAYS_EAGER=False,
+            cors_origins=["https://studio.example.ca"],
+            PAYPAL_CLIENT_ID="AeRealisticLiveClientId1234567890",
+            PAYPAL_CLIENT_SECRET="EeRealisticLiveSecret1234567890",
+            PAYPAL_WEBHOOK_ID="",
+            PAYPAL_ENV="live",
             SENDGRID_API_KEY="SG.change-me",
             EMAIL_FROM="bookings@studio.example.ca",
             SMS_BACKEND="console",
@@ -142,7 +177,7 @@ class RuntimeConfigurationTest(unittest.TestCase):
             APP_ENV="production",
             SECRET_KEY="super-long-live-secret-with-entropy-1234567890",
             APP_BASE_URL="https://studio.example.ca",
-            PAYMENT_BACKEND="stripe",
+            PAYMENT_BACKEND="paypal",
             EMAIL_BACKEND="disabled",
             SMTP_HOST="",
             SMTP_PORT=587,
@@ -151,9 +186,10 @@ class RuntimeConfigurationTest(unittest.TestCase):
             CELERY_TASK_ALWAYS_EAGER=True,
             ALLOW_INLINE_TASKS_IN_PRODUCTION=True,
             cors_origins=["https://studio.example.ca"],
-            STRIPE_PUBLISHABLE_KEY="pk_live_realistic_value",
-            STRIPE_SECRET_KEY="sk_live_realistic_value",
-            STRIPE_WEBHOOK_SECRET="whsec_live_realistic_value",
+            PAYPAL_CLIENT_ID="AeRealisticLiveClientId1234567890",
+            PAYPAL_CLIENT_SECRET="EeRealisticLiveSecret1234567890",
+            PAYPAL_WEBHOOK_ID="4JH86294D6297924G",
+            PAYPAL_ENV="live",
             SENDGRID_API_KEY="SG.change-me",
             EMAIL_FROM="bookings@studio.example.ca",
             SMS_BACKEND="console",
@@ -169,7 +205,7 @@ class RuntimeConfigurationTest(unittest.TestCase):
             APP_ENV="production",
             SECRET_KEY="super-long-live-secret-with-entropy-1234567890",
             APP_BASE_URL="https://studio.example.ca",
-            PAYMENT_BACKEND="stripe",
+            PAYMENT_BACKEND="paypal",
             EMAIL_BACKEND="sendgrid",
             SMTP_HOST="",
             SMTP_PORT=587,
@@ -177,9 +213,10 @@ class RuntimeConfigurationTest(unittest.TestCase):
             SMTP_PASSWORD="",
             CELERY_TASK_ALWAYS_EAGER=False,
             cors_origins=["https://studio.example.ca"],
-            STRIPE_PUBLISHABLE_KEY="pk_live_realistic_value",
-            STRIPE_SECRET_KEY="sk_live_realistic_value",
-            STRIPE_WEBHOOK_SECRET="whsec_live_realistic_value",
+            PAYPAL_CLIENT_ID="AeRealisticLiveClientId1234567890",
+            PAYPAL_CLIENT_SECRET="EeRealisticLiveSecret1234567890",
+            PAYPAL_WEBHOOK_ID="4JH86294D6297924G",
+            PAYPAL_ENV="live",
             SENDGRID_API_KEY="SG.realistic_key_value",
             EMAIL_FROM="bookings@studio.example.ca",
             SMS_BACKEND="twilio",
@@ -196,7 +233,7 @@ class RuntimeConfigurationTest(unittest.TestCase):
             APP_ENV="production",
             SECRET_KEY="super-long-live-secret-with-entropy-1234567890",
             APP_BASE_URL="https://studio.example.ca",
-            PAYMENT_BACKEND="stripe",
+            PAYMENT_BACKEND="paypal",
             EMAIL_BACKEND="smtp",
             SMTP_HOST="smtp.gmail.com",
             SMTP_PORT=587,
@@ -204,9 +241,10 @@ class RuntimeConfigurationTest(unittest.TestCase):
             SMTP_PASSWORD="realistic_app_password_123",
             CELERY_TASK_ALWAYS_EAGER=False,
             cors_origins=["https://studio.example.ca"],
-            STRIPE_PUBLISHABLE_KEY="pk_live_realistic_value",
-            STRIPE_SECRET_KEY="sk_live_realistic_value",
-            STRIPE_WEBHOOK_SECRET="whsec_live_realistic_value",
+            PAYPAL_CLIENT_ID="AeRealisticLiveClientId1234567890",
+            PAYPAL_CLIENT_SECRET="EeRealisticLiveSecret1234567890",
+            PAYPAL_WEBHOOK_ID="4JH86294D6297924G",
+            PAYPAL_ENV="live",
             SENDGRID_API_KEY="SG.change-me",
             EMAIL_FROM="bookings@studio.ca",
             SMS_BACKEND="console",
@@ -222,7 +260,7 @@ class RuntimeConfigurationTest(unittest.TestCase):
             APP_ENV="production",
             SECRET_KEY="super-long-live-secret-with-entropy-1234567890",
             APP_BASE_URL="https://studio.example.ca",
-            PAYMENT_BACKEND="stripe",
+            PAYMENT_BACKEND="paypal",
             EMAIL_BACKEND="smtp",
             SMTP_HOST="smtp.gmail.com",
             SMTP_PORT=587,
@@ -230,9 +268,10 @@ class RuntimeConfigurationTest(unittest.TestCase):
             SMTP_PASSWORD="",
             CELERY_TASK_ALWAYS_EAGER=False,
             cors_origins=["https://studio.example.ca"],
-            STRIPE_PUBLISHABLE_KEY="pk_live_realistic_value",
-            STRIPE_SECRET_KEY="sk_live_realistic_value",
-            STRIPE_WEBHOOK_SECRET="whsec_live_realistic_value",
+            PAYPAL_CLIENT_ID="AeRealisticLiveClientId1234567890",
+            PAYPAL_CLIENT_SECRET="EeRealisticLiveSecret1234567890",
+            PAYPAL_WEBHOOK_ID="4JH86294D6297924G",
+            PAYPAL_ENV="live",
             SENDGRID_API_KEY="SG.change-me",
             EMAIL_FROM="bookings@studio.ca",
             SMS_BACKEND="console",
@@ -244,36 +283,36 @@ class RuntimeConfigurationTest(unittest.TestCase):
         with self.assertRaises(RuntimeConfigurationError):
             validate_runtime_configuration(settings_obj)
 
-    def test_stripe_configuration_status_flags_stub_mode_as_not_ready(self) -> None:
+    def test_paypal_configuration_status_flags_stub_mode_as_not_ready(self) -> None:
         settings_obj = SimpleNamespace(
             PAYMENT_BACKEND="stub",
-            STRIPE_PUBLISHABLE_KEY="pk_test_change_me",
-            STRIPE_SECRET_KEY="sk_test_change_me",
-            STRIPE_WEBHOOK_SECRET="whsec_change_me",
+            PAYPAL_CLIENT_ID="change_me",
+            PAYPAL_CLIENT_SECRET="change_me",
+            PAYPAL_WEBHOOK_ID="change_me",
         )
 
-        status = get_stripe_configuration_status(settings_obj)
+        status = get_paypal_configuration_status(settings_obj)
 
-        self.assertFalse(status["stripe_requested"])
-        self.assertFalse(status["stripe_checkout_ready"])
-        self.assertFalse(status["stripe_webhooks_ready"])
-        self.assertFalse(status["stripe_fully_ready"])
+        self.assertFalse(status["paypal_requested"])
+        self.assertFalse(status["paypal_checkout_ready"])
+        self.assertFalse(status["paypal_webhooks_ready"])
+        self.assertFalse(status["paypal_fully_ready"])
 
-    def test_stripe_configuration_status_requires_real_keys(self) -> None:
+    def test_paypal_configuration_status_requires_real_keys(self) -> None:
         settings_obj = SimpleNamespace(
-            PAYMENT_BACKEND="stripe",
-            STRIPE_PUBLISHABLE_KEY="pk_test_realistic_value",
-            STRIPE_SECRET_KEY="sk_test_realistic_value",
-            STRIPE_WEBHOOK_SECRET="whsec_test_realistic_value",
+            PAYMENT_BACKEND="paypal",
+            PAYPAL_CLIENT_ID="AeRealisticClientId1234567890",
+            PAYPAL_CLIENT_SECRET="EeRealisticSecret1234567890",
+            PAYPAL_WEBHOOK_ID="4JH86294D6297924G",
         )
 
-        status = get_stripe_configuration_status(settings_obj)
+        status = get_paypal_configuration_status(settings_obj)
 
-        self.assertTrue(status["stripe_requested"])
-        self.assertTrue(status["stripe_payments_ready"])
-        self.assertTrue(status["stripe_checkout_ready"])
-        self.assertTrue(status["stripe_webhooks_ready"])
-        self.assertTrue(status["stripe_fully_ready"])
+        self.assertTrue(status["paypal_requested"])
+        self.assertTrue(status["paypal_payments_ready"])
+        self.assertTrue(status["paypal_checkout_ready"])
+        self.assertTrue(status["paypal_webhooks_ready"])
+        self.assertTrue(status["paypal_fully_ready"])
 
     def test_supabase_configuration_status_requires_url_and_publishable_key(self) -> None:
         settings_obj = SimpleNamespace(
@@ -291,23 +330,20 @@ class RuntimeConfigurationTest(unittest.TestCase):
         settings_obj = Settings(
             DATABASE_URL="sqlite:///test.db",
             SECRET_KEY="super-secret-app-key",
-            STRIPE_PUBLISHABLE_KEY="pk_test_visible_value",
-            STRIPE_SECRET_KEY="sk_test_hidden_value",
-            STRIPE_WEBHOOK_SECRET="whsec_hidden_value",
+            PAYPAL_CLIENT_ID="AeVisibleClientIdValue",
+            PAYPAL_CLIENT_SECRET="paypal-hidden-secret-value",
         )
 
         settings_repr = repr(settings_obj)
 
-        self.assertIn("STRIPE_PUBLISHABLE_KEY='pk_test_visible_value'", settings_repr)
+        self.assertIn("PAYPAL_CLIENT_ID='AeVisibleClientIdValue'", settings_repr)
         self.assertNotIn("super-secret-app-key", settings_repr)
-        self.assertNotIn("sk_test_hidden_value", settings_repr)
-        self.assertNotIn("whsec_hidden_value", settings_repr)
+        self.assertNotIn("paypal-hidden-secret-value", settings_repr)
 
     def test_redact_sensitive_text_masks_known_secret_values(self) -> None:
         settings_obj = SimpleNamespace(
             SECRET_KEY="super-secret-app-key",
-            STRIPE_SECRET_KEY="sk_test_hidden_value",
-            STRIPE_WEBHOOK_SECRET="whsec_hidden_value",
+            PAYPAL_CLIENT_SECRET="paypal-hidden-secret-value",
             SENDGRID_API_KEY="SG.hidden-value",
             SMTP_PASSWORD="smtp-secret-password",
             TWILIO_AUTH_TOKEN="twilio-secret-token",
@@ -315,13 +351,12 @@ class RuntimeConfigurationTest(unittest.TestCase):
         )
 
         text = (
-            "stripe=sk_test_hidden_value webhook=whsec_hidden_value "
+            "paypal=paypal-hidden-secret-value "
             "sendgrid=SG.hidden-value app=super-secret-app-key"
         )
         redacted = redact_sensitive_text(text, settings_obj)
 
-        self.assertNotIn("sk_test_hidden_value", redacted)
-        self.assertNotIn("whsec_hidden_value", redacted)
+        self.assertNotIn("paypal-hidden-secret-value", redacted)
         self.assertNotIn("SG.hidden-value", redacted)
         self.assertNotIn("super-secret-app-key", redacted)
         self.assertIn(mask_secret("super-secret-app-key"), redacted)

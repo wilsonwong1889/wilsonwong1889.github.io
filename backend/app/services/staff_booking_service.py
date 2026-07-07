@@ -37,6 +37,7 @@ from app.services.booking_service import (
 )
 from app.services.payment_service import (
     PaymentBackendError,
+    capture_payment_order,
     create_payment_intent,
     create_refund,
     get_payment_intent_session,
@@ -738,7 +739,7 @@ def accept_staff_booking(db: Session, booking: StaffBooking, *, actor_id: UUID |
     if booking.status != "Requested":
         raise StaffBookingStateError("This booking request is no longer pending a response")
 
-    # A direct staff booking is free: skip Stripe entirely. The customer
+    # A direct staff booking is free: skip online payment entirely. The customer
     # completes a $0 confirmation (confirm_free_staff_booking). Paid bookings
     # (legacy / non-zero) still mint a payment intent.
     if booking.price_cents <= 0:
@@ -822,7 +823,7 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
     if expire_pending_staff_booking(db, booking):
         db.commit()
         raise PaymentSessionError("Payment window expired for this booking")
-    # Free direct staff booking: no Stripe, the customer confirms at $0.
+    # Free direct staff booking: no online payment, the customer confirms at $0.
     if booking.price_cents <= 0:
         attach_staff_profile_snapshot(db, booking)
         return {
@@ -830,7 +831,7 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
             "payment_intent_id": None,
             "payment_client_secret": None,
             "payment_backend": "free",
-            "stripe_publishable_key": "",
+            "paypal_client_id": None,
             "payment_expires_at": booking.payment_expires_at,
             "payment_seconds_remaining": booking.payment_seconds_remaining,
         }
@@ -856,15 +857,58 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
         "payment_intent_id": payment_session.intent_id,
         "payment_client_secret": payment_session.client_secret,
         "payment_backend": settings.PAYMENT_BACKEND,
-        "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+        "paypal_client_id": settings.PAYPAL_CLIENT_ID or None,
         "payment_expires_at": booking.payment_expires_at,
         "payment_seconds_remaining": booking.payment_seconds_remaining,
     }
 
 
+def capture_staff_booking_payment(db: Session, booking: StaffBooking, user: User) -> dict:
+    """Capture the customer's approved PayPal order for a staff booking and run
+    it through the same idempotent webhook pipeline as the async webhook."""
+    expire_stale_pending_staff_bookings(db)
+    db.refresh(booking)
+    if booking.status == "Paid":
+        return {"received": True, "staff_booking_id": str(booking.id), "status": booking.status}
+    if booking.status not in PAYABLE_STATUSES:
+        raise PaymentSessionError("Payment is only available once a request is accepted")
+    if expire_pending_staff_booking(db, booking):
+        db.commit()
+        raise PaymentSessionError("Payment window expired for this booking")
+    if not booking.payment_intent_id:
+        raise PaymentSessionError("No payment order exists for this booking yet")
+
+    capture = capture_payment_order(booking.payment_intent_id)
+    if capture.status != "COMPLETED":
+        raise PaymentSessionError(
+            f"PayPal did not complete the payment (status: {capture.status or 'unknown'}). Please try again."
+        )
+
+    event = {
+        "id": f"paypal_capture_{capture.capture_id or uuid4().hex}",
+        "type": "payment_intent.succeeded",
+        "data": {
+            "object": {
+                "id": booking.payment_intent_id,
+                "metadata": {
+                    "booking_type": "staff",
+                    "booking_id": str(booking.id),
+                    "staff_booking_id": str(booking.id),
+                },
+            }
+        },
+    }
+    from app.tasks import process_webhook_event_task
+
+    result = process_webhook_event_task.delay(event)
+    if getattr(result, "inline", False) or settings.CELERY_TASK_ALWAYS_EAGER:
+        return result.get()
+    return {"queued": True, "staff_booking_id": str(booking.id), "capture_status": capture.status}
+
+
 def confirm_free_staff_booking(db: Session, booking: StaffBooking) -> StaffBooking:
     """Customer completes the $0 confirmation for an accepted free staff booking.
-    No Stripe — the booking is confirmed directly."""
+    No online payment — the booking is confirmed directly."""
     expire_stale_pending_staff_bookings(db)
     db.refresh(booking)
     if booking.status not in PAYABLE_STATUSES:
@@ -889,7 +933,7 @@ def confirm_free_staff_booking(db: Session, booking: StaffBooking) -> StaffBooki
 
 def waive_staff_booking_payment(db: Session, booking: StaffBooking, admin: User) -> StaffBooking:
     if booking.status not in PAYABLE_STATUSES:
-        raise ValueError("Only accepted staff bookings awaiting payment can skip Stripe payment")
+        raise ValueError("Only accepted staff bookings awaiting payment can skip payment")
     original_price_cents = booking.price_cents
     booking.price_cents = 0
     waived_payment_reference = f"admin_staff_waived_{uuid4().hex[:20]}"
@@ -903,7 +947,7 @@ def waive_staff_booking_payment(db: Session, booking: StaffBooking, admin: User)
             "staff_booking_id": str(booking.id),
             "original_price_cents": original_price_cents,
             "payment_intent_id": waived_payment_reference,
-            "reason": "Admin skipped Stripe payment for staff booking",
+            "reason": "Admin skipped payment for staff booking",
         },
     )
     db.commit()
@@ -1028,7 +1072,7 @@ def mark_staff_booking_paid_manually(db: Session, booking: StaffBooking, admin: 
             "staff_booking_id": str(booking.id),
             "price_cents": booking.price_cents,
             "payment_intent_id": manual_payment_reference,
-            "reason": "Admin marked staff booking paid without Stripe checkout",
+            "reason": "Admin marked staff booking paid without online checkout",
         },
     )
     db.commit()
@@ -1049,6 +1093,7 @@ def _auto_refund_stale_staff_payment(
             refund_id = create_refund(
                 payment_intent_id=payment_intent_id,
                 amount_cents=refund_amount,
+                currency=booking.currency,
             )
         except Exception as exc:  # noqa: BLE001
             failure_message = str(exc)

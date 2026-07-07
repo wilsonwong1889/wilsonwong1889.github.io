@@ -99,14 +99,17 @@ def _staff_names(booking: Booking) -> list[str]:
 def _payment_method(booking: Booking) -> str:
     """Best-effort payment method label derived from the payment reference.
 
-    The model doesn't store card brand/last4, so we infer from the intent id:
-    Stripe intents start with "pi_"; admin-marked payments contain "manual".
+    The model doesn't store payer details, so we infer from the reference:
+    admin-marked payments contain "manual"; legacy Stripe intents start with
+    "pi_"; anything else with a reference paid through PayPal checkout.
     """
     ref = (booking.payment_intent_id or "").lower()
     if "manual" in ref:
         return "Manual (admin)"
-    if ref.startswith("pi_") or ref:
+    if ref.startswith("pi_"):
         return "Card"
+    if ref:
+        return "PayPal"
     return "—"
 
 

@@ -32,6 +32,7 @@ from app.services.staff_booking_service import (
     StaffBookingStateError,
     accept_staff_booking,
     cancel_staff_booking,
+    capture_staff_booking_payment,
     confirm_free_staff_booking,
     confirm_staff_booking_request,
     create_guest_staff_booking,
@@ -146,6 +147,24 @@ def get_my_staff_booking_payment_session(
         raise HTTPException(status_code=404, detail="Staff booking not found")
     try:
         return get_staff_booking_payment_session(db, booking, current_user)
+    except PaymentBackendError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except PaymentSessionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/staff-bookings/{staff_booking_id}/capture-payment")
+def capture_my_staff_booking_payment(
+    staff_booking_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(booking_rate_limit),
+):
+    booking = get_staff_booking_for_user(db, staff_booking_id, current_user)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Staff booking not found")
+    try:
+        return capture_staff_booking_payment(db, booking, current_user)
     except PaymentBackendError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except PaymentSessionError as exc:

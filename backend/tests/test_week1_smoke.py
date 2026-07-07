@@ -417,11 +417,11 @@ class AppSmokeTest(unittest.TestCase):
 
         response = self.client.get("/assets/js/views/booking-detail.js")
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertIn("stripeElements.submit()", response.text)
+        self.assertIn("paypal.Buttons({", response.text)
         self.assertIn('new URL("/payment-success"', response.text)
         self.assertIn("bookingReschedulePanel", response.text)
         self.assertIn("api.rescheduleBooking(state.selectedBooking.id", response.text)
-        self.assertIn("Skip Stripe as admin", response.text)
+        self.assertIn("Skip payment as admin", response.text)
         self.assertIn('api.adminWaiveBookingPayment(button.dataset.bookingId)', response.text)
         self.assertIn("Mark paid manually as admin", response.text)
         self.assertIn('api.adminMarkBookingPaid(button.dataset.bookingId)', response.text)
@@ -1947,16 +1947,16 @@ class AppSmokeTest(unittest.TestCase):
         payload = json.dumps(event)
         timestamp = str(int(time.time()))
         signature = hmac.new(
-            settings.STRIPE_WEBHOOK_SECRET.encode("utf-8"),
+            settings.SECRET_KEY.encode("utf-8"),
             f"{timestamp}.{payload}".encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
         response = self.client.post(
-            "/api/webhooks/stripe",
+            "/api/webhooks/paypal",
             data=payload,
             headers={
                 "Content-Type": "application/json",
-                "Stripe-Signature": f"t={timestamp},v1={signature}",
+                "Webhook-Signature": f"t={timestamp},v1={signature}",
             },
         )
         self.assertEqual(response.status_code, 200, response.text)
@@ -1998,8 +1998,8 @@ class AppSmokeTest(unittest.TestCase):
         self.assertIn(start_time.isoformat(), availability["available_start_times"])
 
         refund_context = (
-            patch("app.services.booking_service.create_refund", return_value="re_smoke_stripe")
-            if settings.PAYMENT_BACKEND == "stripe"
+            patch("app.services.booking_service.create_refund", return_value="re_smoke_paypal")
+            if settings.PAYMENT_BACKEND == "paypal"
             else nullcontext()
         )
 
@@ -2990,7 +2990,7 @@ class AppSmokeTest(unittest.TestCase):
         self.assertIn("const updatedAccount = await api.adminUpdateUserRole", admin_js.text)
         self.assertIn("...updatedAccount", admin_js.text)
         self.assertIn("Process a ${amountLabel} refund? This changes payment records.", admin_js.text)
-        self.assertIn("window.confirm(\"Skip Stripe and mark this booking free?\")", admin_js.text)
+        self.assertIn("window.confirm(\"Skip payment and mark this booking free?\")", admin_js.text)
         self.assertIn("window.confirm(\"Mark this booking paid manually?\")", admin_js.text)
         self.assertIn("window.confirm(`Delete ${profileName}? This will also remove the profile from any rooms.`)", admin_js.text)
 

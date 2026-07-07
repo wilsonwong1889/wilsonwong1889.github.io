@@ -10,8 +10,7 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 PLACEHOLDER_MARKERS = ("change_me", "change-me", "placeholder", "example.com", "studio.local")
 SENSITIVE_SETTING_NAMES = (
     "SECRET_KEY",
-    "STRIPE_SECRET_KEY",
-    "STRIPE_WEBHOOK_SECRET",
+    "PAYPAL_CLIENT_SECRET",
     "SENDGRID_API_KEY",
     "RESEND_API_KEY",
     "EMAIL_FUNCTION_SECRET",
@@ -48,12 +47,15 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str = Field(default="", repr=False)
     SUPABASE_STORAGE_BUCKET: str = "media"
 
-    STRIPE_PUBLISHABLE_KEY: str = ""
-    STRIPE_SECRET_KEY: str = Field(default="sk_test_placeholder", repr=False)
-    STRIPE_WEBHOOK_SECRET: str = Field(default="whsec_placeholder", repr=False)
-    STRIPE_API_VERSION: str = "2026-02-25.clover"
+    PAYPAL_CLIENT_ID: str = ""
+    PAYPAL_CLIENT_SECRET: str = Field(default="", repr=False)
+    PAYPAL_WEBHOOK_ID: str = ""
+    # "sandbox" or "live" — selects the PayPal API host.
+    PAYPAL_ENV: str = "sandbox"
+    PAYPAL_TIMEOUT_SECONDS: int = 20
     PAYMENT_BACKEND: str = "stub"
-    STRIPE_WEBHOOK_TOLERANCE_SECONDS: int = 300
+    # Stub-mode webhook signatures (tests/dev) are rejected past this age.
+    WEBHOOK_TOLERANCE_SECONDS: int = 300
 
     SENDGRID_API_KEY: str = Field(default="SG.placeholder", repr=False)
     RESEND_API_KEY: str = Field(default="", repr=False)
@@ -177,24 +179,24 @@ def _is_configured(value: str) -> bool:
     return bool(value.strip()) and not _looks_placeholder(value)
 
 
-def get_stripe_configuration_status(settings_obj: Optional[Settings] = None) -> dict[str, bool]:
+def get_paypal_configuration_status(settings_obj: Optional[Settings] = None) -> dict[str, bool]:
     current = settings_obj or settings
-    stripe_requested = current.PAYMENT_BACKEND == "stripe"
-    publishable_key_ready = _is_configured(current.STRIPE_PUBLISHABLE_KEY)
-    secret_key_ready = _is_configured(current.STRIPE_SECRET_KEY)
-    webhook_secret_ready = _is_configured(current.STRIPE_WEBHOOK_SECRET)
+    paypal_requested = current.PAYMENT_BACKEND == "paypal"
+    client_id_ready = _is_configured(current.PAYPAL_CLIENT_ID)
+    client_secret_ready = _is_configured(current.PAYPAL_CLIENT_SECRET)
+    webhook_id_ready = _is_configured(current.PAYPAL_WEBHOOK_ID)
     return {
-        "stripe_requested": stripe_requested,
-        "stripe_publishable_key_ready": publishable_key_ready,
-        "stripe_secret_key_ready": secret_key_ready,
-        "stripe_webhook_secret_ready": webhook_secret_ready,
-        "stripe_payments_ready": stripe_requested and secret_key_ready,
-        "stripe_checkout_ready": stripe_requested and publishable_key_ready and secret_key_ready,
-        "stripe_webhooks_ready": stripe_requested and webhook_secret_ready,
-        "stripe_fully_ready": stripe_requested
-        and publishable_key_ready
-        and secret_key_ready
-        and webhook_secret_ready,
+        "paypal_requested": paypal_requested,
+        "paypal_client_id_ready": client_id_ready,
+        "paypal_client_secret_ready": client_secret_ready,
+        "paypal_webhook_id_ready": webhook_id_ready,
+        "paypal_payments_ready": paypal_requested and client_id_ready and client_secret_ready,
+        "paypal_checkout_ready": paypal_requested and client_id_ready and client_secret_ready,
+        "paypal_webhooks_ready": paypal_requested and webhook_id_ready,
+        "paypal_fully_ready": paypal_requested
+        and client_id_ready
+        and client_secret_ready
+        and webhook_id_ready,
     }
 
 
@@ -221,8 +223,8 @@ def validate_runtime_configuration(settings_obj: Optional[Settings] = None) -> N
         errors.append("SECRET_KEY must be a strong non-placeholder value in production")
     if not current.APP_BASE_URL.startswith("https://"):
         errors.append("APP_BASE_URL must use https in production")
-    if current.PAYMENT_BACKEND != "stripe":
-        errors.append("PAYMENT_BACKEND must be stripe in production")
+    if current.PAYMENT_BACKEND != "paypal":
+        errors.append("PAYMENT_BACKEND must be paypal in production")
     if current.EMAIL_BACKEND not in {"disabled", "sendgrid", "smtp", "resend", "supabase"}:
         errors.append("EMAIL_BACKEND must be disabled, sendgrid, smtp, resend, or supabase in production")
     if current.CELERY_TASK_ALWAYS_EAGER and not getattr(current, "ALLOW_INLINE_TASKS_IN_PRODUCTION", False):
@@ -238,13 +240,17 @@ def validate_runtime_configuration(settings_obj: Optional[Settings] = None) -> N
             errors.append("SUPABASE_URL must be configured when Supabase auth is enabled")
         if not supabase_publishable_key or _looks_placeholder(supabase_publishable_key):
             errors.append("SUPABASE_PUBLISHABLE_KEY must be configured when Supabase auth is enabled")
-    if current.PAYMENT_BACKEND == "stripe":
-        if not current.STRIPE_PUBLISHABLE_KEY or _looks_placeholder(current.STRIPE_PUBLISHABLE_KEY):
-            errors.append("STRIPE_PUBLISHABLE_KEY must be configured when PAYMENT_BACKEND is stripe")
-        if _looks_placeholder(current.STRIPE_SECRET_KEY):
-            errors.append("STRIPE_SECRET_KEY must be configured when PAYMENT_BACKEND is stripe")
-        if _looks_placeholder(current.STRIPE_WEBHOOK_SECRET):
-            errors.append("STRIPE_WEBHOOK_SECRET must be configured when PAYMENT_BACKEND is stripe")
+    if current.PAYMENT_BACKEND == "paypal":
+        if not current.PAYPAL_CLIENT_ID or _looks_placeholder(current.PAYPAL_CLIENT_ID):
+            errors.append("PAYPAL_CLIENT_ID must be configured when PAYMENT_BACKEND is paypal")
+        if not current.PAYPAL_CLIENT_SECRET or _looks_placeholder(current.PAYPAL_CLIENT_SECRET):
+            errors.append("PAYPAL_CLIENT_SECRET must be configured when PAYMENT_BACKEND is paypal")
+        if not current.PAYPAL_WEBHOOK_ID or _looks_placeholder(current.PAYPAL_WEBHOOK_ID):
+            errors.append("PAYPAL_WEBHOOK_ID must be configured when PAYMENT_BACKEND is paypal")
+        # PAYPAL_ENV=sandbox is allowed in production on purpose: the studio
+        # runs test-mode payments on the live site until real payouts start.
+        if current.PAYPAL_ENV.lower().strip() not in {"sandbox", "live"}:
+            errors.append("PAYPAL_ENV must be sandbox or live")
     if current.EMAIL_BACKEND == "sendgrid":
         if _looks_placeholder(current.SENDGRID_API_KEY):
             errors.append("SENDGRID_API_KEY must be configured in production")
