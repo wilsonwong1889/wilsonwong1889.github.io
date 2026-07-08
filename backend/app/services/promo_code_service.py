@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import secrets
 from datetime import datetime, timezone
 
@@ -220,6 +221,50 @@ def _generate_unique_code(db: Session, prefix: str, month_compact: str) -> str:
         if not db.query(PromoCode).filter(PromoCode.code == candidate).first():
             return candidate
     raise PromoCodeError("Could not generate a unique promo code; please retry")
+
+
+def _code_prefix_from_name(full_name: str) -> str:
+    """A short, human-recognisable code prefix built from the person's name,
+    e.g. 'Sarah Khan' -> 'SARAHKHAN' (capped)."""
+    letters = re.sub(r"[^A-Za-z]", "", full_name).upper()
+    return letters[:10] or "MEMBER"
+
+
+def _generate_member_code(db: Session, prefix: str) -> str:
+    for _ in range(25):
+        candidate = f"{prefix}-{secrets.token_hex(3).upper()}"
+        if not db.query(PromoCode).filter(PromoCode.code == candidate).first():
+            return candidate
+    raise PromoCodeError("Could not generate a unique promo code; please retry")
+
+
+def create_member_code(
+    db: Session, *, full_name: str, percent_off: int, max_uses: int | None = None
+) -> dict:
+    """Issue a single named discount code to someone who paid for a membership.
+    The code is auto-generated from their name, gives percent_off, and is capped
+    at max_uses redemptions (None = unlimited). It is not tied to a member
+    account, so the person can redeem it by simply entering the code."""
+    if not (1 <= percent_off <= 100):
+        raise PromoCodeError("percent_off must be between 1 and 100")
+    if max_uses is not None and max_uses < 1:
+        raise PromoCodeError("max_uses must be at least 1, or leave it blank for unlimited")
+
+    clean_name = " ".join(str(full_name or "").split())
+    if not clean_name:
+        raise PromoCodeError("Full name is required")
+
+    promo = PromoCode(
+        code=_generate_member_code(db, _code_prefix_from_name(clean_name)),
+        description=f"Membership code — {clean_name}",
+        percent_off=percent_off,
+        max_redemptions=max_uses,
+        member_unique=False,
+        active=True,
+    )
+    db.add(promo)
+    db.flush()
+    return serialize_promo_code(db, promo)
 
 
 def generate_monthly_member_codes(

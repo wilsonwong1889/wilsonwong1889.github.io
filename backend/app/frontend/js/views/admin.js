@@ -2864,6 +2864,60 @@ export function initAdminView(actions) {
   document.getElementById("admin-schedule-refresh")?.addEventListener("click", () => loadAdminStaffSchedule());
   document.getElementById("admin-tab-schedule")?.addEventListener("click", () => loadAdminStaffSchedule());
 
+  // "Unlimited uses" disables the number-of-uses input.
+  document.getElementById("admin-member-code-unlimited")?.addEventListener("change", (event) => {
+    const usesInput = document.getElementById("admin-member-code-uses");
+    if (!usesInput) return;
+    usesInput.disabled = event.currentTarget.checked;
+    if (event.currentTarget.checked) usesInput.value = "";
+  });
+
+  document.getElementById("admin-member-code-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const feedback = document.getElementById("admin-member-code-feedback");
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalLabel = submitButton ? submitButton.textContent : "";
+    const unlimited = Boolean(form.elements.unlimited?.checked);
+    const usesRaw = form.elements.max_uses?.value;
+    const payload = {
+      full_name: form.elements.full_name.value.trim(),
+      percent_off: Number(form.elements.percent_off.value),
+    };
+    if (!unlimited && usesRaw) {
+      payload.max_uses = Number(usesRaw);
+    }
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "Generating…";
+    }
+    if (feedback) feedback.classList.add("hidden");
+    try {
+      const promo = await api.adminCreateMemberCode(payload);
+      const usesLabel = promo.max_redemptions ? `${promo.max_redemptions} use${promo.max_redemptions === 1 ? "" : "s"}` : "unlimited uses";
+      if (feedback) {
+        feedback.innerHTML = `Code for <strong>${escapeHtml(payload.full_name)}</strong>: <code class="member-code-value">${escapeHtml(promo.code)}</code> — ${promo.percent_off}% off, ${usesLabel}. Copy and give it to them.`;
+        feedback.classList.remove("hidden", "is-error");
+        feedback.classList.add("is-success");
+      }
+      form.reset();
+      const usesInput = document.getElementById("admin-member-code-uses");
+      if (usesInput) usesInput.disabled = false;
+      await actions.refreshAll(`Member code ${promo.code} created.`);
+    } catch (error) {
+      if (feedback) {
+        feedback.textContent = error?.message ? String(error.message) : "Could not create the code.";
+        feedback.classList.remove("hidden", "is-success");
+        feedback.classList.add("is-error");
+      }
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = originalLabel;
+      }
+    }
+  });
+
   document.getElementById("admin-monthly-codes-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;

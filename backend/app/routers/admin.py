@@ -26,6 +26,7 @@ from app.schemas.booking import (
 from app.schemas.admin import AdminTestCaseOut
 from app.schemas.admin import AdminSuiteDashMetaOut, AdminSuiteDashStatusOut
 from app.schemas.promo_code import (
+    MemberCodeRequest,
     MonthlyMemberCodeRequest,
     MonthlyMemberCodeResult,
     PromoCodeCreate,
@@ -66,6 +67,7 @@ from app.services.booking_service import (
 from app.services.payment_service import PaymentBackendError
 from app.services.promo_code_service import (
     PromoCodeError,
+    create_member_code,
     create_promo_code,
     generate_monthly_member_codes,
     list_promo_codes,
@@ -469,6 +471,38 @@ def admin_update_promo_code(
     except PromoCodeError as exc:
         status_code = 404 if "not found" in str(exc).lower() else 400
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@router.post("/promo-codes/member", response_model=PromoCodeOut, status_code=201)
+def admin_create_member_code(
+    payload: MemberCodeRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(admin_rate_limit),
+):
+    try:
+        promo_code = create_member_code(
+            db,
+            full_name=payload.full_name,
+            percent_off=payload.percent_off,
+            max_uses=payload.max_uses,
+        )
+        create_audit_log(
+            db,
+            actor_id=admin.id,
+            booking_id=None,
+            action="member_code_created",
+            details={
+                "code": promo_code["code"],
+                "full_name": payload.full_name,
+                "percent_off": payload.percent_off,
+                "max_uses": payload.max_uses,
+            },
+        )
+        db.commit()
+        return promo_code
+    except PromoCodeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/promo-codes/generate-monthly", response_model=MonthlyMemberCodeResult, status_code=201)

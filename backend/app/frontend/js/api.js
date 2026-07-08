@@ -367,6 +367,12 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  adminCreateMemberCode(payload) {
+    return request("/api/admin/promo-codes/member", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
   adminGenerateMonthlyMemberCodes(payload) {
     return request("/api/admin/promo-codes/generate-monthly", {
       method: "POST",

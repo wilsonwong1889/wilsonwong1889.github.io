@@ -155,3 +155,41 @@ class MemberCouponTest(BaseAppTest):
     def test_06_generate_requires_admin(self) -> None:
         resp = self._generate({})
         self.assertIn(resp.status_code, (401, 403), resp.text)
+
+    def test_07_named_member_code_limited_uses(self) -> None:
+        admin = self._admin_headers()
+        resp = self.client.post(
+            "/api/admin/promo-codes/member",
+            json={"full_name": "Sarah Khan", "percent_off": 25, "max_uses": 3},
+            headers=admin,
+        )
+        self.assertEqual(resp.status_code, 201, resp.text)
+        body = resp.json()
+        self.assertTrue(body["code"].startswith("SARAHKHAN-"))
+        self.assertEqual(body["percent_off"], 25)
+        self.assertEqual(body["max_redemptions"], 3)
+        self.assertIn("Sarah Khan", body["description"])
+        # Redeemable by anyone with the code (not tied to a member account).
+        preview = self.client.post(
+            "/api/public/promo-codes/preview",
+            json={"code": body["code"], "amount_cents": 10000},
+        )
+        self.assertEqual(preview.status_code, 200, preview.text)
+        self.assertEqual(preview.json()["discount_cents"], 2500)
+
+    def test_08_named_member_code_unlimited(self) -> None:
+        admin = self._admin_headers()
+        resp = self.client.post(
+            "/api/admin/promo-codes/member",
+            json={"full_name": "Jordan Lee", "percent_off": 15},
+            headers=admin,
+        )
+        self.assertEqual(resp.status_code, 201, resp.text)
+        self.assertIsNone(resp.json()["max_redemptions"])  # unlimited
+
+    def test_09_named_member_code_requires_admin(self) -> None:
+        resp = self.client.post(
+            "/api/admin/promo-codes/member",
+            json={"full_name": "No Auth", "percent_off": 10},
+        )
+        self.assertIn(resp.status_code, (401, 403), resp.text)

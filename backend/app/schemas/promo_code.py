@@ -115,6 +115,22 @@ class PromoCodePreviewOut(BaseModel):
     amount_off_cents: Optional[int] = None
 
 
+class MemberCodeRequest(BaseModel):
+    # Issue a single named code to someone who paid for a membership in person.
+    full_name: str = Field(min_length=1, max_length=120)
+    percent_off: int = Field(ge=1, le=100)
+    # None / omitted = unlimited uses.
+    max_uses: Optional[int] = Field(default=None, ge=1)
+
+    @field_validator("full_name")
+    @classmethod
+    def clean_full_name(cls, value: str) -> str:
+        cleaned = " ".join(str(value or "").split())
+        if not cleaned:
+            raise ValueError("Full name is required")
+        return cleaned
+
+
 class MonthlyMemberCodeRequest(BaseModel):
     month: str = Field(pattern=r"^\d{4}-\d{2}$")
     member_category: str = Field(min_length=1, max_length=60)
