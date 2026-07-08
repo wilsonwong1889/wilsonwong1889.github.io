@@ -7952,7 +7952,8 @@ body[data-page="home"] .home-carousel-slides-container {
 body[data-page="home"] .home-hero-image {
   object-position: center 46%;
   filter: saturate(1.02) brightness(1.04) contrast(1.02);
-  transform: scale(1.015);
+  /* No upscale on the carousel — show the photo 1:1 for maximum sharpness. */
+  transform: scale(1);
 }
 
 body[data-page="home"] .home-hero-overlay-primary {
