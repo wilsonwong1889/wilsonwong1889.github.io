@@ -106,11 +106,12 @@ app.include_router(admin.router)
 app.include_router(webhooks.router)
 
 # Long-lived media (images/fonts/video/pdf) rarely change and aren't versioned;
-# cache them hard so repeat visits don't re-download. Code (css/js) is cached
-# briefly so a browsing session reuses one copy while staying fresh; bump the
-# ?v= query string in the HTML when shipping a css/js change for instant busting.
-# Everything still carries ETag/Last-Modified, so post-expiry requests revalidate
-# to a tiny 304 instead of re-sending the body.
+# cache them hard so repeat visits don't re-download. Code (css/js) must
+# revalidate on every load: the HTML's ?v= only busts main.js, and its ES-module
+# imports (views/*.js) carry no version, so a max-age here would serve stale
+# modules until it expired. "no-cache" keeps the file cached but forces an
+# ETag revalidation each load — unchanged files come back as a tiny 304, changed
+# files (e.g. after a deploy) are picked up immediately.
 _MEDIA_SUFFIXES = (
     ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico",
     ".woff", ".woff2", ".ttf", ".otf",
@@ -143,7 +144,7 @@ class CachingStaticFiles(StaticFiles):
         if lowered.endswith(_MEDIA_SUFFIXES):
             response.headers["Cache-Control"] = "public, max-age=2592000"
         elif lowered.endswith(_CODE_SUFFIXES):
-            response.headers["Cache-Control"] = "public, max-age=3600"
+            response.headers["Cache-Control"] = "no-cache"
         else:
             response.headers["Cache-Control"] = "public, max-age=300"
 
