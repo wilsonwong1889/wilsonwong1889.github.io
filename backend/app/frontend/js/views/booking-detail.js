@@ -832,7 +832,7 @@ async function mountApplePay(paypal, session, booking, container) {
       currencyCode: session.currency_code || (booking?.currency || "CAD"),
       merchantCapabilities: config.merchantCapabilities,
       supportedNetworks: config.supportedNetworks,
-      requiredBillingContactFields: ["postalAddress"],
+      // A studio session is a service — no shipping/billing address is collected.
       total: {
         label: "BIPOC Creative Innovation Studio",
         type: "final",

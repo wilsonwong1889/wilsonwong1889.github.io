@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import httpx
 
-from app.config import get_payment_backend, get_paypal_configuration_status, redact_sensitive_text, settings
+from app.config import get_paypal_configuration_status, redact_sensitive_text, settings
 
 
 PAYPAL_API_BASE_URLS = {
@@ -48,7 +48,7 @@ class PaymentProviderError(PaymentBackendError):
 
 
 def _is_paypal_backend() -> bool:
-    return get_payment_backend(settings) == "paypal"
+    return settings.PAYMENT_BACKEND == "paypal"
 
 
 def paypal_api_base_url() -> str:
@@ -230,6 +230,13 @@ def _create_paypal_order(
                 "amount": _format_amount(amount_cents, currency),
             }
         ],
+        # Studio sessions are a service, not a shipped product — tell PayPal (and
+        # the Apple Pay / Google Pay sheets) not to collect a shipping address.
+        "application_context": {
+            "shipping_preference": "NO_SHIPPING",
+            "user_action": "PAY_NOW",
+            "brand_name": "BIPOC Creative Innovation Studio",
+        },
     }
     return _paypal_request(
         "POST",
