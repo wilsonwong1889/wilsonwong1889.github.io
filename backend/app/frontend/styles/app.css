@@ -4272,6 +4272,51 @@ textarea.booking-contact-value:focus {
   line-height: 1.5;
 }
 
+/* Apple Pay / Google Pay express buttons shown above the PayPal button. */
+.booking-wallets {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.booking-wallets.hidden {
+  display: none;
+}
+
+.booking-wallets .wallet-slot:empty {
+  display: none;
+}
+
+.booking-wallets .wallet-apple-pay-button {
+  -webkit-appearance: -apple-pay-button;
+  appearance: -apple-pay-button;
+  -apple-pay-button-type: pay;
+  -apple-pay-button-style: black;
+  width: 100%;
+  height: 48px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.booking-wallets-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #8194a4;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.booking-wallets-divider::before,
+.booking-wallets-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(24, 33, 39, 0.12);
+}
+
 .booking-checkout-payment #booking-payment-element {
   margin-top: 0;
   padding: 14px;

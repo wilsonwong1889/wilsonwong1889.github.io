@@ -181,6 +181,9 @@ class PaymentSessionOut(BaseModel):
     payment_client_secret: Optional[str] = None
     payment_backend: str
     paypal_client_id: Optional[str] = None
+    paypal_env: Optional[str] = None
+    amount_value: Optional[str] = None
+    currency_code: Optional[str] = None
     payment_expires_at: Optional[datetime] = None
     payment_seconds_remaining: Optional[int] = None
 

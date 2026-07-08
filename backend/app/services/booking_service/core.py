@@ -12,7 +12,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from app.config import get_payment_backend, settings
+from app.config import settings
 from app.core.security import create_access_token, hash_password
 from app.models.booking import AuditLog, Booking, BookingSlot, BookingStaffAssignment, NotificationLog, Refund, Review
 from app.models.room import Room
@@ -1535,9 +1535,10 @@ def get_booking_payment_session(db: Session, booking: Booking, user: User) -> di
     if not user.email:
         raise PaymentSessionError("User email is required for payment")
 
+    charge_cents = upfront_charge_cents(booking)
     payment_session = get_payment_intent_session(
         payment_intent_id=booking.payment_intent_id,
-        amount_cents=upfront_charge_cents(booking),
+        amount_cents=charge_cents,
         currency=booking.currency,
         booking_id=str(booking.id),
         user_email=user.email,
@@ -1552,8 +1553,11 @@ def get_booking_payment_session(db: Session, booking: Booking, user: User) -> di
         "booking_id": booking.id,
         "payment_intent_id": payment_session.intent_id,
         "payment_client_secret": payment_session.client_secret,
-        "payment_backend": get_payment_backend(settings),
+        "payment_backend": settings.PAYMENT_BACKEND,
         "paypal_client_id": settings.PAYPAL_CLIENT_ID or None,
+        "paypal_env": settings.PAYPAL_ENV,
+        "amount_value": f"{charge_cents // 100}.{charge_cents % 100:02d}",
+        "currency_code": booking.currency,
         "payment_expires_at": booking.payment_expires_at,
         "payment_seconds_remaining": booking.payment_seconds_remaining,
     }
