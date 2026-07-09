@@ -13,9 +13,14 @@ import {
 
 let paypalButtonsInstance = null;
 let paypalSdkPromise = null;
+let googlePayScriptPromise = null;
 let activePaymentSession = null;
 let paymentDeadlineTimer = null;
 let reloadBookingDetailAction = null;
+// Reschedule UI is temporarily hidden (admin-only panel was too messy). Flip to
+// true to bring back the "Reschedule this booking" panel on the detail page;
+// all the wiring below is intact.
+const RESCHEDULE_ENABLED = false;
 let rescheduleAvailability = null;
 let rescheduleBookingId = null;
 let rescheduleDateValue = "";
@@ -608,6 +613,11 @@ function clearPaymentElement() {
   if (paymentContainer) {
     paymentContainer.innerHTML = "";
   }
+  const wallets = document.getElementById("booking-wallets");
+  if (wallets) {
+    wallets.innerHTML = "";
+    wallets.classList.add("hidden");
+  }
   activePaymentSession = null;
   autoLoadingPaymentBookingId = null;
   paymentSessionStatus = "idle";
@@ -686,34 +696,213 @@ async function loadPaymentSession(booking) {
   return session;
 }
 
+function injectPayPalSdk(clientId, currency, components) {
+  return new Promise((resolve, reject) => {
+    const params = new URLSearchParams({
+      "client-id": clientId,
+      currency: (currency || "CAD").toUpperCase(),
+      intent: "capture",
+      components,
+    });
+    const script = document.createElement("script");
+    script.src = `https://www.paypal.com/sdk/js?${params.toString()}`;
+    script.onload = () => {
+      if (window.paypal?.Buttons) {
+        resolve(window.paypal);
+      } else {
+        reject(new Error("PayPal checkout failed to initialise"));
+      }
+    };
+    script.onerror = () => reject(new Error("Unable to load PayPal checkout. Check your connection and try again."));
+    document.head.appendChild(script);
+  });
+}
+
 function loadPayPalSdk(clientId, currency) {
   if (window.paypal?.Buttons) {
     return Promise.resolve(window.paypal);
   }
   if (!paypalSdkPromise) {
-    paypalSdkPromise = new Promise((resolve, reject) => {
-      const params = new URLSearchParams({
-        "client-id": clientId,
-        currency: (currency || "CAD").toUpperCase(),
-        intent: "capture",
-      });
-      const script = document.createElement("script");
-      script.src = `https://www.paypal.com/sdk/js?${params.toString()}`;
-      script.onload = () => {
-        if (window.paypal?.Buttons) {
-          resolve(window.paypal);
-        } else {
-          reject(new Error("PayPal checkout failed to initialise"));
-        }
-      };
-      script.onerror = () => {
+    // Load the wallet components alongside Buttons. If the merchant isn't
+    // enabled for a wallet the combined script can fail to load, so fall back
+    // to a buttons-only SDK — the core PayPal button must always work.
+    paypalSdkPromise = injectPayPalSdk(clientId, currency, "buttons,googlepay,applepay").catch(() => {
+      return injectPayPalSdk(clientId, currency, "buttons").catch((err) => {
         paypalSdkPromise = null;
-        reject(new Error("Unable to load PayPal checkout. Check your connection and try again."));
-      };
-      document.head.appendChild(script);
+        throw err;
+      });
     });
   }
   return paypalSdkPromise;
+}
+
+function loadGooglePayScript() {
+  if (window.google?.payments?.api) {
+    return Promise.resolve();
+  }
+  if (!googlePayScriptPromise) {
+    googlePayScriptPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://pay.google.com/gp/p/js/pay.js";
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => { googlePayScriptPromise = null; reject(new Error("Google Pay failed to load")); };
+      document.head.appendChild(script);
+    });
+  }
+  return googlePayScriptPromise;
+}
+
+// Renders a Google Pay button if the merchant + device are eligible. Returns
+// true when a button was rendered. Never throws to the caller.
+async function mountGooglePay(paypal, session, booking, container) {
+  if (!container || typeof paypal.Googlepay !== "function") return false;
+  const gp = paypal.Googlepay();
+  const config = await gp.config();
+  if (!config?.isEligible) return false;
+  await loadGooglePayScript();
+  const environment = session.paypal_env === "live" ? "PRODUCTION" : "TEST";
+  const client = new window.google.payments.api.PaymentsClient({ environment });
+  const ready = await client.isReadyToPay({
+    apiVersion: config.apiVersion,
+    apiVersionMinor: config.apiVersionMinor,
+    allowedPaymentMethods: config.allowedPaymentMethods,
+  });
+  if (!ready?.result) return false;
+
+  const onClick = async () => {
+    if (confirmPaymentInFlight) return;
+    clearBookingPaymentAlert();
+    try {
+      const paymentData = await client.loadPaymentData({
+        apiVersion: config.apiVersion,
+        apiVersionMinor: config.apiVersionMinor,
+        allowedPaymentMethods: config.allowedPaymentMethods,
+        merchantInfo: config.merchantInfo,
+        transactionInfo: {
+          currencyCode: session.currency_code || (booking?.currency || "CAD"),
+          totalPriceStatus: "FINAL",
+          totalPrice: session.amount_value || "0.00",
+        },
+      });
+      confirmPaymentInFlight = true;
+      const confirm = await gp.confirmOrder({
+        orderId: session.payment_intent_id,
+        paymentMethodData: paymentData.paymentMethodData,
+      });
+      if (confirm?.status === "APPROVED") {
+        await capturePaymentAfterApproval(session);
+      } else {
+        throw new Error("Google Pay could not complete this payment. Please use the PayPal button.");
+      }
+    } catch (error) {
+      // User dismissing the sheet reports a benign CANCELED/statusCode error.
+      if (error?.statusCode === "CANCELED") return;
+      showBookingPaymentAlert(humanizePaymentError(error?.message || String(error || "")));
+    } finally {
+      confirmPaymentInFlight = false;
+    }
+  };
+
+  const button = client.createButton({
+    onClick,
+    buttonType: "pay",
+    buttonSizeMode: "fill",
+    buttonColor: "black",
+  });
+  container.appendChild(button);
+  return true;
+}
+
+// Renders an Apple Pay button if the merchant + device (Safari) are eligible.
+// Returns true when a button was rendered. Never throws to the caller.
+async function mountApplePay(paypal, session, booking, container) {
+  if (!container || typeof paypal.Applepay !== "function") return false;
+  if (!window.ApplePaySession || !window.ApplePaySession.canMakePayments()) return false;
+  const ap = paypal.Applepay();
+  const config = await ap.config();
+  if (!config?.isEligible) return false;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "wallet-apple-pay-button";
+  button.setAttribute("aria-label", "Pay with Apple Pay");
+
+  button.addEventListener("click", () => {
+    if (confirmPaymentInFlight) return;
+    clearBookingPaymentAlert();
+    const paymentRequest = {
+      countryCode: config.countryCode || "CA",
+      currencyCode: session.currency_code || (booking?.currency || "CAD"),
+      merchantCapabilities: config.merchantCapabilities,
+      supportedNetworks: config.supportedNetworks,
+      // A studio session is a service — no shipping/billing address is collected.
+      total: {
+        label: "BIPOC Creative Innovation Studio",
+        type: "final",
+        amount: session.amount_value || "0.00",
+      },
+    };
+    const appleSession = new window.ApplePaySession(4, paymentRequest);
+    appleSession.onvalidatemerchant = (event) => {
+      ap.validateMerchant({ validationUrl: event.validationURL, displayName: "BIPOC Creative Innovation Studio" })
+        .then((result) => appleSession.completeMerchantValidation(result.merchantSession))
+        .catch((error) => {
+          appleSession.abort();
+          showBookingPaymentAlert(humanizePaymentError(error?.message || "Apple Pay could not start."));
+        });
+    };
+    appleSession.onpaymentauthorized = async (event) => {
+      confirmPaymentInFlight = true;
+      try {
+        await ap.confirmOrder({
+          orderId: session.payment_intent_id,
+          token: event.payment.token,
+          billingContact: event.payment.billingContact,
+        });
+        appleSession.completePayment(window.ApplePaySession.STATUS_SUCCESS);
+        await capturePaymentAfterApproval(session);
+      } catch (error) {
+        appleSession.completePayment(window.ApplePaySession.STATUS_FAILURE);
+        showBookingPaymentAlert(humanizePaymentError(error?.message || "Apple Pay payment failed."));
+      } finally {
+        confirmPaymentInFlight = false;
+      }
+    };
+    appleSession.begin();
+  });
+
+  container.appendChild(button);
+  return true;
+}
+
+// Best-effort: render the Apple Pay / Google Pay express buttons above the
+// PayPal button. Any failure is swallowed so the PayPal button is unaffected.
+async function mountExpressWallets(paypal, session, booking, paymentContainer) {
+  let wrap = document.getElementById("booking-wallets");
+  if (!wrap) {
+    wrap = document.createElement("div");
+    wrap.id = "booking-wallets";
+    wrap.className = "booking-wallets hidden";
+    paymentContainer.parentNode?.insertBefore(wrap, paymentContainer);
+  }
+  wrap.innerHTML =
+    '<div id="booking-applepay" class="wallet-slot"></div>' +
+    '<div id="booking-googlepay" class="wallet-slot"></div>' +
+    '<div class="booking-wallets-divider"><span>or</span></div>';
+
+  let rendered = false;
+  try {
+    if (await mountApplePay(paypal, session, booking, document.getElementById("booking-applepay"))) rendered = true;
+  } catch (error) {
+    /* Apple Pay unavailable — fall through to PayPal button. */
+  }
+  try {
+    if (await mountGooglePay(paypal, session, booking, document.getElementById("booking-googlepay"))) rendered = true;
+  } catch (error) {
+    /* Google Pay unavailable — fall through to PayPal button. */
+  }
+  wrap.classList.toggle("hidden", !rendered);
 }
 
 async function capturePaymentAfterApproval(session) {
@@ -778,6 +967,10 @@ async function mountPayPalButtons(session, booking) {
   activePaymentSession = session;
   paymentSessionStatus = "ready";
   paymentSessionMessage = "Secure PayPal checkout is ready.";
+
+  // Add the Apple Pay / Google Pay express buttons above the PayPal button.
+  // Fully best-effort: if wallet setup fails the PayPal button still stands.
+  mountExpressWallets(paypal, session, booking, paymentContainer).catch(() => {});
 }
 
 async function ensurePaymentSession(booking) {
@@ -799,6 +992,14 @@ async function ensurePaymentSession(booking) {
     if (session.payment_backend === "paypal") {
       await mountPayPalButtons(session, booking);
       nextMessage = "Secure payment is ready.";
+    } else if (session.payment_backend === "free") {
+      // Nothing due now (e.g. a 100%-off promo) — the customer just confirms.
+      clearPaymentElement();
+      toggleHidden(elements.bookingPaymentElement, true);
+      activePaymentSession = session;
+      paymentSessionStatus = "free";
+      paymentSessionMessage = "This booking is fully covered — no payment needed. Confirm to lock it in.";
+      nextMessage = paymentSessionMessage;
     } else {
       toggleHidden(elements.bookingPaymentElement, true);
       paymentSessionStatus = "stub";
@@ -836,19 +1037,28 @@ function renderPaymentPanel(state, booking) {
 
   const hasPayPalSession =
     idsMatch(activePaymentSession?.booking_id, booking.id) && activePaymentSession.payment_backend === "paypal";
+  // Nothing due now (e.g. a 100%-off promo): confirm for free instead of paying.
+  const isFreeSession =
+    idsMatch(activePaymentSession?.booking_id, booking.id) && activePaymentSession.payment_backend === "free";
   const isPaymentLoading = idsMatch(autoLoadingPaymentBookingId, booking.id) || paymentSessionStatus === "loading";
   elements.bookingPaymentCopy.textContent = hasPayPalSession
     ? "Pay securely with PayPal below — you can use your PayPal balance or a card."
-    : isPaymentLoading
-      ? "Loading secure payment..."
-      : paymentSessionMessage || "Complete payment to confirm your studio session.";
+    : isFreeSession
+      ? "This booking is fully covered — no payment needed. Confirm to lock it in."
+      : isPaymentLoading
+        ? "Loading secure payment..."
+        : paymentSessionMessage || "Complete payment to confirm your studio session.";
   const primaryDisabled = isPaymentLoading ? "disabled" : "";
+  // price_cents > 0 exactly matches "an amount is due now" (the deposit is
+  // capped at the total, so a $0 total means a $0 — free — booking).
+  const primaryAction = isFreeSession ? "confirm-free" : "load-payment";
+  const primaryLabel = isFreeSession || booking.price_cents === 0 ? "Confirm booking" : "Pay now";
   elements.bookingPaymentControls.innerHTML = `
     ${
       hasPayPalSession
         ? ""
-        : `<button class="primary-button" type="button" data-booking-detail-action="load-payment" data-booking-id="${booking.id}" ${primaryDisabled}>
-      ${booking.price_cents > 0 ? "Pay now" : "Confirm booking"}
+        : `<button class="primary-button" type="button" data-booking-detail-action="${primaryAction}" data-booking-id="${booking.id}" ${primaryDisabled}>
+      ${primaryLabel}
     </button>`
     }
     ${
@@ -945,7 +1155,7 @@ function renderReschedulePanel(booking) {
   }
 
   const isAdmin = Boolean(state.currentUser?.is_admin);
-  const canReschedule = isAdmin && booking.status === "Paid" && !booking.checked_in_at;
+  const canReschedule = RESCHEDULE_ENABLED && isAdmin && booking.status === "Paid" && !booking.checked_in_at;
   toggleHidden(elements.bookingReschedulePanel, !canReschedule);
   if (!canReschedule) {
     return;
@@ -1038,12 +1248,15 @@ function renderCheckoutPricingRows(booking, kind, staffTotal) {
   // owed later. Mirror backend upfront_charge_cents: fall back to the full total
   // when no deposit is configured.
   const depositCents = Number(booking.deposit_amount_cents || 0);
+  // Deposit is capped at the (post-discount) total — mirrors backend
+  // upfront_charge_cents. A 100%-off promo makes the total $0, so nothing is
+  // due now; a total under the deposit is simply paid in full now.
   const depositChargeCents = depositCents > 0
-    ? depositCents + Math.floor(depositCents * 0.05)
+    ? Math.min(depositCents + Math.floor(depositCents * 0.05), finalTotal)
     : finalTotal;
   const balanceCents = Math.max(0, finalTotal - depositChargeCents);
   let settlementRows = "";
-  if (kind !== "staff" && depositCents > 0) {
+  if (kind !== "staff" && depositCents > 0 && depositChargeCents > 0) {
     if (booking.status === "PendingPayment") {
       settlementRows = `
         <div class="booking-summary-price-line booking-summary-due-now"><span>Deposit due now</span><strong>${formatCurrency(depositChargeCents, booking.currency)}</strong></div>
@@ -1227,6 +1440,29 @@ export function initBookingDetailView(actions) {
         setState({ selectedBooking: booking, message: "Booking confirmed." });
         if (actions?.reloadBookingDetail) {
           await actions.reloadBookingDetail("Booking confirmed.");
+        }
+        return;
+      }
+
+      if (action === "confirm-free") {
+        // A fully-discounted room booking ($0 due now): confirm without payment.
+        if (confirmPaymentInFlight) return;
+        confirmPaymentInFlight = true;
+        clearBookingPaymentAlert();
+        try {
+          await saveBookingIntakeToNote().catch(() => {});
+          await saveBookingContactDetails({ silent: true }).catch(() => {});
+          setState({ message: "Confirming your booking..." });
+          const confirmed = await api.confirmFreeBooking(button.dataset.bookingId);
+          clearPaymentElement();
+          window.location.assign(
+            buildPaymentSuccessUrl(confirmed.id, getBookingKind(state.selectedBooking)).toString(),
+          );
+        } catch (error) {
+          showBookingPaymentAlert(humanizePaymentError(error?.message));
+          setState({ message: error?.message || "Could not confirm the booking." });
+        } finally {
+          confirmPaymentInFlight = false;
         }
         return;
       }
