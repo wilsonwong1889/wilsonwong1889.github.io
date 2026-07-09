@@ -101,17 +101,34 @@ def _sync_staff_snapshot_to_rooms(db: Session, profile: StaffProfile) -> None:
             room.staff_roles = updated_staff
 
 
-def _delete_photo_if_unused(db: Session, photo_url: str | None, exclude_profile_id=None) -> None:
-    if not photo_url:
-        return
+def _profile_media_urls(profile: StaffProfile) -> set[str]:
+    """Every stored-image URL a profile references (avatar + portfolio headshots)."""
+    urls = set(normalize_string_list(profile.headshot_urls))
+    if profile.photo_url:
+        urls.add(profile.photo_url)
+    return urls
 
-    query = db.query(StaffProfile).filter(StaffProfile.photo_url == photo_url)
+
+def _media_url_in_use(db: Session, url: str, exclude_profile_id=None) -> bool:
+    """True if any OTHER staff profile still references this image as its avatar
+    or one of its headshots — so we never delete a shared image out from under it."""
+    query = db.query(StaffProfile)
     if exclude_profile_id:
         query = query.filter(StaffProfile.id != exclude_profile_id)
-    if query.first():
-        return
+    for other in query.all():
+        if url in _profile_media_urls(other):
+            return True
+    return False
 
-    delete_media(photo_url)
+
+def _cleanup_unreferenced_media(
+    db: Session, urls, exclude_profile_id=None
+) -> None:
+    """Delete each stored image in ``urls`` that no remaining profile references
+    (best-effort; covers both the primary photo and removed portfolio headshots)."""
+    for url in {u for u in urls if u}:
+        if not _media_url_in_use(db, url, exclude_profile_id=exclude_profile_id):
+            delete_media(url)
 
 
 def list_staff_profiles(db: Session) -> list[StaffProfile]:
@@ -231,7 +248,7 @@ def update_staff_profile(db: Session, profile_id: str, payload: StaffProfileUpda
         raise ValueError("Staff profile not found")
 
     update_data = payload.model_dump(exclude_unset=True)
-    previous_photo_url = profile.photo_url
+    previous_media_urls = _profile_media_urls(profile)
     if "name" in update_data and update_data["name"] is not None:
         profile.name = _normalize_profile_name(update_data["name"])
         _ensure_unique_name(db, profile.name, exclude_profile_id=profile.id)
@@ -287,8 +304,10 @@ def update_staff_profile(db: Session, profile_id: str, payload: StaffProfileUpda
     _sync_staff_snapshot_to_rooms(db, profile)
     db.commit()
     db.refresh(profile)
-    if previous_photo_url != profile.photo_url:
-        _delete_photo_if_unused(db, previous_photo_url, exclude_profile_id=profile.id)
+    # Delete any image (avatar or headshot) this profile dropped and that no
+    # other profile still references.
+    removed_media = previous_media_urls - _profile_media_urls(profile)
+    _cleanup_unreferenced_media(db, removed_media, exclude_profile_id=profile.id)
     return profile
 
 
@@ -297,8 +316,8 @@ def delete_staff_profile(db: Session, profile_id: str) -> None:
     if not profile:
         raise ValueError("Staff profile not found")
 
-    photo_url = profile.photo_url
+    media_urls = _profile_media_urls(profile)
     _remove_staff_from_rooms(db, str(profile.id))
     db.delete(profile)
     db.commit()
-    _delete_photo_if_unused(db, photo_url)
+    _cleanup_unreferenced_media(db, media_urls)
