@@ -377,7 +377,7 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertIn("--bg:", response.text)
 
-        response = self.client.get("/assets/media/recording-studio.svg")
+        response = self.client.get("/assets/media/staff/staff-placeholder.svg")
         self.assertEqual(response.status_code, 200, response.text)
         self.assertIn("<svg", response.text)
 

@@ -26,7 +26,7 @@ class JsAssetTest(BaseAppTest):
         self.assertIn(".admin-today-row.is-imminent", resp.text)
         self.assertIn("body.admin-printing-today", resp.text)
 
-        resp = self.client.get("/assets/media/recording-studio.svg")
+        resp = self.client.get("/assets/media/staff/staff-placeholder.svg")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("<svg", resp.text)
 
