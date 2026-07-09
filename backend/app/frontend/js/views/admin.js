@@ -12,6 +12,19 @@ let selectedAdminCalendarRoomId = "all";
 let selectedAdminAccountId = null;
 let adminSearchResults = null;
 let selectedAdminBookingQuickFilter = "all";
+// Membership tiers an admin can assign (value → label). Must mirror the
+// backend account_service.MEMBERSHIP_CATEGORIES list.
+const MEMBERSHIP_OPTIONS = [
+  ["general_public", "Customer (general public)"],
+  ["artist_member", "Artist Member"],
+  ["fellowship_artist", "Artist Fellowship Member"],
+  ["artist_in_residence", "Artist in Residence"],
+  ["service_engineer", "Service Engineer"],
+  ["bipoc_community_member", "BIPOC Community Member"],
+  ["venture_member", "Venture Member"],
+  ["organizational_member", "Organizational Member"],
+];
+
 const DEFAULT_ADMIN_SUBPAGES = {
   overview: "dashboard",
   accounts: "directory",
@@ -1280,7 +1293,6 @@ function populateStaffProfileForm(profile) {
   elements.adminStaffProfileForm.elements.notify_by_sms.checked = Boolean(profile.notify_by_sms);
   elements.adminStaffProfileForm.elements.booking_requires_approval.checked = profile.booking_requires_approval !== false;
   elements.adminStaffProfileForm.elements.linked_user_email.value = profile.linked_user_email || "";
-  elements.adminStaffProfileForm.elements.schedule_published.checked = Boolean(profile.schedule_published);
   elements.adminStaffProfileForm.elements.active.checked = Boolean(profile.active);
   if (elements.adminStaffProfileId) {
     elements.adminStaffProfileId.value = profile.id;
@@ -1464,6 +1476,24 @@ function renderAdminAccountDetail(account, currentUser) {
             `
             : `<div class="admin-detail-grid">${renderAccountField("Role", getAccountRoleLabel(account))}</div>`
         }
+      </section>
+
+      <section class="admin-account-section">
+        <h4>Membership</h4>
+        <p class="field-help">Set this customer's membership tier (e.g. after they pay for a membership). Members can redeem member-scoped promo codes and any membership pricing.</p>
+        <div class="profile-grid profile-grid-tight">
+          <label>
+            <span>Membership</span>
+            <select data-admin-membership-select data-user-id="${escapeAttribute(account.id)}">
+              ${MEMBERSHIP_OPTIONS.map(([value, label]) => `<option value="${value}" ${(account.membership_category || "general_public") === value ? "selected" : ""}>${label}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+        <div class="hero-actions">
+          <button class="ghost-button" type="button" data-admin-action="update-user-membership" data-user-id="${escapeAttribute(account.id)}" data-user-email="${escapeAttribute(account.email)}">
+            Update membership
+          </button>
+        </div>
       </section>
 
       <section class="admin-account-section">
@@ -2486,6 +2516,33 @@ export function initAdminView(actions) {
       return;
     }
 
+    const membershipButton = event.target.closest("[data-admin-action='update-user-membership']");
+    if (membershipButton) {
+      const membershipSelect = elements.adminAccountDetail.querySelector(
+        `[data-admin-membership-select][data-user-id="${CSS.escape(membershipButton.dataset.userId)}"]`,
+      );
+      const nextCategory = membershipSelect?.value;
+      if (!nextCategory) {
+        setState({ message: "Choose a membership before updating." });
+        return;
+      }
+      const accountEmail = membershipButton.dataset.userEmail || "this account";
+      const label = membershipSelect.options[membershipSelect.selectedIndex].text;
+      if (!window.confirm(`Set ${accountEmail} as "${label}"?`)) {
+        return;
+      }
+      try {
+        setState({ message: "Updating membership..." });
+        await api.adminUpdateUserMembership(membershipButton.dataset.userId, {
+          membership_category: nextCategory,
+        });
+        await actions.refreshAll(`Membership updated to ${label}.`);
+      } catch (error) {
+        setState({ message: error.message });
+      }
+      return;
+    }
+
     const button = event.target.closest("[data-admin-action='delete-user-account']");
     if (!button) {
       return;
@@ -2577,7 +2634,6 @@ export function initAdminView(actions) {
         notify_by_sms: form.elements.notify_by_sms.checked,
         booking_requires_approval: form.elements.booking_requires_approval.checked,
         linked_user_email: form.elements.linked_user_email.value.trim() || null,
-        schedule_published: form.elements.schedule_published.checked,
         active: form.elements.active.checked,
       };
 
@@ -2863,6 +2919,60 @@ export function initAdminView(actions) {
   document.getElementById("admin-staff-schedule-date")?.addEventListener("change", () => loadAdminStaffSchedule());
   document.getElementById("admin-schedule-refresh")?.addEventListener("click", () => loadAdminStaffSchedule());
   document.getElementById("admin-tab-schedule")?.addEventListener("click", () => loadAdminStaffSchedule());
+
+  // "Unlimited uses" disables the number-of-uses input.
+  document.getElementById("admin-member-code-unlimited")?.addEventListener("change", (event) => {
+    const usesInput = document.getElementById("admin-member-code-uses");
+    if (!usesInput) return;
+    usesInput.disabled = event.currentTarget.checked;
+    if (event.currentTarget.checked) usesInput.value = "";
+  });
+
+  document.getElementById("admin-member-code-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const feedback = document.getElementById("admin-member-code-feedback");
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalLabel = submitButton ? submitButton.textContent : "";
+    const unlimited = Boolean(form.elements.unlimited?.checked);
+    const usesRaw = form.elements.max_uses?.value;
+    const payload = {
+      full_name: form.elements.full_name.value.trim(),
+      percent_off: Number(form.elements.percent_off.value),
+    };
+    if (!unlimited && usesRaw) {
+      payload.max_uses = Number(usesRaw);
+    }
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "Generating…";
+    }
+    if (feedback) feedback.classList.add("hidden");
+    try {
+      const promo = await api.adminCreateMemberCode(payload);
+      const usesLabel = promo.max_redemptions ? `${promo.max_redemptions} use${promo.max_redemptions === 1 ? "" : "s"}` : "unlimited uses";
+      if (feedback) {
+        feedback.innerHTML = `Code for <strong>${escapeHtml(payload.full_name)}</strong>: <code class="member-code-value">${escapeHtml(promo.code)}</code> — ${promo.percent_off}% off, ${usesLabel}. Copy and give it to them.`;
+        feedback.classList.remove("hidden", "is-error");
+        feedback.classList.add("is-success");
+      }
+      form.reset();
+      const usesInput = document.getElementById("admin-member-code-uses");
+      if (usesInput) usesInput.disabled = false;
+      await actions.refreshAll(`Member code ${promo.code} created.`);
+    } catch (error) {
+      if (feedback) {
+        feedback.textContent = error?.message ? String(error.message) : "Could not create the code.";
+        feedback.classList.remove("hidden", "is-success");
+        feedback.classList.add("is-error");
+      }
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = originalLabel;
+      }
+    }
+  });
 
   document.getElementById("admin-monthly-codes-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();

@@ -272,7 +272,7 @@
               <div class="panel-header">
                 <p class="panel-kicker">Team calendar</p>
                 <h3>Staff schedule</h3>
-                <p class="panel-copy">Every active staff member's published availability for a day, in one place. Staff set their own windows from the staff dashboard.</p>
+                <p class="panel-copy">Every active staff member's availability for a day, in one place. Staff set their own windows from the staff dashboard, and they go live immediately.</p>
               </div>
               <div class="admin-intakes-filters">
                 <label class="inline-field">
@@ -518,9 +518,36 @@
                       </div>
                     </form>
 
+                    <form id="admin-member-code-form" class="stack-form admin-member-code-form">
+                      <h4>Issue a membership code</h4>
+                      <p class="field-help">For someone who paid for a membership in person: enter their name and a percent off, and a unique code is generated on the spot for you to hand them. Set a number of uses, or tick "Unlimited uses".</p>
+                      <p id="admin-member-code-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
+                      <div class="intake-form-grid">
+                        <label>
+                          <span>Full name</span>
+                          <input type="text" name="full_name" required placeholder="Sarah Khan" />
+                        </label>
+                        <label>
+                          <span>Percent off</span>
+                          <input type="number" name="percent_off" min="1" max="100" value="25" required />
+                        </label>
+                        <label>
+                          <span>Number of uses</span>
+                          <input id="admin-member-code-uses" type="number" name="max_uses" min="1" placeholder="e.g. 5" />
+                        </label>
+                      </div>
+                      <label class="checkbox-row">
+                        <input id="admin-member-code-unlimited" type="checkbox" name="unlimited" />
+                        <span>Unlimited uses</span>
+                      </label>
+                      <div class="room-actions">
+                        <button class="primary-button" type="submit">Generate member code</button>
+                      </div>
+                    </form>
+
                     <form id="admin-monthly-codes-form" class="stack-form admin-monthly-codes-form">
-                      <h4>Generate monthly member codes</h4>
-                      <p class="field-help">Creates one unique, single-use code per member in the selected category for the chosen month. Re-running skips members who already have a code that month — codes do not stack.</p>
+                      <h4>Generate monthly member codes (batch)</h4>
+                      <p class="field-help">Bulk tool: creates one unique, single-use code for <em>every</em> member in the selected category, tagged to the chosen month. Re-running skips members who already have a code that month. Use this only if you track members by membership category; for one-off codes use "Issue a membership code" above.</p>
                       <p id="admin-monthly-codes-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
                       <div class="intake-form-grid">
                         <label>
@@ -675,10 +702,6 @@
                   </div>
                   <p class="field-help">JPG, PNG, WebP, or HEIC. Maximum 20 MB.</p>
                   <label class="checkbox-row">
-                    <input type="checkbox" name="schedule_published" />
-                    <span>Publish schedule to public (customers can request to book)</span>
-                  </label>
-                  <label class="checkbox-row">
                     <input type="checkbox" name="active" checked />
                     <span>Available for booking</span>
                   </label>
@@ -702,7 +725,7 @@
                   <div class="panel-header">
                     <p class="panel-kicker">Applications</p>
                     <h3>Studio engineer applications</h3>
-                    <p class="panel-copy">People who created an account and submitted a profile. Approve to grant them the Staff role and a profile (publish their schedule separately when ready).</p>
+                    <p class="panel-copy">People who created an account and submitted a profile. Approve to grant them the Staff role and a profile; once approved, the availability they set goes live automatically.</p>
                   </div>
                   <div id="admin-staff-applications-list" class="admin-staff-catalog-list"></div>
                 </section>

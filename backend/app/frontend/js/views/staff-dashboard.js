@@ -487,9 +487,7 @@ async function loadStaffDashboard(profile) {
   if (title) title.textContent = `${profile.name}'s dashboard`;
   const subtitle = el("staff-dashboard-subtitle");
   if (subtitle) {
-    subtitle.textContent = profile.schedule_published
-      ? "You're a studio engineer — edit your profile and manage your schedule below. Your schedule is published, so customers can request to book you."
-      : "You're a studio engineer — edit your profile and manage your schedule and booking requests below. An admin publishes your schedule to make it public.";
+    subtitle.textContent = "You're a studio engineer — edit your profile and manage your schedule and booking requests below. The availability you set is live: customers can request to book you during those windows.";
   }
   populateProfileForm(profile);
   await Promise.all([renderRequests(), renderRules(), renderExceptions()]);

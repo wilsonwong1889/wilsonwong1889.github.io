@@ -280,18 +280,9 @@ def _availability_windows_for_staff_date(
         available_windows_for_date,
     )
 
-    # Unpublished schedules aren't bookable by the public — the staff member is
-    # still listed, but shows no available times until an admin publishes.
-    published = (
-        db.query(StaffProfile.schedule_published)
-        .filter(StaffProfile.id == staff_profile_id)
-        .scalar()
-    )
-    if not published:
-        return []
-
-    # Staff are unavailable by default. Public bookable windows only come from
-    # their weekly rules or explicit one-off available exceptions.
+    # Staff availability is public as soon as they set it — the windows a staff
+    # member configures (weekly rules or one-off available exceptions) are what
+    # customers can book. Staff are unavailable by default (no windows = no slots).
     return available_windows_for_date(db, staff_profile_id, target_date)
 
 
@@ -832,6 +823,9 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
             "payment_client_secret": None,
             "payment_backend": "free",
             "paypal_client_id": None,
+            "paypal_env": settings.PAYPAL_ENV,
+            "amount_value": "0.00",
+            "currency_code": booking.currency,
             "payment_expires_at": booking.payment_expires_at,
             "payment_seconds_remaining": booking.payment_seconds_remaining,
         }
@@ -858,6 +852,9 @@ def get_staff_booking_payment_session(db: Session, booking: StaffBooking, user: 
         "payment_client_secret": payment_session.client_secret,
         "payment_backend": settings.PAYMENT_BACKEND,
         "paypal_client_id": settings.PAYPAL_CLIENT_ID or None,
+        "paypal_env": settings.PAYPAL_ENV,
+        "amount_value": f"{booking.price_cents // 100}.{booking.price_cents % 100:02d}",
+        "currency_code": booking.currency,
         "payment_expires_at": booking.payment_expires_at,
         "payment_seconds_remaining": booking.payment_seconds_remaining,
     }
