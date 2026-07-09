@@ -30,6 +30,7 @@ from app.services.booking_service import (
     DailyBookingLimitError,
     cancel_booking,
     capture_booking_payment,
+    confirm_free_booking,
     create_or_update_booking_review,
     create_booking,
     create_guest_booking,
@@ -314,6 +315,22 @@ def capture_my_booking_payment(
         return capture_booking_payment(db, booking, current_user)
     except PaymentBackendError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except PaymentSessionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/bookings/{booking_id}/confirm-free", response_model=BookingOut)
+def confirm_my_free_booking(
+    booking_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(booking_rate_limit),
+):
+    booking = get_booking_for_user(db, booking_id, current_user)
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    try:
+        return confirm_free_booking(db, booking, current_user)
     except PaymentSessionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

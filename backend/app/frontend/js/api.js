@@ -163,6 +163,11 @@ export const api = {
       method: "POST",
     });
   },
+  confirmFreeBooking(bookingId) {
+    return request(`/api/bookings/${bookingId}/confirm-free`, {
+      method: "POST",
+    });
+  },
   updateBookingContact(bookingId, payload) {
     return request(`/api/bookings/${bookingId}/contact`, {
       method: "PUT",

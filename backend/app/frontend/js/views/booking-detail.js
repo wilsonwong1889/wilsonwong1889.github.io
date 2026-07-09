@@ -988,6 +988,14 @@ async function ensurePaymentSession(booking) {
     if (session.payment_backend === "paypal") {
       await mountPayPalButtons(session, booking);
       nextMessage = "Secure payment is ready.";
+    } else if (session.payment_backend === "free") {
+      // Nothing due now (e.g. a 100%-off promo) — the customer just confirms.
+      clearPaymentElement();
+      toggleHidden(elements.bookingPaymentElement, true);
+      activePaymentSession = session;
+      paymentSessionStatus = "free";
+      paymentSessionMessage = "This booking is fully covered — no payment needed. Confirm to lock it in.";
+      nextMessage = paymentSessionMessage;
     } else {
       toggleHidden(elements.bookingPaymentElement, true);
       paymentSessionStatus = "stub";
@@ -1025,24 +1033,28 @@ function renderPaymentPanel(state, booking) {
 
   const hasPayPalSession =
     idsMatch(activePaymentSession?.booking_id, booking.id) && activePaymentSession.payment_backend === "paypal";
+  // Nothing due now (e.g. a 100%-off promo): confirm for free instead of paying.
+  const isFreeSession =
+    idsMatch(activePaymentSession?.booking_id, booking.id) && activePaymentSession.payment_backend === "free";
   const isPaymentLoading = idsMatch(autoLoadingPaymentBookingId, booking.id) || paymentSessionStatus === "loading";
   elements.bookingPaymentCopy.textContent = hasPayPalSession
     ? "Pay securely with PayPal below — you can use your PayPal balance or a card."
-    : isPaymentLoading
-      ? "Loading secure payment..."
-      : paymentSessionMessage || "Complete payment to confirm your studio session.";
+    : isFreeSession
+      ? "This booking is fully covered — no payment needed. Confirm to lock it in."
+      : isPaymentLoading
+        ? "Loading secure payment..."
+        : paymentSessionMessage || "Complete payment to confirm your studio session.";
   const primaryDisabled = isPaymentLoading ? "disabled" : "";
-  // A room booking always collects the deposit up front, so there is still an
-  // amount due now even when a 100%-off promo takes the session total to $0.
-  const hasAmountDueNow =
-    booking.price_cents > 0 ||
-    (bookingKind !== "staff" && Number(booking.deposit_amount_cents || 0) > 0);
+  // price_cents > 0 exactly matches "an amount is due now" (the deposit is
+  // capped at the total, so a $0 total means a $0 — free — booking).
+  const primaryAction = isFreeSession ? "confirm-free" : "load-payment";
+  const primaryLabel = isFreeSession || booking.price_cents === 0 ? "Confirm booking" : "Pay now";
   elements.bookingPaymentControls.innerHTML = `
     ${
       hasPayPalSession
         ? ""
-        : `<button class="primary-button" type="button" data-booking-detail-action="load-payment" data-booking-id="${booking.id}" ${primaryDisabled}>
-      ${hasAmountDueNow ? "Pay now" : "Confirm booking"}
+        : `<button class="primary-button" type="button" data-booking-detail-action="${primaryAction}" data-booking-id="${booking.id}" ${primaryDisabled}>
+      ${primaryLabel}
     </button>`
     }
     ${
@@ -1232,12 +1244,15 @@ function renderCheckoutPricingRows(booking, kind, staffTotal) {
   // owed later. Mirror backend upfront_charge_cents: fall back to the full total
   // when no deposit is configured.
   const depositCents = Number(booking.deposit_amount_cents || 0);
+  // Deposit is capped at the (post-discount) total — mirrors backend
+  // upfront_charge_cents. A 100%-off promo makes the total $0, so nothing is
+  // due now; a total under the deposit is simply paid in full now.
   const depositChargeCents = depositCents > 0
-    ? depositCents + Math.floor(depositCents * 0.05)
+    ? Math.min(depositCents + Math.floor(depositCents * 0.05), finalTotal)
     : finalTotal;
   const balanceCents = Math.max(0, finalTotal - depositChargeCents);
   let settlementRows = "";
-  if (kind !== "staff" && depositCents > 0) {
+  if (kind !== "staff" && depositCents > 0 && depositChargeCents > 0) {
     if (booking.status === "PendingPayment") {
       settlementRows = `
         <div class="booking-summary-price-line booking-summary-due-now"><span>Deposit due now</span><strong>${formatCurrency(depositChargeCents, booking.currency)}</strong></div>
@@ -1421,6 +1436,29 @@ export function initBookingDetailView(actions) {
         setState({ selectedBooking: booking, message: "Booking confirmed." });
         if (actions?.reloadBookingDetail) {
           await actions.reloadBookingDetail("Booking confirmed.");
+        }
+        return;
+      }
+
+      if (action === "confirm-free") {
+        // A fully-discounted room booking ($0 due now): confirm without payment.
+        if (confirmPaymentInFlight) return;
+        confirmPaymentInFlight = true;
+        clearBookingPaymentAlert();
+        try {
+          await saveBookingIntakeToNote().catch(() => {});
+          await saveBookingContactDetails({ silent: true }).catch(() => {});
+          setState({ message: "Confirming your booking..." });
+          const confirmed = await api.confirmFreeBooking(button.dataset.bookingId);
+          clearPaymentElement();
+          window.location.assign(
+            buildPaymentSuccessUrl(confirmed.id, getBookingKind(state.selectedBooking)).toString(),
+          );
+        } catch (error) {
+          showBookingPaymentAlert(humanizePaymentError(error?.message));
+          setState({ message: error?.message || "Could not confirm the booking." });
+        } finally {
+          confirmPaymentInFlight = false;
         }
         return;
       }

@@ -197,14 +197,19 @@ def calculate_tax_cents(subtotal_cents: int) -> int:
 
 def upfront_charge_cents(booking: Booking) -> int:
     """Amount the customer pays now for a public booking: the room deposit plus
-    GST on that deposit. The rest of ``price_cents`` becomes the balance owed.
+    GST on that deposit, but never more than the (post-discount) total. The rest
+    of ``price_cents`` becomes the balance owed at the studio.
 
-    If the booking has no deposit configured, fall back to the full total so we
-    never create a $0 charge."""
+    Capping at the total means a discount is reflected up front: e.g. a 100%-off
+    promo takes ``price_cents`` to $0, so the deposit due now is $0 (a free
+    booking), and any total under ~$21 is simply paid in full now. If no deposit
+    is configured, the full total is charged."""
+    total = booking.price_cents or 0
     deposit = booking.deposit_amount_cents or 0
     if deposit <= 0:
-        return booking.price_cents or 0
-    return deposit + calculate_tax_cents(deposit)
+        return total
+    deposit_charge = deposit + calculate_tax_cents(deposit)
+    return min(deposit_charge, total)
 
 
 def get_room_max_booking_duration_minutes(room: Room) -> int:
@@ -753,9 +758,11 @@ def _create_booking_record(
         )
         sync_booking_staff_assignment_guards(db, booking)
         db.flush()
-        if status == "PendingPayment":
+        if status == "PendingPayment" and upfront_charge_cents(booking) > 0:
             # Customers pay only the deposit (+ GST on it) up front; the balance
-            # of price_cents is collected later. See upfront_charge_cents.
+            # of price_cents is collected later. See upfront_charge_cents. When the
+            # amount due now is $0 (e.g. a 100%-off promo) no order is created —
+            # the customer confirms the free booking on the checkout page.
             payment_intent = create_payment_intent(
                 amount_cents=upfront_charge_cents(booking),
                 currency=booking.currency,
@@ -1536,6 +1543,21 @@ def get_booking_payment_session(db: Session, booking: Booking, user: User) -> di
         raise PaymentSessionError("User email is required for payment")
 
     charge_cents = upfront_charge_cents(booking)
+    # Nothing due now (e.g. a 100%-off promo): the customer confirms for free
+    # instead of paying — mirrors the free staff-booking flow.
+    if charge_cents <= 0:
+        return {
+            "booking_id": booking.id,
+            "payment_intent_id": None,
+            "payment_client_secret": None,
+            "payment_backend": "free",
+            "paypal_client_id": None,
+            "paypal_env": settings.PAYPAL_ENV,
+            "amount_value": "0.00",
+            "currency_code": booking.currency,
+            "payment_expires_at": booking.payment_expires_at,
+            "payment_seconds_remaining": booking.payment_seconds_remaining,
+        }
     payment_session = get_payment_intent_session(
         payment_intent_id=booking.payment_intent_id,
         amount_cents=charge_cents,
@@ -1561,6 +1583,22 @@ def get_booking_payment_session(db: Session, booking: Booking, user: User) -> di
         "payment_expires_at": booking.payment_expires_at,
         "payment_seconds_remaining": booking.payment_seconds_remaining,
     }
+
+
+def confirm_free_booking(db: Session, booking: Booking, user: User) -> Booking:
+    """Confirm a booking whose amount due now is $0 (e.g. a 100%-off promo).
+    No payment is taken — the booking is marked paid directly."""
+    if expire_pending_booking(db, booking):
+        db.commit()
+        db.refresh(booking)
+        raise PaymentSessionError("Payment window expired for this booking")
+    if booking.user_id != user.id and not user_has_admin_access(user):
+        raise PaymentSessionError("Booking not found")
+    if booking.status != "PendingPayment":
+        raise PaymentSessionError("Only pending bookings can be confirmed")
+    if upfront_charge_cents(booking) > 0:
+        raise PaymentSessionError("This booking requires payment and cannot be confirmed for free")
+    return mark_booking_paid(db, booking, f"free_{uuid4().hex[:20]}")
 
 
 def capture_booking_payment(db: Session, booking: Booking, user: User) -> dict:
