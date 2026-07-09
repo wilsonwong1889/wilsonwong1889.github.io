@@ -280,18 +280,9 @@ def _availability_windows_for_staff_date(
         available_windows_for_date,
     )
 
-    # Unpublished schedules aren't bookable by the public — the staff member is
-    # still listed, but shows no available times until an admin publishes.
-    published = (
-        db.query(StaffProfile.schedule_published)
-        .filter(StaffProfile.id == staff_profile_id)
-        .scalar()
-    )
-    if not published:
-        return []
-
-    # Staff are unavailable by default. Public bookable windows only come from
-    # their weekly rules or explicit one-off available exceptions.
+    # Staff availability is public as soon as they set it — the windows a staff
+    # member configures (weekly rules or one-off available exceptions) are what
+    # customers can book. Staff are unavailable by default (no windows = no slots).
     return available_windows_for_date(db, staff_profile_id, target_date)
 
 

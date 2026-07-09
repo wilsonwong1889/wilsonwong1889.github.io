@@ -96,33 +96,15 @@ class StaffDashboardE2ETest(BaseAppTest):
         self.assertEqual(rules.status_code, 200, rules.text)
         self.assertEqual(len(rules.json()), 1)
 
-        # 6. Before publish: the customer sees NO availability (publish gating).
+        # 6. The window the staff member set is live immediately — no admin
+        # publish step. The customer sees availability right away.
         customer = self._account("e2e-cust@example.com")
         date_str = start.astimezone(__import__("zoneinfo").ZoneInfo("America/Edmonton")).date().isoformat()
         avail = self.client.get(f"/api/staff/{profile_id}/availability?date={date_str}")
         self.assertEqual(avail.status_code, 200, avail.text)
-        self.assertEqual(avail.json()["available_start_times"], [], "Unpublished schedule must not be bookable")
+        self.assertTrue(avail.json()["available_start_times"], "Staff-set availability should be public immediately")
 
-        # A booking attempt before publish must be rejected.
-        pre = self.client.post(
-            "/api/staff-bookings",
-            headers=customer,
-            json={"staff_profile_id": profile_id, "start_time": start.isoformat(), "duration_minutes": 60},
-        )
-        self.assertEqual(pre.status_code, 400, pre.text)
-
-        # 7. Admin publishes the schedule.
-        pub = self.client.put(
-            f"/api/admin/staff/{profile_id}",
-            headers=admin,
-            json={"schedule_published": True},
-        )
-        self.assertEqual(pub.status_code, 200, pub.text)
-
-        # 8. Now the customer sees availability and can request.
-        avail2 = self.client.get(f"/api/staff/{profile_id}/availability?date={date_str}")
-        self.assertTrue(avail2.json()["available_start_times"], "Published schedule should offer slots")
-
+        # 7. The customer can request without any admin publish step.
         booking = self.client.post(
             "/api/staff-bookings",
             headers=customer,
