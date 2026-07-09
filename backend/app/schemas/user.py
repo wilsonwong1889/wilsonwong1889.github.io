@@ -58,12 +58,18 @@ class AdminUserAccountOut(BaseModel):
     opt_in_sms: bool
     is_admin: bool
     role: str = "Customer"
+    membership_category: Optional[str] = None
     booking_count: int = 0
     last_booking_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class AdminUserMembershipUpdate(BaseModel):
+    membership_category: str = Field(min_length=1, max_length=60)
+
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None

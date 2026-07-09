@@ -35,7 +35,12 @@ from app.schemas.promo_code import (
 )
 from app.schemas.staff import AdminStaffProfileOut, StaffPhotoUploadOut, StaffProfileCreate, StaffProfileUpdate
 from app.schemas.staff_booking import StaffBookingOut
-from app.schemas.user import AdminUserAccountOut, AdminUserDeleteConfirm, AdminUserRoleUpdate
+from app.schemas.user import (
+    AdminUserAccountOut,
+    AdminUserDeleteConfirm,
+    AdminUserMembershipUpdate,
+    AdminUserRoleUpdate,
+)
 from app.core.image_utils import ACCEPTED_PHOTO_EXTENSIONS, MAX_PHOTO_BYTES, to_jpeg_bytes
 from app.core.media_storage import store_media
 from app.core.security import verify_password
@@ -44,8 +49,10 @@ from app.services.account_service import (
     can_delete_admin_account,
     count_admin_managers,
     delete_user_account,
+    get_membership_category,
     list_accounts_for_admin,
     serialize_admin_account,
+    set_user_membership,
 )
 from app.services.booking_service import (
     check_in_booking,
@@ -216,7 +223,34 @@ def admin_update_user_role(
     )
     db.commit()
     db.refresh(user)
-    return serialize_admin_account(user)
+    return serialize_admin_account(user, membership_category=get_membership_category(db, user.id))
+
+
+@router.put("/users/{user_id}/membership", response_model=AdminUserAccountOut)
+def admin_update_user_membership(
+    user_id: str,
+    payload: AdminUserMembershipUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(admin_rate_limit),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        category = set_user_membership(db, user, payload.membership_category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    create_audit_log(
+        db,
+        actor_id=admin.id,
+        booking_id=None,
+        action="user_membership_updated",
+        details={"target_user_id": str(user.id), "target_user_email": user.email, "category": category},
+    )
+    db.commit()
+    db.refresh(user)
+    return serialize_admin_account(user, membership_category=category)
 
 
 @router.get("/activity", response_model=List[AdminActivityItemOut])

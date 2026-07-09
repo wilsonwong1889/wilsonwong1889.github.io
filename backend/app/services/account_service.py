@@ -4,8 +4,50 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.booking import Booking
+from app.models.membership import UserMembership
 from app.models.user import User
 from app.roles import USER_ROLE_ADMIN, USER_ROLE_ADMIN_MANAGER, is_admin_manager_role, normalize_user_role
+
+
+# Membership categories an admin can assign, most-common first.
+MEMBERSHIP_CATEGORIES = (
+    "general_public",
+    "artist_member",
+    "fellowship_artist",
+    "artist_in_residence",
+    "service_engineer",
+    "bipoc_community_member",
+    "venture_member",
+    "organizational_member",
+)
+
+
+def get_membership_category(db: Session, user_id) -> Optional[str]:
+    membership = (
+        db.query(UserMembership)
+        .filter(UserMembership.user_id == user_id)
+        .order_by(UserMembership.created_at.desc())
+        .first()
+    )
+    return membership.category if membership else None
+
+
+def set_user_membership(db: Session, user: User, category: str) -> str:
+    if category not in MEMBERSHIP_CATEGORIES:
+        raise ValueError("Unknown membership category")
+    membership = (
+        db.query(UserMembership)
+        .filter(UserMembership.user_id == user.id)
+        .order_by(UserMembership.created_at.desc())
+        .first()
+    )
+    if membership:
+        membership.category = category
+    else:
+        membership = UserMembership(user_id=user.id, category=category)
+        db.add(membership)
+    db.flush()
+    return category
 
 
 def list_accounts_for_admin(db: Session) -> list[dict]:
@@ -34,8 +76,25 @@ def list_accounts_for_admin(db: Session) -> list[dict]:
         .all()
     )
 
+    # Latest membership category per user, in one pass.
+    membership_by_user_id: dict[str, str] = {}
+    for membership in (
+        db.query(UserMembership)
+        .filter(UserMembership.user_id.isnot(None))
+        .order_by(UserMembership.created_at.desc())
+        .all()
+    ):
+        membership_by_user_id.setdefault(str(membership.user_id), membership.category)
+
     return sorted(
-        [serialize_admin_account(user, booking_stats_by_user_id.get(str(user.id))) for user in users],
+        [
+            serialize_admin_account(
+                user,
+                booking_stats_by_user_id.get(str(user.id)),
+                membership_category=membership_by_user_id.get(str(user.id)),
+            )
+            for user in users
+        ],
         key=lambda account: (
             0 if account["role"] == "AdminManager" else 1 if account["is_admin"] else 2,
             account["created_at"],
@@ -44,7 +103,9 @@ def list_accounts_for_admin(db: Session) -> list[dict]:
     )
 
 
-def serialize_admin_account(user: User, booking_stats: Optional[dict] = None) -> dict:
+def serialize_admin_account(
+    user: User, booking_stats: Optional[dict] = None, membership_category: Optional[str] = None
+) -> dict:
     stats = booking_stats or {}
     role = normalize_user_role(getattr(user, "role", None), is_admin=user.is_admin)
     return {
@@ -59,6 +120,7 @@ def serialize_admin_account(user: User, booking_stats: Optional[dict] = None) ->
         "opt_in_sms": user.opt_in_sms,
         "is_admin": user.is_admin,
         "role": role,
+        "membership_category": membership_category,
         "booking_count": stats.get("booking_count", 0) or 0,
         "last_booking_at": stats.get("last_booking_at"),
         "created_at": user.created_at,

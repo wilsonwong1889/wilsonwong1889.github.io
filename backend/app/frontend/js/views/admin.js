@@ -12,6 +12,19 @@ let selectedAdminCalendarRoomId = "all";
 let selectedAdminAccountId = null;
 let adminSearchResults = null;
 let selectedAdminBookingQuickFilter = "all";
+// Membership tiers an admin can assign (value → label). Must mirror the
+// backend account_service.MEMBERSHIP_CATEGORIES list.
+const MEMBERSHIP_OPTIONS = [
+  ["general_public", "Customer (general public)"],
+  ["artist_member", "Artist Member"],
+  ["fellowship_artist", "Artist Fellowship Member"],
+  ["artist_in_residence", "Artist in Residence"],
+  ["service_engineer", "Service Engineer"],
+  ["bipoc_community_member", "BIPOC Community Member"],
+  ["venture_member", "Venture Member"],
+  ["organizational_member", "Organizational Member"],
+];
+
 const DEFAULT_ADMIN_SUBPAGES = {
   overview: "dashboard",
   accounts: "directory",
@@ -1467,6 +1480,24 @@ function renderAdminAccountDetail(account, currentUser) {
       </section>
 
       <section class="admin-account-section">
+        <h4>Membership</h4>
+        <p class="field-help">Set this customer's membership tier (e.g. after they pay for a membership). Members can redeem member-scoped promo codes and any membership pricing.</p>
+        <div class="profile-grid profile-grid-tight">
+          <label>
+            <span>Membership</span>
+            <select data-admin-membership-select data-user-id="${escapeAttribute(account.id)}">
+              ${MEMBERSHIP_OPTIONS.map(([value, label]) => `<option value="${value}" ${(account.membership_category || "general_public") === value ? "selected" : ""}>${label}</option>`).join("")}
+            </select>
+          </label>
+        </div>
+        <div class="hero-actions">
+          <button class="ghost-button" type="button" data-admin-action="update-user-membership" data-user-id="${escapeAttribute(account.id)}" data-user-email="${escapeAttribute(account.email)}">
+            Update membership
+          </button>
+        </div>
+      </section>
+
+      <section class="admin-account-section">
         <h4>Account lifecycle</h4>
         <div class="admin-detail-grid">
           ${renderAccountField("Created", formatBookingDate(account.created_at))}
@@ -2480,6 +2511,33 @@ export function initAdminView(actions) {
           });
         }
         await actions.refreshAll("Role updated.");
+      } catch (error) {
+        setState({ message: error.message });
+      }
+      return;
+    }
+
+    const membershipButton = event.target.closest("[data-admin-action='update-user-membership']");
+    if (membershipButton) {
+      const membershipSelect = elements.adminAccountDetail.querySelector(
+        `[data-admin-membership-select][data-user-id="${CSS.escape(membershipButton.dataset.userId)}"]`,
+      );
+      const nextCategory = membershipSelect?.value;
+      if (!nextCategory) {
+        setState({ message: "Choose a membership before updating." });
+        return;
+      }
+      const accountEmail = membershipButton.dataset.userEmail || "this account";
+      const label = membershipSelect.options[membershipSelect.selectedIndex].text;
+      if (!window.confirm(`Set ${accountEmail} as "${label}"?`)) {
+        return;
+      }
+      try {
+        setState({ message: "Updating membership..." });
+        await api.adminUpdateUserMembership(membershipButton.dataset.userId, {
+          membership_category: nextCategory,
+        });
+        await actions.refreshAll(`Membership updated to ${label}.`);
       } catch (error) {
         setState({ message: error.message });
       }

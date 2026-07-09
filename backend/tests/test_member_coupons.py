@@ -193,3 +193,39 @@ class MemberCouponTest(BaseAppTest):
             json={"full_name": "No Auth", "percent_off": 10},
         )
         self.assertIn(resp.status_code, (401, 403), resp.text)
+
+    def test_10_admin_assigns_membership_then_generator_finds_member(self) -> None:
+        admin = self._admin_headers()
+        user_id, _ = self._register("newartist@example.com")  # no membership yet
+        # Assign the artist_member tier via the admin endpoint.
+        resp = self.client.put(
+            f"/api/admin/users/{user_id}/membership",
+            json={"membership_category": "artist_member"},
+            headers=admin,
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        self.assertEqual(resp.json()["membership_category"], "artist_member")
+        # It shows up in the account list.
+        accounts = self.client.get("/api/admin/users", headers=admin).json()
+        target = next(a for a in accounts if str(a["id"]) == str(user_id))
+        self.assertEqual(target["membership_category"], "artist_member")
+        # And the monthly generator now finds this member.
+        result = self._generate(admin, category="artist_member").json()
+        self.assertGreaterEqual(result["created"], 1)
+
+    def test_11_membership_update_requires_admin_and_valid_category(self) -> None:
+        admin = self._admin_headers()
+        user_id, _ = self._register("membercheck@example.com")
+        # No auth.
+        resp = self.client.put(
+            f"/api/admin/users/{user_id}/membership",
+            json={"membership_category": "artist_member"},
+        )
+        self.assertIn(resp.status_code, (401, 403), resp.text)
+        # Unknown category.
+        resp = self.client.put(
+            f"/api/admin/users/{user_id}/membership",
+            json={"membership_category": "not_a_real_tier"},
+            headers=admin,
+        )
+        self.assertEqual(resp.status_code, 400, resp.text)

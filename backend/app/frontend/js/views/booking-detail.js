@@ -1032,12 +1032,17 @@ function renderPaymentPanel(state, booking) {
       ? "Loading secure payment..."
       : paymentSessionMessage || "Complete payment to confirm your studio session.";
   const primaryDisabled = isPaymentLoading ? "disabled" : "";
+  // A room booking always collects the deposit up front, so there is still an
+  // amount due now even when a 100%-off promo takes the session total to $0.
+  const hasAmountDueNow =
+    booking.price_cents > 0 ||
+    (bookingKind !== "staff" && Number(booking.deposit_amount_cents || 0) > 0);
   elements.bookingPaymentControls.innerHTML = `
     ${
       hasPayPalSession
         ? ""
         : `<button class="primary-button" type="button" data-booking-detail-action="load-payment" data-booking-id="${booking.id}" ${primaryDisabled}>
-      ${booking.price_cents > 0 ? "Pay now" : "Confirm booking"}
+      ${hasAmountDueNow ? "Pay now" : "Confirm booking"}
     </button>`
     }
     ${
