@@ -23,6 +23,8 @@ class User(Base):
     user_category = Column(String, nullable=False, default="general_public")
     opt_in_email = Column(Boolean, default=True)
     opt_in_sms = Column(Boolean, default=False)
+    # Opaque per-user token for one-click CASL email unsubscribe links.
+    unsubscribe_token = Column(UUID(as_uuid=True), unique=True, default=uuid.uuid4)
     two_factor_enabled = Column(Boolean, default=False)
     two_factor_method = Column(String, default="email")
     two_factor_code_hash = Column(String)

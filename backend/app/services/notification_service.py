@@ -46,7 +46,17 @@ def _fmt_money(cents: int) -> str:
     return f"CAD ${cents / 100:.2f}"
 
 
-def _html_wrap(body_html: str) -> str:
+def _html_wrap(body_html: str, *, unsubscribe_url: Optional[str] = None) -> str:
+    # CASL: identify the sender (name + physical mailing address, always in the
+    # footer) and, for non-essential mail, offer a readily-performed unsubscribe.
+    unsubscribe_html = (
+        f'<p style="margin:8px 0 0;color:#aaa;font-size:11px;line-height:1.6;">'
+        f'You are receiving this because you have a booking or account with the '
+        f'{STUDIO_NAME}. '
+        f'<a href="{unsubscribe_url}" style="color:#999;text-decoration:underline;">'
+        f'Unsubscribe</a> from non-essential email.</p>'
+        if unsubscribe_url else ""
+    )
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
@@ -69,6 +79,7 @@ def _html_wrap(body_html: str) -> str:
           <td style="padding:20px 32px;border-top:1px solid #eef0f3;background:#fafbfc;">
             <p style="margin:0;color:#888;font-size:12px;line-height:1.6;">{STUDIO_ADDRESS} &nbsp;·&nbsp; {STUDIO_PHONE}</p>
             <p style="margin:2px 0 0;color:#888;font-size:12px;">{STUDIO_HOURS}</p>
+            {unsubscribe_html}
           </td>
         </tr>
       </table>
@@ -707,6 +718,255 @@ def booking_reminder_email(
     )
 
 
+# ── Reschedule & payment-state emails ─────────────────────────────────────────
+
+def booking_rescheduled_email(
+    *,
+    to_email: str,
+    booking_code: str,
+    new_start_dt: datetime,
+    new_end_dt: datetime,
+    previous_start_dt: Optional[datetime] = None,
+    full_name: Optional[str] = None,
+    room_name: Optional[str] = None,
+    duration_minutes: Optional[int] = None,
+    booking_id: Optional[str] = None,
+    guest_access_token: Optional[str] = None,
+    unsubscribe_url: Optional[str] = None,
+) -> dict:
+    greeting = full_name or to_email
+    new_time = _fmt_local(new_start_dt)
+    rows = _detail_row("Booking code", booking_code)
+    if room_name:
+        rows += _detail_row("Studio", room_name)
+    if previous_start_dt:
+        rows += _detail_row("Previous time", _fmt_local(previous_start_dt))
+    rows += _detail_row("New date & time", new_time)
+    if duration_minutes:
+        rows += _detail_row("Duration", f"{duration_minutes} minutes")
+    rows += _detail_row("Location", STUDIO_ADDRESS)
+
+    booking_link_base = settings.APP_BASE_URL.rstrip("/")
+    if booking_id:
+        link_params = f"?id={booking_id}"
+        if guest_access_token:
+            link_params += f"&t={guest_access_token}"
+        view_booking_url = f"{booking_link_base}/booking{link_params}"
+    else:
+        view_booking_url = f"{booking_link_base}/bookings"
+
+    body = _html_wrap(
+        f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">Your booking was rescheduled</h2>'
+        f'<p style="margin:0 0 4px;color:#444;font-size:15px;">Hi {greeting},</p>'
+        f'<p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">'
+        f'The time for your booking has changed. Your new details are below — we\'ve '
+        f'attached an updated calendar invite.</p>'
+        + _details_table(rows) +
+        _button("View My Booking", view_booking_url) +
+        f'<p style="margin:20px 0 0;color:#888;font-size:13px;">'
+        f'Didn\'t request this change? Call {STUDIO_PHONE} right away.</p>',
+        unsubscribe_url=unsubscribe_url,
+    )
+
+    ics = generate_ics(
+        title=f"Studio Booking — {room_name or 'BIPOC Foundation Hub'}",
+        description=f"Booking code: {booking_code}\nLocation: {STUDIO_ADDRESS}",
+        location=STUDIO_ADDRESS,
+        start_dt=new_start_dt,
+        end_dt=new_end_dt,
+        uid=f"{booking_code}@bipocfoundation.org",
+    )
+
+    return send_email(
+        to_email=to_email,
+        subject=f"Booking rescheduled — new time {new_time}",
+        plain_text_content=(
+            f"Hi {greeting},\n\n"
+            f"The time for booking {booking_code} has changed.\n"
+            + (f"Previous time: {_fmt_local(previous_start_dt)}\n" if previous_start_dt else "")
+            + f"New date & time: {new_time}\n"
+            + (f"Duration: {duration_minutes} minutes\n" if duration_minutes else "")
+            + f"Studio: {room_name or 'BIPOC Foundation Hub'}\n"
+            f"Location: {STUDIO_ADDRESS}\n\n"
+            f"Didn't request this change? Call {STUDIO_PHONE} right away.\n"
+        ),
+        html_content=body,
+        ics_bytes=ics,
+    )
+
+
+def staff_booking_rescheduled_customer_email(
+    *,
+    to_email: str,
+    booking_code: str,
+    new_start_dt: datetime,
+    previous_start_dt: Optional[datetime] = None,
+    customer_name: Optional[str] = None,
+    staff_name: Optional[str] = None,
+    unsubscribe_url: Optional[str] = None,
+) -> dict:
+    greeting = customer_name or to_email
+    new_time = _fmt_local(new_start_dt)
+    rows = _detail_row("Booking code", booking_code)
+    if staff_name:
+        rows += _detail_row("Staff", staff_name)
+    if previous_start_dt:
+        rows += _detail_row("Previous time", _fmt_local(previous_start_dt))
+    rows += _detail_row("New date & time", new_time)
+    rows += _detail_row("Location", STUDIO_ADDRESS)
+
+    body = _html_wrap(
+        f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">Your session was rescheduled</h2>'
+        f'<p style="margin:0 0 4px;color:#444;font-size:15px;">Hi {greeting},</p>'
+        f'<p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">'
+        f'The time for your session'
+        + (f' with {staff_name}' if staff_name else '') +
+        f' has changed. Your new details are below.</p>'
+        + _details_table(rows) +
+        _button("View My Bookings", f"{settings.APP_BASE_URL.rstrip('/')}/bookings") +
+        f'<p style="margin:20px 0 0;color:#888;font-size:13px;">'
+        f'Didn\'t request this change? Call {STUDIO_PHONE} right away.</p>',
+        unsubscribe_url=unsubscribe_url,
+    )
+    return send_email(
+        to_email=to_email,
+        subject=f"Session rescheduled — new time {new_time}",
+        plain_text_content=(
+            f"Hi {greeting},\n\n"
+            f"The time for booking {booking_code} has changed.\n"
+            + (f"Previous time: {_fmt_local(previous_start_dt)}\n" if previous_start_dt else "")
+            + f"New date & time: {new_time}\n"
+            + (f"Staff: {staff_name}\n" if staff_name else "")
+            + f"Location: {STUDIO_ADDRESS}\n\n"
+            f"Didn't request this change? Call {STUDIO_PHONE} right away.\n"
+        ),
+        html_content=body,
+    )
+
+
+def deposit_paid_email(
+    *,
+    to_email: str,
+    booking_code: str,
+    deposit_paid_cents: int,
+    balance_due_cents: int,
+    start_dt: datetime,
+    end_dt: datetime,
+    full_name: Optional[str] = None,
+    room_name: Optional[str] = None,
+    duration_minutes: Optional[int] = None,
+    booking_id: Optional[str] = None,
+    guest_access_token: Optional[str] = None,
+    unsubscribe_url: Optional[str] = None,
+) -> dict:
+    greeting = full_name or to_email
+    local_time = _fmt_local(start_dt)
+    rows = _detail_row("Booking code", booking_code)
+    if room_name:
+        rows += _detail_row("Studio", room_name)
+    rows += _detail_row("Date & time", local_time)
+    if duration_minutes:
+        rows += _detail_row("Duration", f"{duration_minutes} minutes")
+    rows += _detail_row("Deposit paid", _fmt_money(deposit_paid_cents))
+    rows += _detail_row("Balance due", _fmt_money(balance_due_cents))
+    rows += _detail_row("Location", STUDIO_ADDRESS)
+
+    booking_link_base = settings.APP_BASE_URL.rstrip("/")
+    if booking_id:
+        link_params = f"?id={booking_id}"
+        if guest_access_token:
+            link_params += f"&t={guest_access_token}"
+        view_booking_url = f"{booking_link_base}/booking{link_params}"
+    else:
+        view_booking_url = f"{booking_link_base}/bookings"
+
+    body = _html_wrap(
+        f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">Deposit received ✓</h2>'
+        f'<p style="margin:0 0 4px;color:#444;font-size:15px;">Hi {greeting},</p>'
+        f'<p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">'
+        f'Thanks — your deposit is in and your booking is confirmed. The remaining '
+        f'balance of <strong>{_fmt_money(balance_due_cents)}</strong> is due at the '
+        f'studio. We\'ve attached a calendar invite.</p>'
+        + _details_table(rows) +
+        _button("View My Booking", view_booking_url) +
+        f'<p style="margin:20px 0 0;color:#888;font-size:13px;">'
+        f'Plan to arrive 10–15 minutes early. '
+        f'Questions? Call {STUDIO_PHONE} or reply to this email.</p>',
+        unsubscribe_url=unsubscribe_url,
+    )
+
+    ics = generate_ics(
+        title=f"Studio Booking — {room_name or 'BIPOC Foundation Hub'}",
+        description=f"Booking code: {booking_code}\nBalance due: {_fmt_money(balance_due_cents)}\nLocation: {STUDIO_ADDRESS}",
+        location=STUDIO_ADDRESS,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        uid=f"{booking_code}@bipocfoundation.org",
+    )
+
+    return send_email(
+        to_email=to_email,
+        subject=f"Deposit received — balance {_fmt_money(balance_due_cents)} due at studio",
+        plain_text_content=(
+            f"Hi {greeting}, your deposit is confirmed!\n\n"
+            f"Booking code: {booking_code}\n"
+            f"Studio: {room_name or 'BIPOC Foundation Hub'}\n"
+            f"Date & time: {local_time}\n"
+            + (f"Duration: {duration_minutes} minutes\n" if duration_minutes else "")
+            + f"Deposit paid: {_fmt_money(deposit_paid_cents)}\n"
+            f"Balance due at studio: {_fmt_money(balance_due_cents)}\n"
+            f"Location: {STUDIO_ADDRESS}\n\n"
+            f"Plan to arrive 10–15 minutes early.\n"
+        ),
+        html_content=body,
+        ics_bytes=ics,
+    )
+
+
+def payment_failed_email(
+    *,
+    to_email: str,
+    booking_code: str,
+    full_name: Optional[str] = None,
+    room_name: Optional[str] = None,
+    start_dt: Optional[datetime] = None,
+    unsubscribe_url: Optional[str] = None,
+) -> dict:
+    greeting = full_name or to_email
+    local_time = _fmt_local(start_dt) if start_dt else None
+    rows = _detail_row("Booking code", booking_code)
+    if room_name:
+        rows += _detail_row("Studio", room_name)
+    if local_time:
+        rows += _detail_row("Requested time", local_time)
+
+    body = _html_wrap(
+        f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">Payment didn\'t go through</h2>'
+        f'<p style="margin:0 0 16px;color:#444;font-size:15px;">Hi {greeting},</p>'
+        f'<p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">'
+        f'We couldn\'t process the payment for this booking, so the time slot has been '
+        f'released. No charge was made. You\'re welcome to book again whenever you\'re '
+        f'ready.</p>'
+        + _details_table(rows) +
+        _button("Book Again", f"{settings.APP_BASE_URL.rstrip('/')}/rooms") +
+        f'<p style="margin:20px 0 0;color:#888;font-size:13px;">'
+        f'Think this is a mistake? Call {STUDIO_PHONE} or reply to this email.</p>',
+        unsubscribe_url=unsubscribe_url,
+    )
+    return send_email(
+        to_email=to_email,
+        subject=f"Payment didn't go through — {booking_code}",
+        plain_text_content=(
+            f"Hi {greeting},\n\n"
+            f"We couldn't process the payment for booking {booking_code}, so the "
+            f"time slot has been released. No charge was made.\n"
+            + (f"Requested time: {local_time}\n" if local_time else "")
+            + f"\nBook again at: {settings.APP_BASE_URL.rstrip('/')}/rooms\n"
+        ),
+        html_content=body,
+    )
+
+
 # ── Staff notification email ──────────────────────────────────────────────────
 
 def booking_staff_notification_email(
@@ -956,4 +1216,18 @@ def booking_reminder_sms(*, to_number: str, booking_code: str, start_time: str, 
     return send_sms(
         to_number=to_number,
         body=f"Reminder: your booking {booking_code} starts in {label}. {start_time}. {STUDIO_ADDRESS}.",
+    )
+
+
+def booking_rescheduled_sms(*, to_number: str, booking_code: str, new_start_time: str) -> dict:
+    return send_sms(
+        to_number=to_number,
+        body=f"Booking {booking_code} rescheduled. New time: {new_start_time}. {STUDIO_ADDRESS}.",
+    )
+
+
+def payment_failed_sms(*, to_number: str, booking_code: str) -> dict:
+    return send_sms(
+        to_number=to_number,
+        body=f"Payment for booking {booking_code} didn't go through and the slot was released. No charge was made. Book again anytime.",
     )

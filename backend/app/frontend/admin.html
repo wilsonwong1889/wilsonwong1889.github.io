@@ -178,6 +178,25 @@
                   <p class="panel-copy">Refunds, manual bookings, cancellations, and payment updates appear here.</p>
                 </div>
                 <div id="admin-activity-list" class="admin-activity-list"></div>
+
+                <div class="panel-header" style="margin-top:24px;">
+                  <p class="panel-kicker">Notifications</p>
+                  <h3>Email &amp; SMS log</h3>
+                  <p class="panel-copy">Every message the system queued or sent — confirmations, reminders, reschedules, deposits, refunds — with delivery status.</p>
+                </div>
+                <div class="admin-notifications-controls" style="margin-bottom:12px;">
+                  <label>
+                    <span class="sr-only">Filter notifications by status</span>
+                    <select id="admin-notifications-status-filter" data-admin-notifications-status>
+                      <option value="">All statuses</option>
+                      <option value="Sent">Sent</option>
+                      <option value="Failed">Failed</option>
+                      <option value="Queued">Queued</option>
+                    </select>
+                  </label>
+                  <button id="admin-notifications-refresh" class="ghost-button" type="button" data-admin-notifications-refresh>Refresh</button>
+                </div>
+                <div id="admin-notifications-list" class="admin-notifications-list"></div>
               </section>
             </section>
 

@@ -1642,6 +1642,64 @@ body[data-page="home"] .site-acknowledgement {
   align-items: baseline;
 }
 
+.admin-notifications-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-notifications-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-notification-card {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.admin-notification-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.admin-notification-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.admin-notification-status {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-notification-sent {
+  border-left-color: #1f9d55;
+}
+
+.admin-notification-failed {
+  border-left-color: var(--brand-red);
+}
+
+.admin-notification-queued {
+  border-left-color: #b7791f;
+}
+
+.admin-notification-error {
+  color: var(--brand-red);
+}
+
 .admin-room-staff-list {
   display: grid;
   gap: 16px;
@@ -4270,6 +4328,51 @@ textarea.booking-contact-value:focus {
   color: #4e6275;
   font-size: 0.92rem;
   line-height: 1.5;
+}
+
+/* Apple Pay / Google Pay express buttons shown above the PayPal button. */
+.booking-wallets {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.booking-wallets.hidden {
+  display: none;
+}
+
+.booking-wallets .wallet-slot:empty {
+  display: none;
+}
+
+.booking-wallets .wallet-apple-pay-button {
+  -webkit-appearance: -apple-pay-button;
+  appearance: -apple-pay-button;
+  -apple-pay-button-type: pay;
+  -apple-pay-button-style: black;
+  width: 100%;
+  height: 48px;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.booking-wallets-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #8194a4;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.booking-wallets-divider::before,
+.booking-wallets-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(24, 33, 39, 0.12);
 }
 
 .booking-checkout-payment #booking-payment-element {
@@ -7952,7 +8055,8 @@ body[data-page="home"] .home-carousel-slides-container {
 body[data-page="home"] .home-hero-image {
   object-position: center 46%;
   filter: saturate(1.02) brightness(1.04) contrast(1.02);
-  transform: scale(1.015);
+  /* No upscale on the carousel — show the photo 1:1 for maximum sharpness. */
+  transform: scale(1);
 }
 
 body[data-page="home"] .home-hero-overlay-primary {

@@ -32,14 +32,20 @@ from app.services.notification_service import (
     booking_confirmation_sms,
     booking_reminder_email,
     booking_reminder_sms,
+    booking_rescheduled_email,
+    booking_rescheduled_sms,
     booking_staff_notification_email,
+    deposit_paid_email,
     password_reset_email,
+    payment_failed_email,
+    payment_failed_sms,
     refund_processed_email,
     refund_processed_sms,
     staff_booking_accepted_customer_email,
     staff_booking_declined_customer_email,
     staff_booking_request_email,
     staff_booking_request_sms,
+    staff_booking_rescheduled_customer_email,
 )
 from app.services.suitedash_service import (
     SuiteDashConfigurationError,
@@ -71,6 +77,28 @@ def _get_user(db, user_id: str):
     if not user_id:
         return None
     return db.query(User).filter(User.id == user_id).first()
+
+
+def _unsubscribe_url_for(user) -> Optional[str]:
+    """CASL unsubscribe link for a recipient, or None if they have no token.
+
+    Forward-compatible: returns None until the unsubscribe_token column exists
+    and is populated, so callers can pass it unconditionally.
+    """
+    token = getattr(user, "unsubscribe_token", None)
+    if not token:
+        return None
+    return f"{settings.APP_BASE_URL.rstrip('/')}/api/notifications/unsubscribe?token={token}"
+
+
+def _deposit_and_balance_cents(booking) -> tuple[int, int]:
+    """Deposit collected online (deposit + 5% GST) and the balance still owing."""
+    from math import floor
+
+    deposit = booking.deposit_amount_cents or 0
+    deposit_paid = deposit + floor(deposit * 0.05)
+    balance_due = max((booking.price_cents or 0) - deposit_paid, 0)
+    return deposit_paid, balance_due
 
 
 def _json_safe_details(value) -> dict:
@@ -502,6 +530,237 @@ def send_booking_confirmation_sms_task(booking_id: str):
         db.commit()
         record_task_run("send_booking_confirmation_sms")
         record_task_items("send_booking_confirmation_sms", "sent", 1)
+        return {"sent": True}
+    finally:
+        db.close()
+
+
+@task(name="app.tasks.send_booking_rescheduled_email")
+def send_booking_rescheduled_email_task(booking_id: str, previous_start_iso: Optional[str] = None):
+    db = SessionLocal()
+    try:
+        booking, user = _get_booking_and_user(db, booking_id)
+        if not booking or not user or not user.email or not user.opt_in_email:
+            record_task_run("send_booking_rescheduled_email")
+            record_task_items("send_booking_rescheduled_email", "skipped", 1)
+            return {"sent": False}
+        room_name = getattr(booking, "room_name_snapshot", None) or _get_room_name(db, booking.room_id)
+        end_dt = booking.start_time + timedelta(minutes=booking.duration_minutes)
+        previous_start_dt = datetime.fromisoformat(previous_start_iso) if previous_start_iso else None
+        guest_token = None
+        try:
+            from app.core.security import create_access_token
+            if user.email and "@guest.studiobooking.local" in user.email:
+                guest_token = create_access_token({"sub": str(user.id)}, expires_minutes=60 * 24 * 30)
+        except Exception:  # noqa: BLE001 — never let token minting block the email
+            guest_token = None
+        delivery = booking_rescheduled_email(
+            to_email=user.email,
+            booking_code=booking.booking_code,
+            new_start_dt=booking.start_time,
+            new_end_dt=end_dt,
+            previous_start_dt=previous_start_dt,
+            full_name=user.full_name,
+            room_name=room_name,
+            duration_minutes=booking.duration_minutes,
+            booking_id=str(booking.id),
+            guest_access_token=guest_token,
+            unsubscribe_url=_unsubscribe_url_for(user),
+        )
+        create_notification_log(
+            db,
+            user_id=user.id,
+            booking_id=booking.id,
+            notification_type="booking_rescheduled_email_worker",
+            status="Sent",
+            details={"delivery": delivery},
+        )
+        db.commit()
+        record_task_run("send_booking_rescheduled_email")
+        record_task_items("send_booking_rescheduled_email", "sent", 1)
+        return {"sent": True}
+    finally:
+        db.close()
+
+
+@task(name="app.tasks.send_booking_rescheduled_sms")
+def send_booking_rescheduled_sms_task(booking_id: str):
+    db = SessionLocal()
+    try:
+        booking, user = _get_booking_and_user(db, booking_id)
+        if not booking or not user or not user.phone or not user.opt_in_sms:
+            record_task_run("send_booking_rescheduled_sms")
+            record_task_items("send_booking_rescheduled_sms", "skipped", 1)
+            return {"sent": False}
+        delivery = booking_rescheduled_sms(
+            to_number=user.phone,
+            booking_code=booking.booking_code,
+            new_start_time=booking.start_time.isoformat(),
+        )
+        create_notification_log(
+            db,
+            user_id=user.id,
+            booking_id=booking.id,
+            notification_type="booking_rescheduled_sms_worker",
+            status="Sent",
+            details={"delivery": delivery},
+        )
+        db.commit()
+        record_task_run("send_booking_rescheduled_sms")
+        record_task_items("send_booking_rescheduled_sms", "sent", 1)
+        return {"sent": True}
+    finally:
+        db.close()
+
+
+@task(name="app.tasks.send_staff_booking_rescheduled_email")
+def send_staff_booking_rescheduled_email_task(staff_booking_id: str, previous_start_iso: Optional[str] = None):
+    db = SessionLocal()
+    try:
+        booking = db.query(StaffBooking).filter(StaffBooking.id == staff_booking_id).first()
+        if not booking or not booking.user_email:
+            record_task_run("send_staff_booking_rescheduled_email")
+            record_task_items("send_staff_booking_rescheduled_email", "skipped", 1)
+            return {"sent": False}
+        user = _get_user(db, str(booking.user_id)) if booking.user_id else None
+        if user and not user.opt_in_email:
+            record_task_run("send_staff_booking_rescheduled_email")
+            record_task_items("send_staff_booking_rescheduled_email", "skipped", 1)
+            return {"sent": False}
+        profile = db.query(StaffProfile).filter(StaffProfile.id == booking.staff_profile_id).first()
+        previous_start_dt = datetime.fromisoformat(previous_start_iso) if previous_start_iso else None
+        delivery = staff_booking_rescheduled_customer_email(
+            to_email=booking.user_email,
+            booking_code=booking.booking_code,
+            new_start_dt=booking.start_time,
+            previous_start_dt=previous_start_dt,
+            customer_name=booking.user_full_name_snapshot,
+            staff_name=profile.name if profile else None,
+            unsubscribe_url=_unsubscribe_url_for(user) if user else None,
+        )
+        create_notification_log(
+            db,
+            user_id=booking.user_id,
+            booking_id=None,
+            notification_type="staff_booking_rescheduled_email_worker",
+            status="Sent",
+            details={"delivery": delivery, "staff_booking_id": str(booking.id)},
+        )
+        db.commit()
+        record_task_run("send_staff_booking_rescheduled_email")
+        record_task_items("send_staff_booking_rescheduled_email", "sent", 1)
+        return {"sent": True}
+    finally:
+        db.close()
+
+
+@task(name="app.tasks.send_deposit_paid_email")
+def send_deposit_paid_email_task(booking_id: str):
+    db = SessionLocal()
+    try:
+        booking, user = _get_booking_and_user(db, booking_id)
+        if not booking or not user or not user.email or not user.opt_in_email:
+            record_task_run("send_deposit_paid_email")
+            record_task_items("send_deposit_paid_email", "skipped", 1)
+            return {"sent": False}
+        room_name = getattr(booking, "room_name_snapshot", None) or _get_room_name(db, booking.room_id)
+        end_dt = booking.start_time + timedelta(minutes=booking.duration_minutes)
+        deposit_paid_cents, balance_due_cents = _deposit_and_balance_cents(booking)
+        guest_token = None
+        try:
+            from app.core.security import create_access_token
+            if user.email and "@guest.studiobooking.local" in user.email:
+                guest_token = create_access_token({"sub": str(user.id)}, expires_minutes=60 * 24 * 30)
+        except Exception:  # noqa: BLE001 — never let token minting block the email
+            guest_token = None
+        delivery = deposit_paid_email(
+            to_email=user.email,
+            booking_code=booking.booking_code,
+            deposit_paid_cents=deposit_paid_cents,
+            balance_due_cents=balance_due_cents,
+            start_dt=booking.start_time,
+            end_dt=end_dt,
+            full_name=user.full_name,
+            room_name=room_name,
+            duration_minutes=booking.duration_minutes,
+            booking_id=str(booking.id),
+            guest_access_token=guest_token,
+            unsubscribe_url=_unsubscribe_url_for(user),
+        )
+        create_notification_log(
+            db,
+            user_id=user.id,
+            booking_id=booking.id,
+            notification_type="deposit_paid_email_worker",
+            status="Sent",
+            details={"delivery": delivery},
+        )
+        db.commit()
+        record_task_run("send_deposit_paid_email")
+        record_task_items("send_deposit_paid_email", "sent", 1)
+        return {"sent": True}
+    finally:
+        db.close()
+
+
+@task(name="app.tasks.send_payment_failed_email")
+def send_payment_failed_email_task(booking_id: str):
+    db = SessionLocal()
+    try:
+        booking, user = _get_booking_and_user(db, booking_id)
+        if not booking or not user or not user.email or not user.opt_in_email:
+            record_task_run("send_payment_failed_email")
+            record_task_items("send_payment_failed_email", "skipped", 1)
+            return {"sent": False}
+        room_name = getattr(booking, "room_name_snapshot", None) or _get_room_name(db, booking.room_id)
+        delivery = payment_failed_email(
+            to_email=user.email,
+            booking_code=booking.booking_code,
+            full_name=user.full_name,
+            room_name=room_name,
+            start_dt=booking.start_time,
+            unsubscribe_url=_unsubscribe_url_for(user),
+        )
+        create_notification_log(
+            db,
+            user_id=user.id,
+            booking_id=booking.id,
+            notification_type="payment_failed_email_worker",
+            status="Sent",
+            details={"delivery": delivery},
+        )
+        db.commit()
+        record_task_run("send_payment_failed_email")
+        record_task_items("send_payment_failed_email", "sent", 1)
+        return {"sent": True}
+    finally:
+        db.close()
+
+
+@task(name="app.tasks.send_payment_failed_sms")
+def send_payment_failed_sms_task(booking_id: str):
+    db = SessionLocal()
+    try:
+        booking, user = _get_booking_and_user(db, booking_id)
+        if not booking or not user or not user.phone or not user.opt_in_sms:
+            record_task_run("send_payment_failed_sms")
+            record_task_items("send_payment_failed_sms", "skipped", 1)
+            return {"sent": False}
+        delivery = payment_failed_sms(
+            to_number=user.phone,
+            booking_code=booking.booking_code,
+        )
+        create_notification_log(
+            db,
+            user_id=user.id,
+            booking_id=booking.id,
+            notification_type="payment_failed_sms_worker",
+            status="Sent",
+            details={"delivery": delivery},
+        )
+        db.commit()
+        record_task_run("send_payment_failed_sms")
+        record_task_items("send_payment_failed_sms", "sent", 1)
         return {"sent": True}
     finally:
         db.close()

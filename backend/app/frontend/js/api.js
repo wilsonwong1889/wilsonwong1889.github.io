@@ -163,6 +163,11 @@ export const api = {
       method: "POST",
     });
   },
+  confirmFreeBooking(bookingId) {
+    return request(`/api/bookings/${bookingId}/confirm-free`, {
+      method: "POST",
+    });
+  },
   updateBookingContact(bookingId, payload) {
     return request(`/api/bookings/${bookingId}/contact`, {
       method: "PUT",
@@ -349,6 +354,12 @@ export const api = {
   getAdminActivity(limit = 12) {
     return request(`/api/admin/activity?limit=${limit}`);
   },
+  getAdminNotifications({ limit = 50, status = "", type = "" } = {}) {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (status) params.set("status", status);
+    if (type) params.set("type", type);
+    return request(`/api/admin/notifications?${params.toString()}`);
+  },
   getAdminStaffProfiles() {
     return request("/api/admin/staff");
   },
@@ -364,6 +375,12 @@ export const api = {
   adminUpdatePromoCode(promoCodeId, payload) {
     return request(`/api/admin/promo-codes/${promoCodeId}`, {
       method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+  adminCreateMemberCode(payload) {
+    return request("/api/admin/promo-codes/member", {
+      method: "POST",
       body: JSON.stringify(payload),
     });
   },
@@ -451,6 +468,12 @@ export const api = {
   },
   adminUpdateUserRole(userId, payload) {
     return request(`/api/admin/users/${userId}/role`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+  adminUpdateUserMembership(userId, payload) {
+    return request(`/api/admin/users/${userId}/membership`, {
       method: "PUT",
       body: JSON.stringify(payload),
     });

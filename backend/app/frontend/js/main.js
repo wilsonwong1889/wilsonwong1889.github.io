@@ -348,6 +348,7 @@ function resetScopedData() {
     patch.adminBookings = [];
     patch.adminAnalytics = null;
     patch.adminActivity = [];
+    patch.adminNotifications = [];
     patch.adminUsers = [];
     patch.adminTestCases = [];
     patch.adminStaffProfiles = [];
@@ -495,13 +496,16 @@ async function refreshAdminActivity(message) {
   }
 
   if (!state.currentUser?.is_admin) {
-    setState({ adminActivity: [], message: message || state.message });
+    setState({ adminActivity: [], adminNotifications: [], message: message || state.message });
     return;
   }
 
   try {
-    const adminActivity = await api.getAdminActivity();
-    setState({ adminActivity, message: message || "Admin activity loaded." });
+    const [adminActivity, adminNotifications] = await Promise.all([
+      api.getAdminActivity(),
+      api.getAdminNotifications(),
+    ]);
+    setState({ adminActivity, adminNotifications, message: message || "Admin activity loaded." });
   } catch (error) {
     setState({ message: error.message });
   }
@@ -839,6 +843,7 @@ async function refreshSession(message) {
       adminBookings: [],
       adminAnalytics: null,
       adminActivity: [],
+      adminNotifications: [],
       adminUsers: [],
       adminTestCases: [],
       adminStaffProfiles: [],
@@ -864,6 +869,7 @@ async function clearSession() {
     adminBookings: [],
     adminAnalytics: null,
     adminActivity: [],
+    adminNotifications: [],
     adminUsers: [],
     adminTestCases: [],
     adminStaffProfiles: [],

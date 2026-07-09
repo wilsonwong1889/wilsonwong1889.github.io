@@ -17,6 +17,7 @@ from app.schemas.booking import (
     AdminBookingLookupOut,
     AdminBookingBulkClearResultOut,
     AdminBookingClearByDateIn,
+    AdminNotificationLogOut,
     AdminTodayRosterOut,
     BookingOut,
     ManualBookingCreate,
@@ -26,6 +27,7 @@ from app.schemas.booking import (
 from app.schemas.admin import AdminTestCaseOut
 from app.schemas.admin import AdminSuiteDashMetaOut, AdminSuiteDashStatusOut
 from app.schemas.promo_code import (
+    MemberCodeRequest,
     MonthlyMemberCodeRequest,
     MonthlyMemberCodeResult,
     PromoCodeCreate,
@@ -34,7 +36,12 @@ from app.schemas.promo_code import (
 )
 from app.schemas.staff import AdminStaffProfileOut, StaffPhotoUploadOut, StaffProfileCreate, StaffProfileUpdate
 from app.schemas.staff_booking import StaffBookingOut
-from app.schemas.user import AdminUserAccountOut, AdminUserDeleteConfirm, AdminUserRoleUpdate
+from app.schemas.user import (
+    AdminUserAccountOut,
+    AdminUserDeleteConfirm,
+    AdminUserMembershipUpdate,
+    AdminUserRoleUpdate,
+)
 from app.core.image_utils import ACCEPTED_PHOTO_EXTENSIONS, MAX_PHOTO_BYTES, to_jpeg_bytes
 from app.core.media_storage import store_media
 from app.core.security import verify_password
@@ -43,8 +50,10 @@ from app.services.account_service import (
     can_delete_admin_account,
     count_admin_managers,
     delete_user_account,
+    get_membership_category,
     list_accounts_for_admin,
     serialize_admin_account,
+    set_user_membership,
 )
 from app.services.booking_service import (
     check_in_booking,
@@ -54,6 +63,7 @@ from app.services.booking_service import (
     get_admin_analytics_summary,
     get_admin_today_roster,
     list_recent_admin_activity,
+    list_recent_notifications,
     lookup_bookings_for_admin,
     mark_booking_paid_manually,
     process_refund,
@@ -66,6 +76,7 @@ from app.services.booking_service import (
 from app.services.payment_service import PaymentBackendError
 from app.services.promo_code_service import (
     PromoCodeError,
+    create_member_code,
     create_promo_code,
     generate_monthly_member_codes,
     list_promo_codes,
@@ -214,7 +225,34 @@ def admin_update_user_role(
     )
     db.commit()
     db.refresh(user)
-    return serialize_admin_account(user)
+    return serialize_admin_account(user, membership_category=get_membership_category(db, user.id))
+
+
+@router.put("/users/{user_id}/membership", response_model=AdminUserAccountOut)
+def admin_update_user_membership(
+    user_id: str,
+    payload: AdminUserMembershipUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(admin_rate_limit),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        category = set_user_membership(db, user, payload.membership_category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    create_audit_log(
+        db,
+        actor_id=admin.id,
+        booking_id=None,
+        action="user_membership_updated",
+        details={"target_user_id": str(user.id), "target_user_email": user.email, "category": category},
+    )
+    db.commit()
+    db.refresh(user)
+    return serialize_admin_account(user, membership_category=category)
 
 
 @router.get("/activity", response_model=List[AdminActivityItemOut])
@@ -225,6 +263,19 @@ def admin_recent_activity(
     _: None = Depends(admin_rate_limit),
 ):
     return list_recent_admin_activity(db, limit=limit)
+
+
+@router.get("/notifications", response_model=List[AdminNotificationLogOut])
+def admin_recent_notifications(
+    limit: int = Query(default=50, ge=1, le=200),
+    status: Optional[str] = Query(default=None),
+    type: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(admin_rate_limit),
+):
+    """Recent email/SMS notification log for admin visibility."""
+    return list_recent_notifications(db, limit=limit, status=status, notification_type=type)
 
 
 @router.get("/staff", response_model=List[AdminStaffProfileOut])
@@ -469,6 +520,38 @@ def admin_update_promo_code(
     except PromoCodeError as exc:
         status_code = 404 if "not found" in str(exc).lower() else 400
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@router.post("/promo-codes/member", response_model=PromoCodeOut, status_code=201)
+def admin_create_member_code(
+    payload: MemberCodeRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(admin_rate_limit),
+):
+    try:
+        promo_code = create_member_code(
+            db,
+            full_name=payload.full_name,
+            percent_off=payload.percent_off,
+            max_uses=payload.max_uses,
+        )
+        create_audit_log(
+            db,
+            actor_id=admin.id,
+            booking_id=None,
+            action="member_code_created",
+            details={
+                "code": promo_code["code"],
+                "full_name": payload.full_name,
+                "percent_off": payload.percent_off,
+                "max_uses": payload.max_uses,
+            },
+        )
+        db.commit()
+        return promo_code
+    except PromoCodeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/promo-codes/generate-monthly", response_model=MonthlyMemberCodeResult, status_code=201)

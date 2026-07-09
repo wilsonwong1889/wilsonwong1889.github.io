@@ -181,6 +181,9 @@ class PaymentSessionOut(BaseModel):
     payment_client_secret: Optional[str] = None
     payment_backend: str
     paypal_client_id: Optional[str] = None
+    paypal_env: Optional[str] = None
+    amount_value: Optional[str] = None
+    currency_code: Optional[str] = None
     payment_expires_at: Optional[datetime] = None
     payment_seconds_remaining: Optional[int] = None
 
@@ -231,6 +234,18 @@ class AdminActivityItemOut(BaseModel):
     booking_id: Optional[UUID] = None
     action: str
     details: Optional[dict] = None
+    created_at: datetime
+
+
+class AdminNotificationLogOut(BaseModel):
+    id: UUID
+    type: str
+    status: str
+    user_email: Optional[str] = None
+    booking_code: Optional[str] = None
+    backend: Optional[str] = None
+    error: Optional[str] = None
+    sent_at: Optional[datetime] = None
     created_at: datetime
 
 

@@ -1183,6 +1183,13 @@ function formatActivityAction(action) {
   return action.replaceAll("_", " ");
 }
 
+function formatNotificationType(type) {
+  // Strip the internal "_worker" suffix and humanize the event name.
+  return String(type || "")
+    .replace(/_worker$/, "")
+    .replaceAll("_", " ");
+}
+
 function normalizeTestCaseHealth(health) {
   return String(health || "working")
     .trim()
@@ -2335,6 +2342,19 @@ export function initAdminView(actions) {
     resetAdminPromoForm();
   });
 
+  async function reloadAdminNotifications() {
+    const status = elements.adminNotificationsStatusFilter?.value || "";
+    try {
+      const adminNotifications = await api.getAdminNotifications({ status });
+      setState({ adminNotifications, message: "Notification log refreshed." });
+      renderAdminView(actions.getState());
+    } catch (error) {
+      setState({ message: error.message });
+    }
+  }
+  elements.adminNotificationsRefresh?.addEventListener("click", reloadAdminNotifications);
+  elements.adminNotificationsStatusFilter?.addEventListener("change", reloadAdminNotifications);
+
   elements.adminScheduleDate?.addEventListener("change", () => {
     selectedAdminScheduleDate = elements.adminScheduleDate.value || todayString();
     renderAdminView(actions.getState());
@@ -3286,6 +3306,26 @@ export function renderAdminView(currentState) {
           )
           .join("")
       : '<div class="empty-state">No activity recorded yet.</div>';
+  }
+
+  if (elements.adminNotificationsList) {
+    const notifications = currentState.adminNotifications || [];
+    elements.adminNotificationsList.innerHTML = notifications.length
+      ? notifications
+          .map(
+            (item) => `
+              <article class="admin-notification-card admin-notification-${escapeHtml((item.status || "").toLowerCase())}">
+                <header>
+                  <strong>${escapeHtml(formatNotificationType(item.type))}</strong>
+                  <span class="admin-notification-status">${escapeHtml(item.status || "")}</span>
+                </header>
+                <p>${escapeHtml(item.user_email || "—")}${item.booking_code ? ` • ${escapeHtml(item.booking_code)}` : ""}${item.backend ? ` • via ${escapeHtml(item.backend)}` : ""}</p>
+                <p class="admin-notification-meta">${formatBookingDate(item.created_at)}${item.error ? ` • <span class="admin-notification-error">${escapeHtml(item.error)}</span>` : ""}</p>
+              </article>
+            `,
+          )
+          .join("")
+      : '<div class="empty-state">No notifications logged yet.</div>';
   }
 
   if (elements.adminAccountsList && elements.adminAccountDetail) {

@@ -579,7 +579,7 @@ class PaymentTest(BaseAppTest):
             confirmation_notifications = (
                 db.query(self.NotificationLog)
                 .filter(self.NotificationLog.booking_id == booking["id"])
-                .filter(self.NotificationLog.type == "booking_confirmation_email")
+                .filter(self.NotificationLog.type == "deposit_paid_email")
                 .count()
             )
             webhook_event = (

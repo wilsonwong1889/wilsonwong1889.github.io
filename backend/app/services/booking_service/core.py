@@ -197,14 +197,19 @@ def calculate_tax_cents(subtotal_cents: int) -> int:
 
 def upfront_charge_cents(booking: Booking) -> int:
     """Amount the customer pays now for a public booking: the room deposit plus
-    GST on that deposit. The rest of ``price_cents`` becomes the balance owed.
+    GST on that deposit, but never more than the (post-discount) total. The rest
+    of ``price_cents`` becomes the balance owed at the studio.
 
-    If the booking has no deposit configured, fall back to the full total so we
-    never create a $0 charge."""
+    Capping at the total means a discount is reflected up front: e.g. a 100%-off
+    promo takes ``price_cents`` to $0, so the deposit due now is $0 (a free
+    booking), and any total under ~$21 is simply paid in full now. If no deposit
+    is configured, the full total is charged."""
+    total = booking.price_cents or 0
     deposit = booking.deposit_amount_cents or 0
     if deposit <= 0:
-        return booking.price_cents or 0
-    return deposit + calculate_tax_cents(deposit)
+        return total
+    deposit_charge = deposit + calculate_tax_cents(deposit)
+    return min(deposit_charge, total)
 
 
 def get_room_max_booking_duration_minutes(room: Room) -> int:
@@ -753,9 +758,11 @@ def _create_booking_record(
         )
         sync_booking_staff_assignment_guards(db, booking)
         db.flush()
-        if status == "PendingPayment":
+        if status == "PendingPayment" and upfront_charge_cents(booking) > 0:
             # Customers pay only the deposit (+ GST on it) up front; the balance
-            # of price_cents is collected later. See upfront_charge_cents.
+            # of price_cents is collected later. See upfront_charge_cents. When the
+            # amount due now is $0 (e.g. a 100%-off promo) no order is created —
+            # the customer confirms the free booking on the checkout page.
             payment_intent = create_payment_intent(
                 amount_cents=upfront_charge_cents(booking),
                 currency=booking.currency,
@@ -1195,6 +1202,7 @@ def reschedule_booking(
         exclude_booking_id=booking.id,
     )
 
+    previous_start = booking.start_time
     slot_starts = build_slot_starts(normalized_start, booking.duration_minutes)
     try:
         release_booking_slots(db, booking.id)
@@ -1219,6 +1227,7 @@ def reschedule_booking(
             details={
                 "start_time": normalized_start.isoformat(),
                 "end_time": end_time.isoformat(),
+                "previous_start_time": previous_start.isoformat() if previous_start else None,
                 "status": booking.status,
             },
         )
@@ -1231,8 +1240,8 @@ def reschedule_booking(
             details={
                 "booking_code": booking.booking_code,
                 "queued_tasks": [
-                    "send_booking_confirmation_email",
-                    "send_booking_confirmation_sms",
+                    "send_booking_rescheduled_email",
+                    "send_booking_rescheduled_sms",
                 ],
             },
         )
@@ -1245,13 +1254,14 @@ def reschedule_booking(
 
     db.refresh(booking)
     from app.tasks import (
-        send_booking_confirmation_email_task,
-        send_booking_confirmation_sms_task,
+        send_booking_rescheduled_email_task,
+        send_booking_rescheduled_sms_task,
         send_booking_staff_notification_email_task,
     )
 
-    send_booking_confirmation_email_task.delay(str(booking.id))
-    send_booking_confirmation_sms_task.delay(str(booking.id))
+    previous_start_iso = previous_start.isoformat() if previous_start else None
+    send_booking_rescheduled_email_task.delay(str(booking.id), previous_start_iso)
+    send_booking_rescheduled_sms_task.delay(str(booking.id))
     send_booking_staff_notification_email_task.delay(str(booking.id), "confirmed")
     return booking
 
@@ -1535,9 +1545,25 @@ def get_booking_payment_session(db: Session, booking: Booking, user: User) -> di
     if not user.email:
         raise PaymentSessionError("User email is required for payment")
 
+    charge_cents = upfront_charge_cents(booking)
+    # Nothing due now (e.g. a 100%-off promo): the customer confirms for free
+    # instead of paying — mirrors the free staff-booking flow.
+    if charge_cents <= 0:
+        return {
+            "booking_id": booking.id,
+            "payment_intent_id": None,
+            "payment_client_secret": None,
+            "payment_backend": "free",
+            "paypal_client_id": None,
+            "paypal_env": settings.PAYPAL_ENV,
+            "amount_value": "0.00",
+            "currency_code": booking.currency,
+            "payment_expires_at": booking.payment_expires_at,
+            "payment_seconds_remaining": booking.payment_seconds_remaining,
+        }
     payment_session = get_payment_intent_session(
         payment_intent_id=booking.payment_intent_id,
-        amount_cents=upfront_charge_cents(booking),
+        amount_cents=charge_cents,
         currency=booking.currency,
         booking_id=str(booking.id),
         user_email=user.email,
@@ -1554,9 +1580,28 @@ def get_booking_payment_session(db: Session, booking: Booking, user: User) -> di
         "payment_client_secret": payment_session.client_secret,
         "payment_backend": settings.PAYMENT_BACKEND,
         "paypal_client_id": settings.PAYPAL_CLIENT_ID or None,
+        "paypal_env": settings.PAYPAL_ENV,
+        "amount_value": f"{charge_cents // 100}.{charge_cents % 100:02d}",
+        "currency_code": booking.currency,
         "payment_expires_at": booking.payment_expires_at,
         "payment_seconds_remaining": booking.payment_seconds_remaining,
     }
+
+
+def confirm_free_booking(db: Session, booking: Booking, user: User) -> Booking:
+    """Confirm a booking whose amount due now is $0 (e.g. a 100%-off promo).
+    No payment is taken — the booking is marked paid directly."""
+    if expire_pending_booking(db, booking):
+        db.commit()
+        db.refresh(booking)
+        raise PaymentSessionError("Payment window expired for this booking")
+    if booking.user_id != user.id and not user_has_admin_access(user):
+        raise PaymentSessionError("Booking not found")
+    if booking.status != "PendingPayment":
+        raise PaymentSessionError("Only pending bookings can be confirmed")
+    if upfront_charge_cents(booking) > 0:
+        raise PaymentSessionError("This booking requires payment and cannot be confirmed for free")
+    return mark_booking_paid(db, booking, f"free_{uuid4().hex[:20]}")
 
 
 def capture_booking_payment(db: Session, booking: Booking, user: User) -> dict:
@@ -1725,6 +1770,51 @@ def list_recent_admin_activity(db: Session, limit: int = 12) -> list[dict]:
         }
         for audit_log, actor_email in rows
     ]
+
+
+def list_recent_notifications(
+    db: Session,
+    *,
+    limit: int = 50,
+    status: Optional[str] = None,
+    notification_type: Optional[str] = None,
+) -> list[dict]:
+    """Recent NotificationLog rows for the admin visibility panel, newest first.
+
+    Joins the recipient's email and the booking code when available, and
+    surfaces the delivery backend / error captured in `details`.
+    """
+    query = (
+        db.query(NotificationLog, User.email, Booking.booking_code)
+        .outerjoin(User, NotificationLog.user_id == User.id)
+        .outerjoin(Booking, NotificationLog.booking_id == Booking.id)
+    )
+    if status:
+        query = query.filter(NotificationLog.status == status)
+    if notification_type:
+        query = query.filter(NotificationLog.type == notification_type)
+    rows = query.order_by(NotificationLog.created_at.desc()).limit(limit).all()
+
+    results = []
+    for log, user_email, booking_code in rows:
+        details = log.details or {}
+        delivery = details.get("delivery") if isinstance(details, dict) else None
+        backend = delivery.get("backend") if isinstance(delivery, dict) else None
+        error = details.get("error") if isinstance(details, dict) else None
+        results.append(
+            {
+                "id": log.id,
+                "type": log.type,
+                "status": log.status,
+                "user_email": user_email,
+                "booking_code": booking_code,
+                "backend": backend,
+                "error": error,
+                "sent_at": log.sent_at,
+                "created_at": log.created_at,
+            }
+        )
+    return results
 
 
 def clear_bookings_for_admin_day(db: Session, admin: User, target_date: date) -> dict:
@@ -2026,10 +2116,18 @@ def mark_booking_paid(
         booking.status = "Paid"
     booking.payment_intent_id = payment_intent_id
     booking.confirmed_at = datetime.now(timezone.utc)
+    # Deposit payments get a dedicated "deposit received / balance due" email;
+    # full payments get the standard confirmation.
+    if as_deposit:
+        customer_email_task = "send_deposit_paid_email"
+        notification_type = "deposit_paid_email"
+    else:
+        customer_email_task = "send_booking_confirmation_email"
+        notification_type = "booking_confirmation_email"
     notification_details = {
         "booking_code": booking.booking_code,
         "queued_tasks": [
-            "send_booking_confirmation_email",
+            customer_email_task,
             "send_booking_confirmation_sms",
         ],
     }
@@ -2037,7 +2135,7 @@ def mark_booking_paid(
         db,
         user_id=booking.user_id,
         booking_id=booking.id,
-        notification_type="booking_confirmation_email",
+        notification_type=notification_type,
         status="Sent",
         details=notification_details,
     )
@@ -2046,7 +2144,7 @@ def mark_booking_paid(
         actor_id=None,
         booking_id=booking.id,
         action="payment_confirmed",
-        details={"payment_intent_id": payment_intent_id},
+        details={"payment_intent_id": payment_intent_id, "as_deposit": as_deposit},
     )
     db.commit()
     db.refresh(booking)
@@ -2054,9 +2152,13 @@ def mark_booking_paid(
         send_booking_confirmation_email_task,
         send_booking_confirmation_sms_task,
         send_booking_staff_notification_email_task,
+        send_deposit_paid_email_task,
     )
 
-    send_booking_confirmation_email_task.delay(str(booking.id))
+    if as_deposit:
+        send_deposit_paid_email_task.delay(str(booking.id))
+    else:
+        send_booking_confirmation_email_task.delay(str(booking.id))
     send_booking_confirmation_sms_task.delay(str(booking.id))
     send_booking_staff_notification_email_task.delay(str(booking.id), "confirmed")
     return booking
@@ -2149,13 +2251,13 @@ def handle_payment_webhook_event(db: Session, event: dict) -> dict:
             db,
             user_id=booking.user_id,
             booking_id=booking.id,
-            notification_type="booking_cancelled",
+            notification_type="payment_failed",
             status="Sent",
             details={
                 "reason": booking.cancellation_reason,
                 "queued_tasks": [
-                    "send_booking_cancellation_email",
-                    "send_booking_cancellation_sms",
+                    "send_payment_failed_email",
+                    "send_payment_failed_sms",
                 ],
             },
         )
@@ -2168,13 +2270,13 @@ def handle_payment_webhook_event(db: Session, event: dict) -> dict:
         )
         db.commit()
         from app.tasks import (
-            send_booking_cancellation_email_task,
-            send_booking_cancellation_sms_task,
+            send_payment_failed_email_task,
+            send_payment_failed_sms_task,
             send_booking_staff_notification_email_task,
         )
 
-        send_booking_cancellation_email_task.delay(str(booking.id))
-        send_booking_cancellation_sms_task.delay(str(booking.id))
+        send_payment_failed_email_task.delay(str(booking.id))
+        send_payment_failed_sms_task.delay(str(booking.id))
         send_booking_staff_notification_email_task.delay(str(booking.id), "cancelled")
         return {"received": True, "booking_id": str(booking.id), "status": booking.status}
 

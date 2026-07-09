@@ -18,6 +18,7 @@ from app.routers import (
     auth,
     bookings,
     intake,
+    notifications,
     rooms,
     staff,
     staff_application,
@@ -98,6 +99,7 @@ app.include_router(staff.router)
 app.include_router(bookings.router)
 app.include_router(staff_bookings.router)
 app.include_router(intake.router)
+app.include_router(notifications.router)
 app.include_router(staff_availability.router)
 app.include_router(staff_portal.router)
 app.include_router(staff_application.router)

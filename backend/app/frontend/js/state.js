@@ -22,6 +22,7 @@ export const state = {
   adminTodayRoster: null,
   adminAnalytics: null,
   adminActivity: [],
+  adminNotifications: [],
   adminUsers: [],
   adminTestCases: [],
   adminStaffProfiles: [],
