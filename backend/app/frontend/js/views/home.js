@@ -1,11 +1,11 @@
 const AUTOPLAY_INTERVAL_MS = 6000;
 const REAL_STUDIO_VISUALS = {
-  Recording: "/assets/media/placeholder-carousel-3.jpg",
-  Podcast: "/assets/media/placeholder-carousel-2.jpg",
-  Photography: "/assets/media/placeholder-carousel-1.jpg",
+  Recording: "/assets/media/music-production-horizontal-1.jpg",
+  Podcast: "/assets/media/podcast-room-horizontal-9.jpg",
+  Photography: "/assets/media/studio-photography-horizontal-5.jpg",
   Film: "/assets/media/studio-photo-editing.jpg",
   Dance: "/assets/media/studio-conference-room.jpg",
-  Production: "/assets/media/placeholder-carousel-3.jpg",
+  Production: "/assets/media/music-production-horizontal-2.jpg",
 };
 
 function formatCurrency(cents) {
