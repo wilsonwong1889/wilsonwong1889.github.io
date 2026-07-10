@@ -1059,6 +1059,7 @@ function renderAdminPromoCodes(currentState) {
 const INTAKE_TYPE_LABELS = {
   membership_interest: "Membership interest",
   engineer_application: "Engineer application",
+  service_inquiry: "Service inquiry",
 };
 
 function humanizeIntakeKey(key) {

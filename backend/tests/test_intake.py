@@ -1,4 +1,4 @@
-"""Backend tests for public intake forms (membership interest + engineer application)."""
+"""Backend tests for public intake forms (membership interest + engineer application + service inquiry)."""
 import os
 import sys
 
@@ -79,6 +79,44 @@ class IntakeTest(BaseAppTest):
         self.assertEqual(body["details"]["skillset"], "Mixing, mastering")
         self.assertEqual(body["details"]["equipment"], "SSL console")
         self.assertEqual(body["details"]["why_considered"], "10 years of studio experience.")
+
+    def test_03b_service_inquiry_persists(self) -> None:
+        resp = self.client.post(
+            "/api/intake/service-inquiry",
+            json={
+                "name": "Jordan Lee",
+                "email": "jordan@example.com",
+                "phone": "403-555-0199",
+                "service_interest": "Operations Bundle",
+                "message": "Need ongoing marketing support.",
+            },
+        )
+        self.assertEqual(resp.status_code, 201, resp.text)
+        body = resp.json()
+        self.assertEqual(body["intake_type"], "service_inquiry")
+        self.assertEqual(body["status"], "new")
+        self.assertEqual(body["details"]["service_interest"], "Operations Bundle")
+        self.assertEqual(body["details"]["message"], "Need ongoing marketing support.")
+
+    def test_03c_service_inquiry_validation(self) -> None:
+        # Missing required service_interest -> 422
+        resp = self.client.post(
+            "/api/intake/service-inquiry",
+            json={"name": "No Service", "email": "x@example.com", "phone": "403-555-0114"},
+        )
+        self.assertEqual(resp.status_code, 422, resp.text)
+        # Message is optional -> 201 without it
+        resp = self.client.post(
+            "/api/intake/service-inquiry",
+            json={
+                "name": "Terse Client",
+                "email": "terse@example.com",
+                "phone": "403-555-0115",
+                "service_interest": "Recording Studio",
+            },
+        )
+        self.assertEqual(resp.status_code, 201, resp.text)
+        self.assertEqual(resp.json()["details"]["message"], "")
 
     def test_04_admin_list_filter_and_status_update(self) -> None:
         self.client.post(

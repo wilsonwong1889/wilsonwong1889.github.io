@@ -73,6 +73,20 @@ export function initIntakeView() {
   );
 
   wireIntakeForm(
+    "service-inquiry-form",
+    "service-inquiry-feedback",
+    (data) => ({
+      name: cleanValue(data.get("name")),
+      email: cleanValue(data.get("email")),
+      phone: cleanValue(data.get("phone")),
+      service_interest: cleanValue(data.get("service_interest")),
+      message: cleanValue(data.get("message")) || null,
+    }),
+    (payload) => api.submitServiceInquiry(payload),
+    "Thanks! Your inquiry is in — the team will reach out by email or phone soon.",
+  );
+
+  wireIntakeForm(
     "engineer-application-form",
     "engineer-application-feedback",
     (data) => ({

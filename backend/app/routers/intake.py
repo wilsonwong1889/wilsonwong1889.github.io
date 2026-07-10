@@ -14,11 +14,13 @@ from app.schemas.intake import (
     IntakeOut,
     IntakeStatusUpdate,
     MembershipInterestCreate,
+    ServiceInquiryCreate,
 )
 from app.services.intake_service import (
     IntakeError,
     create_engineer_application,
     create_membership_interest,
+    create_service_inquiry,
     list_intakes,
     update_intake_status,
 )
@@ -41,6 +43,19 @@ def submit_membership_interest(
     db: Session = Depends(get_db),
 ):
     return create_membership_interest(db, **payload.model_dump())
+
+
+@router.post(
+    "/intake/service-inquiry",
+    response_model=IntakeOut,
+    status_code=201,
+    dependencies=[Depends(intake_rate_limit)],
+)
+def submit_service_inquiry(
+    payload: ServiceInquiryCreate,
+    db: Session = Depends(get_db),
+):
+    return create_service_inquiry(db, **payload.model_dump())
 
 
 @router.post(

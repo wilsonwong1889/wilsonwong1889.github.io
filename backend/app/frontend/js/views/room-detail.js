@@ -1,11 +1,47 @@
 import { elements } from "../dom.js";
+// Real, category-matched galleries so every room shows multiple genuine
+// photos even before an admin uploads room-specific images.
+const ROOM_CATEGORY_GALLERIES = {
+  recording: [
+    "/assets/media/music-production-horizontal-1.jpg",
+    "/assets/media/music-production-horizontal-2.jpg",
+    "/assets/media/music-production-horizontal-3.jpg",
+  ],
+  production: [
+    "/assets/media/music-production-horizontal-2.jpg",
+    "/assets/media/music-production-horizontal-1.jpg",
+    "/assets/media/music-production-horizontal-3.jpg",
+  ],
+  podcast: [
+    "/assets/media/podcast-room-horizontal-9.jpg",
+    "/assets/media/podcast-room-horizontal-3.jpg",
+    "/assets/media/podcast-room-horizontal-4.jpg",
+    "/assets/media/podcast-room-horizontal-10.jpg",
+  ],
+  photography: [
+    "/assets/media/studio-photography-horizontal-1.jpg",
+    "/assets/media/studio-photography-horizontal-5.jpg",
+    "/assets/media/studio-photography-horizontal-8.jpg",
+    "/assets/media/studio-photography-horizontal-9.jpg",
+  ],
+  film: [
+    "/assets/media/studio-photography-horizontal-5.jpg",
+    "/assets/media/studio-photo-editing.jpg",
+    "/assets/media/studio-photography-horizontal-8.jpg",
+  ],
+  dance: [
+    "/assets/media/studio-conference-room.jpg",
+    "/assets/media/studio-building-lobby.jpg",
+  ],
+};
+
 const ROOM_CATEGORY_VISUALS = {
-  recording: "/assets/media/placeholder-carousel-3.jpg",
-  podcast: "/assets/media/placeholder-carousel-2.jpg",
-  production: "/assets/media/placeholder-carousel-3.jpg",
-  photography: "/assets/media/placeholder-carousel-1.jpg",
-  dance: "/assets/media/studio-conference-room.jpg",
-  film: "/assets/media/studio-photo-editing.jpg",
+  recording: ROOM_CATEGORY_GALLERIES.recording[0],
+  podcast: ROOM_CATEGORY_GALLERIES.podcast[0],
+  production: ROOM_CATEGORY_GALLERIES.production[0],
+  photography: ROOM_CATEGORY_GALLERIES.photography[0],
+  dance: ROOM_CATEGORY_GALLERIES.dance[0],
+  film: ROOM_CATEGORY_GALLERIES.film[0],
 };
 
 function formatCurrency(cents) {
@@ -89,19 +125,7 @@ function getRoomGallery(room) {
   }
 
   const category = getRoomCategory(room);
-  const fallback = ROOM_CATEGORY_VISUALS[category] || "/assets/media/studio-building-lobby.jpg";
-  if (category === "podcast") {
-    return [
-      "/assets/media/placeholder-carousel-2.jpg",
-      "/assets/media/studio-conference-room.jpg",
-      "/assets/media/studio-building-lobby.jpg",
-    ];
-  }
-  return [
-    fallback,
-    "/assets/media/placeholder-carousel-2.jpg",
-    "/assets/media/studio-conference-room.jpg",
-  ];
+  return ROOM_CATEGORY_GALLERIES[category] || ROOM_CATEGORY_GALLERIES.recording;
 }
 
 function buildAmenityList(room) {

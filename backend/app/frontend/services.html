@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Services | BIPOC Hub</title>
-    <link rel="stylesheet" href="/assets/styles/app.css?v=20260710c" />
+    <link rel="stylesheet" href="/assets/styles/app.css?v=20260710d" />
   </head>
   <body data-page="services">
     <div class="site-frame">
@@ -103,6 +103,9 @@
                 <a class="ghost-button ghost-link" href="/contact">Contact us</a>
               </div>
             </div>
+            <aside class="page-hero-media">
+              <img src="/assets/media/studio-photography-horizontal-5.jpg" alt="Photographer shooting a model against a black backdrop in the photography studio" loading="eager" />
+            </aside>
           </div>
         </section>
 
@@ -114,23 +117,38 @@
             <p class="panel-copy">Each space is set up for a specific type of production. Book by the hour, Wednesday through Saturday, 12–8 PM.</p>
           </div>
           <div class="home-collab-grid responsive-card-grid-3">
-            <article class="home-collab-org-card">
-              <span class="pill">Recording</span>
-              <h3>Recording Studio</h3>
-              <p>Vocal tracking, overdubs, mixing sessions, ADR, and audio production. Professional acoustic treatment and monitoring.</p>
-              <a class="ghost-button ghost-link card-bottom-action" href="/rooms">See availability</a>
+            <article class="home-collab-org-card services-space-card">
+              <div class="services-card-media">
+                <img src="/assets/media/music-production-horizontal-2.jpg" alt="Producer working at the music production desk with studio monitors and mixing gear" loading="lazy" />
+              </div>
+              <div class="services-card-body">
+                <span class="pill">Recording</span>
+                <h3>Recording Studio</h3>
+                <p>Vocal tracking, overdubs, mixing sessions, ADR, and audio production. Professional acoustic treatment and monitoring.</p>
+                <a class="ghost-button ghost-link card-bottom-action" href="/rooms">See availability</a>
+              </div>
             </article>
-            <article class="home-collab-org-card">
-              <span class="pill">Podcast</span>
-              <h3>Podcast Studio</h3>
-              <p>Interviews, live shows, commentary, and audio storytelling. Multiple microphone setups and lounge-style seating.</p>
-              <a class="ghost-button ghost-link card-bottom-action" href="/rooms">See availability</a>
+            <article class="home-collab-org-card services-space-card">
+              <div class="services-card-media">
+                <img src="/assets/media/podcast-room-horizontal-9.jpg" alt="Two hosts recording in the podcast room with microphones and a wood slat accent wall" loading="lazy" />
+              </div>
+              <div class="services-card-body">
+                <span class="pill">Podcast</span>
+                <h3>Podcast Studio</h3>
+                <p>Interviews, live shows, commentary, and audio storytelling. Multiple microphone setups and lounge-style seating.</p>
+                <a class="ghost-button ghost-link card-bottom-action" href="/rooms">See availability</a>
+              </div>
             </article>
-            <article class="home-collab-org-card">
-              <span class="pill">Photo &amp; Film</span>
-              <h3>Photography &amp; Film Studio</h3>
-              <p>Product shoots, headshots, editorial photography, short-form video, and content creation. Lighting and backdrop included.</p>
-              <a class="ghost-button ghost-link card-bottom-action" href="/rooms">See availability</a>
+            <article class="home-collab-org-card services-space-card">
+              <div class="services-card-media">
+                <img src="/assets/media/studio-photography-horizontal-1.jpg" alt="Photography studio with a seamless backdrop, studio seating, and a tripod" loading="lazy" />
+              </div>
+              <div class="services-card-body">
+                <span class="pill">Photo &amp; Film</span>
+                <h3>Photography &amp; Film Studio</h3>
+                <p>Product shoots, headshots, editorial photography, short-form video, and content creation. Lighting and backdrop included.</p>
+                <a class="ghost-button ghost-link card-bottom-action" href="/rooms">See availability</a>
+              </div>
             </article>
           </div>
         </section>
@@ -140,6 +158,9 @@
           <div class="panel-header">
             <p class="panel-kicker">Media Collective</p>
             <h2>Creative and business services for your brand.</h2>
+          </div>
+          <div class="services-section-media">
+            <img src="/assets/media/collective-community.jpg" alt="The BIPOC Foundation Media Collective community at the studio" loading="lazy" />
           </div>
           <div class="home-collab-grid responsive-card-grid-3">
             <article class="home-collab-org-card">
@@ -187,15 +208,61 @@
           </div>
         </section>
 
-        <!-- Section 4: CTA -->
-        <section class="panel panel-wide">
+        <!-- Section 4: Inquiry -->
+        <section class="panel panel-wide intake-panel" id="service-inquiry">
           <div class="panel-header">
+            <p class="panel-kicker">Get in touch</p>
             <h2>Ready to build something?</h2>
-            <p class="panel-copy">Get in touch and let's talk about what your project needs.</p>
+            <p class="panel-copy">Media Collective services are inquiry-based. Tell us what you're working on and the team will follow up by email or phone — or reach us directly at <a href="mailto:lethsmakeithappen@bipocfoundation.org">lethsmakeithappen@bipocfoundation.org</a>.</p>
           </div>
-          <div class="hero-actions">
-            <a class="primary-button" href="/contact">Contact the team</a>
-          </div>
+          <form id="service-inquiry-form" class="stack-form intake-form" novalidate>
+            <p id="service-inquiry-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
+            <div class="intake-form-grid">
+              <label>
+                <span>Name</span>
+                <input type="text" name="name" autocomplete="name" maxlength="120" placeholder="Jane Doe" required />
+              </label>
+              <label>
+                <span>Email</span>
+                <input type="email" name="email" autocomplete="email" maxlength="120" placeholder="jane@example.com" required />
+              </label>
+              <label>
+                <span>Phone</span>
+                <input type="tel" name="phone" autocomplete="tel" maxlength="40" placeholder="403-555-0100" required />
+              </label>
+            </div>
+            <label>
+              <span>What are you interested in?</span>
+              <select name="service_interest" required>
+                <option value="" disabled selected>Choose a service…</option>
+                <optgroup label="Studio spaces">
+                  <option value="Recording Studio">Recording Studio</option>
+                  <option value="Podcast Studio">Podcast Studio</option>
+                  <option value="Photography &amp; Film Studio">Photography &amp; Film Studio</option>
+                </optgroup>
+                <optgroup label="Media Collective">
+                  <option value="Executive &amp; Marketing Assistants">Executive &amp; Marketing Assistants</option>
+                  <option value="Brand Foundation Development">Brand Foundation Development</option>
+                  <option value="Promotional &amp; Marketing Campaign">Promotional &amp; Marketing Campaign</option>
+                </optgroup>
+                <optgroup label="Packages">
+                  <option value="Startup Kit">Startup Kit</option>
+                  <option value="Operations Bundle">Operations Bundle</option>
+                  <option value="Campaign Execution Bundle">Campaign Execution Bundle</option>
+                  <option value="Growth Kit">Growth Kit</option>
+                </optgroup>
+                <option value="Not sure / general inquiry">Not sure / general inquiry</option>
+              </select>
+            </label>
+            <label>
+              <span>Tell us about your project <span class="intake-optional">(optional)</span></span>
+              <textarea name="message" rows="4" maxlength="2000" placeholder="Timeline, goals, budget, or anything else we should know."></textarea>
+            </label>
+            <div class="hero-actions">
+              <button type="submit" class="primary-button" id="service-inquiry-submit">Send inquiry</button>
+              <a class="ghost-button ghost-link" href="mailto:lethsmakeithappen@bipocfoundation.org">Email us instead</a>
+            </div>
+          </form>
         </section>
 
       </main>
@@ -253,6 +320,6 @@
       </section>
     </div>
 
-    <script type="module" src="/assets/js/main.js?v=20260710c"></script>
+    <script type="module" src="/assets/js/main.js?v=20260710d"></script>
   </body>
 </html>

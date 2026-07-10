@@ -13,6 +13,14 @@ class MembershipInterestCreate(BaseModel):
     message: Optional[str] = Field(default=None, max_length=2000)
 
 
+class ServiceInquiryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: EmailStr
+    phone: str = Field(min_length=3, max_length=40)
+    service_interest: str = Field(min_length=1, max_length=120)
+    message: Optional[str] = Field(default=None, max_length=2000)
+
+
 class EngineerApplicationCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     email: EmailStr
