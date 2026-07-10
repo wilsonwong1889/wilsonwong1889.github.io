@@ -10642,6 +10642,69 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
   gap: 7px;
 }
 
+/* ── Staff dashboard tabs ─────────────────────────────────────────────── */
+
+.staff-tab-switcher {
+  margin-bottom: 18px;
+}
+
+.staff-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 7px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--brand-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tab-button.active .staff-tab-badge {
+  background: #fff;
+  color: var(--brand-blue);
+}
+
+.staff-tab-panel > .panel + .panel {
+  margin-top: 20px;
+}
+
+/* The merged availability day editor stacks its sections instead of sitting
+   side-by-side like the original two-column day panel. */
+.staff-day-detail {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.staff-day-detail .staff-day-detail-head .field-help {
+  margin: 0 0 6px;
+}
+
+.staff-day-quick-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.staff-day-custom summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--brand-blue);
+  padding: 6px 0;
+}
+
+.staff-day-custom[open] summary {
+  margin-bottom: 10px;
+}
+
+.staff-day-exceptions .panel-kicker {
+  margin-bottom: 6px;
+}
+
 .engineer-fullprofile-cta {
   display: flex;
   align-items: center;

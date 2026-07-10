@@ -2,6 +2,7 @@ import { api } from "../api.js";
 import { downloadBookingCalendarFile } from "../calendar.js";
 import { downloadBookingReceiptPdf } from "../receipt.js";
 import { getSearchParam } from "../config.js";
+import { todayISO } from "../date-utils.js";
 import { elements, toggleHidden } from "../dom.js";
 import {
   getPersistedLastBookingId,
@@ -366,7 +367,7 @@ function getBookingLayoutElements() {
 }
 
 function getDateInputValue(value) {
-  return String(value || "").split("T")[0] || new Date().toISOString().slice(0, 10);
+  return String(value || "").split("T")[0] || todayISO();
 }
 
 function isAdminWaivedPayment(booking) {

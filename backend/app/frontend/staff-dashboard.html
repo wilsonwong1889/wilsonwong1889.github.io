@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Staff dashboard | BIPOC Hub</title>
-    <link rel="stylesheet" href="/assets/styles/app.css?v=20260610b" />
+    <link rel="stylesheet" href="/assets/styles/app.css?v=20260710a" />
   </head>
   <body data-page="staff-dashboard">
     <div class="site-frame">
@@ -93,6 +93,14 @@
 
         <div id="staff-dashboard-body" class="hidden">
           <div id="staff-application-banner" class="intake-feedback hidden" role="status" aria-live="polite"></div>
+
+          <div id="staff-tab-switcher" class="auth-switcher staff-tab-switcher hidden" role="tablist" aria-label="Staff dashboard sections">
+            <button id="staff-tab-profile" class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="staff-panel-profile" tabindex="0" data-staff-tab="profile">Profile</button>
+            <button id="staff-tab-requests" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="staff-panel-requests" tabindex="-1" data-staff-tab="requests">Requests<span id="staff-requests-badge" class="staff-tab-badge hidden"></span></button>
+            <button id="staff-tab-availability" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="staff-panel-availability" tabindex="-1" data-staff-tab="availability">Availability</button>
+          </div>
+
+          <section id="staff-panel-profile" class="staff-tab-panel" role="tabpanel" aria-labelledby="staff-tab-profile" data-staff-panel="profile">
           <section class="panel panel-wide">
             <div class="panel-header">
               <p class="panel-kicker">Your profile</p>
@@ -134,86 +142,104 @@
               <div class="hero-actions"><button class="primary-button" type="submit" id="staff-profile-submit">Save profile</button></div>
             </form>
           </section>
+          </section>
 
           <div id="staff-approved-sections">
-          <section class="panel panel-wide">
-            <div class="panel-header">
-              <p class="panel-kicker">Requests</p>
-              <h2>Booking requests</h2>
-              <p class="panel-copy">Accept or decline sessions clients have requested with you.</p>
-            </div>
-            <p id="staff-dashboard-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
-            <div id="staff-requests-list" class="staff-requests-list"></div>
+          <section id="staff-panel-requests" class="staff-tab-panel hidden" role="tabpanel" aria-labelledby="staff-tab-requests" data-staff-panel="requests">
+            <section class="panel panel-wide">
+              <div class="panel-header">
+                <p class="panel-kicker">Requests</p>
+                <h2>Booking requests</h2>
+                <p class="panel-copy">Accept or decline sessions clients have requested with you.</p>
+              </div>
+              <p id="staff-dashboard-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
+              <div id="staff-requests-list" class="staff-requests-list"></div>
+            </section>
           </section>
 
-          <section class="panel panel-wide">
-            <div class="panel-header">
-              <p class="panel-kicker">Calendar</p>
-              <h2>Your availability calendar</h2>
-              <p class="panel-copy">Days start unavailable. Add a weekly window or mark a selected day available so customers can request those times.</p>
-            </div>
-            <div class="staff-dashboard-calendar">
-              <div class="reserve-calendar-header reserve-calendar-header-tight">
-                <button id="staff-dashboard-prev-month" class="reserve-calendar-nav" type="button" aria-label="Previous month">‹</button>
-                <h3 id="staff-dashboard-calendar-title">Availability by day</h3>
-                <button id="staff-dashboard-next-month" class="reserve-calendar-nav" type="button" aria-label="Next month">›</button>
+          <section id="staff-panel-availability" class="staff-tab-panel hidden" role="tabpanel" aria-labelledby="staff-tab-availability" data-staff-panel="availability">
+            <section class="panel panel-wide">
+              <div class="panel-header">
+                <p class="panel-kicker">Step 1 &middot; Weekly hours</p>
+                <h2>Your usual week</h2>
+                <p class="panel-copy">Toggle each day on and set the hours you normally work. Add more than one block per day for breaks, and use “Copy to all days” to reuse a day's hours. This is the base schedule customers book against.</p>
               </div>
-              <div class="calendar-weekdays reserve-calendar-weekdays">
-                <span>Sun</span>
-                <span>Mon</span>
-                <span>Tue</span>
-                <span>Wed</span>
-                <span>Thu</span>
-                <span>Fri</span>
-                <span>Sat</span>
+              <div id="staff-weekly-editor" class="staff-weekly-editor"></div>
+            </section>
+
+            <section class="panel panel-wide">
+              <div class="panel-header">
+                <p class="panel-kicker">Step 2 &middot; Specific days</p>
+                <h2>Adjust a single day</h2>
+                <p class="panel-copy">Pick a day to see the hours customers can actually book. Changes here override your weekly hours for that day only.</p>
               </div>
-              <div id="staff-dashboard-month-grid" class="calendar-grid reserve-calendar-grid staff-dashboard-calendar-grid"></div>
-              <div class="staff-dashboard-day-panel">
-                <div>
-                  <p class="panel-kicker">Selected day</p>
-                  <h3 id="staff-dashboard-selected-date-label">Choose a day</h3>
-                  <div id="staff-dashboard-day-windows" class="staff-dashboard-day-windows"></div>
+              <p id="staff-availability-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
+              <div class="staff-dashboard-calendar">
+                <div class="reserve-calendar-header reserve-calendar-header-tight">
+                  <button id="staff-dashboard-prev-month" class="reserve-calendar-nav" type="button" aria-label="Previous month">‹</button>
+                  <h3 id="staff-dashboard-calendar-title">Availability by day</h3>
+                  <button id="staff-dashboard-next-month" class="reserve-calendar-nav" type="button" aria-label="Next month">›</button>
                 </div>
-                <div class="hero-actions">
-                  <button class="ghost-button" type="button" data-staff-calendar-action="available">Make available 12 PM-8 PM</button>
-                  <button class="ghost-button" type="button" data-staff-calendar-action="blocked">Mark unavailable</button>
+                <div class="calendar-weekdays reserve-calendar-weekdays">
+                  <span>Sun</span>
+                  <span>Mon</span>
+                  <span>Tue</span>
+                  <span>Wed</span>
+                  <span>Thu</span>
+                  <span>Fri</span>
+                  <span>Sat</span>
+                </div>
+                <div id="staff-dashboard-month-grid" class="calendar-grid reserve-calendar-grid staff-dashboard-calendar-grid"></div>
+
+                <div class="staff-dashboard-day-panel staff-day-detail">
+                  <div class="staff-day-detail-head">
+                    <p class="panel-kicker">Selected day</p>
+                    <h3 id="staff-dashboard-selected-date-label">Choose a day</h3>
+                    <p class="field-help">Bookable hours on this day:</p>
+                    <div id="staff-dashboard-day-windows" class="staff-dashboard-day-windows"></div>
+                  </div>
+
+                  <div class="hero-actions staff-day-quick-actions">
+                    <button class="ghost-button" type="button" data-staff-calendar-action="available">Available 12 PM &ndash; 8 PM</button>
+                    <button class="ghost-button" type="button" data-staff-calendar-action="blocked">Unavailable all day</button>
+                    <button class="ghost-button" type="button" data-staff-calendar-action="reset">Reset to weekly hours</button>
+                  </div>
+
+                  <details class="staff-day-custom">
+                    <summary>Add custom hours for this day</summary>
+                    <form id="staff-exception-form" class="stack-form intake-form">
+                      <div class="intake-form-grid">
+                        <label>
+                          <span>Type</span>
+                          <select name="kind" required>
+                            <option value="blocked">Unavailable</option>
+                            <option value="available">Extra available</option>
+                          </select>
+                        </label>
+                        <label><span>From <span class="intake-optional">(optional)</span></span><input type="time" name="start" step="1800" /></label>
+                        <label><span>To <span class="intake-optional">(optional)</span></span><input type="time" name="end" step="1800" /></label>
+                      </div>
+                      <label><span>Reason <span class="intake-optional">(optional)</span></span><input type="text" name="reason" maxlength="200" placeholder="Leave times blank for a full-day change" /></label>
+                      <div class="hero-actions"><button class="primary-button" type="submit">Add change</button></div>
+                    </form>
+                  </details>
+
+                  <div class="staff-day-exceptions">
+                    <p class="panel-kicker">Changes on this day</p>
+                    <div id="staff-day-exceptions-list" class="staff-exceptions-list"></div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          <section class="panel panel-wide">
-            <div class="panel-header">
-              <p class="panel-kicker">Weekly hours</p>
-              <h2>When you're available</h2>
-              <p class="panel-copy">Toggle each day on and set the hours you're open. Add more than one block per day for breaks, and use “Copy to all days” to reuse a day's hours. Customers can only book inside these windows.</p>
-            </div>
-            <div id="staff-weekly-editor" class="staff-weekly-editor"></div>
-          </section>
-
-          <section class="panel panel-wide">
-            <div class="panel-header">
-              <p class="panel-kicker">Time off &amp; extras</p>
-              <h2>One-off changes</h2>
-              <p class="panel-copy">Block a specific date, or add extra availability outside your weekly schedule.</p>
-            </div>
-            <form id="staff-exception-form" class="stack-form intake-form">
-              <div class="intake-form-grid">
-                <label><span>Date</span><input type="date" name="date" required /></label>
-                <label>
-                  <span>Type</span>
-                  <select name="kind" required>
-                    <option value="blocked">Unavailable</option>
-                    <option value="available">Extra available</option>
-                  </select>
-                </label>
-                <label><span>From <span class="intake-optional">(optional)</span></span><input type="time" name="start" step="3600" /></label>
-                <label><span>To <span class="intake-optional">(optional)</span></span><input type="time" name="end" step="3600" /></label>
+            <section class="panel panel-wide">
+              <div class="panel-header">
+                <p class="panel-kicker">Upcoming</p>
+                <h2>Scheduled changes</h2>
+                <p class="panel-copy">Every upcoming override to your weekly hours. Past changes are hidden.</p>
               </div>
-              <label><span>Reason <span class="intake-optional">(optional)</span></span><input type="text" name="reason" maxlength="200" placeholder="Leave blank for a full-day change" /></label>
-              <div class="hero-actions"><button class="primary-button" type="submit">Add change</button></div>
-            </form>
-            <div id="staff-exceptions-list" class="staff-exceptions-list"></div>
+              <div id="staff-exceptions-list" class="staff-exceptions-list"></div>
+            </section>
           </section>
           </div>
         </div>
@@ -258,6 +284,6 @@
       </section>
     </div>
 
-    <script type="module" src="/assets/js/main.js?v=20260520c"></script>
+    <script type="module" src="/assets/js/main.js?v=20260710a"></script>
   </body>
 </html>

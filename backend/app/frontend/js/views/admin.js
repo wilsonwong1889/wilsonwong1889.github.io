@@ -1,11 +1,12 @@
 import { api } from "../api.js";
+import { todayISO } from "../date-utils.js";
 import { elements } from "../dom.js";
 import { setState } from "../state.js";
 
 let editingStaffProfileId = null;
 let activeAdminTab = "rooms";
 let adminRoomEditorOpen = false;
-let selectedAdminScheduleDate = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+let selectedAdminScheduleDate = todayISO();
 let selectedAdminScheduleRoomId = "all";
 let selectedAdminCalendarMonth = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
 let selectedAdminCalendarRoomId = "all";
@@ -187,8 +188,7 @@ function toIsoStringFromLocal(value) {
 }
 
 function todayString() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return todayISO();
 }
 
 function safeMonthValue(value) {
@@ -1170,7 +1170,7 @@ async function loadAdminStaffSchedule() {
   const dateInput = document.getElementById("admin-staff-schedule-date");
   if (!dateInput) return;
   if (!dateInput.value) {
-    dateInput.value = new Date().toISOString().slice(0, 10);
+    dateInput.value = todayISO();
   }
   try {
     renderAdminStaffSchedule(await api.getAdminStaffSchedule(dateInput.value));

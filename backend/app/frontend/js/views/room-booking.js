@@ -1,4 +1,12 @@
 import { api } from "../api.js";
+import {
+  firstOfMonthISO,
+  isDateBeforeToday,
+  parseLocalDate,
+  shiftMonthISO,
+  toLocalISODate,
+  todayISO,
+} from "../date-utils.js";
 import { elements, toggleHidden } from "../dom.js";
 import { persistCheckoutDraft, persistLastBookingId, persistToken, setState, state } from "../state.js";
 const ROOM_CATEGORY_VISUALS = {
@@ -88,19 +96,8 @@ function getReserveStepList() {
   return document.getElementById("reserve-step-list");
 }
 
-function localDateString(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function todayString() {
-  return localDateString();
-}
-
-function isDateBeforeToday(value) {
-  return Boolean(value && value < todayString());
+  return todayISO();
 }
 
 function clampBookingDate(value) {
@@ -108,9 +105,7 @@ function clampBookingDate(value) {
 }
 
 function firstOfMonth(value) {
-  const date = new Date(`${value}T00:00:00`);
-  date.setDate(1);
-  return date.toISOString().slice(0, 10);
+  return firstOfMonthISO(value);
 }
 
 function getReserveUrlSelection() {
@@ -675,9 +670,9 @@ async function loadMonthAvailability(roomId, monthValue) {
     const totalDays = daysInMonth(monthValue);
     const entries = await Promise.all(
       Array.from({ length: totalDays }, async (_value, index) => {
-        const date = new Date(`${monthValue}T00:00:00`);
+        const date = parseLocalDate(monthValue);
         date.setDate(index + 1);
-        const isoDate = date.toISOString().slice(0, 10);
+        const isoDate = toLocalISODate(date);
         if (isDateBeforeToday(isoDate)) {
           return [isoDate, 0];
         }
@@ -1025,9 +1020,9 @@ function renderCalendar() {
   }
 
   for (let day = 1; day <= totalDays; day += 1) {
-    const date = new Date(`${displayedMonth}T00:00:00`);
+    const date = parseLocalDate(displayedMonth);
     date.setDate(day);
-    const isoDate = date.toISOString().slice(0, 10);
+    const isoDate = toLocalISODate(date);
     const isPast = isDateBeforeToday(isoDate);
     const count = isPast ? 0 : monthAvailability[isoDate];
     const isSelected = isoDate === selectedDate;
@@ -1303,9 +1298,7 @@ export function initRoomBookingView() {
     if (!state.selectedRoom || !displayedMonth) {
       return;
     }
-    const date = new Date(`${displayedMonth}T00:00:00`);
-    date.setMonth(date.getMonth() - 1);
-    const previousMonth = `${date.toISOString().slice(0, 7)}-01`;
+    const previousMonth = shiftMonthISO(displayedMonth, -1);
     displayedMonth = previousMonth < firstOfMonth(todayString()) ? firstOfMonth(todayString()) : previousMonth;
     renderCalendar();
     await loadMonthAvailability(String(state.selectedRoom.id), displayedMonth);
@@ -1315,9 +1308,7 @@ export function initRoomBookingView() {
     if (!state.selectedRoom || !displayedMonth) {
       return;
     }
-    const date = new Date(`${displayedMonth}T00:00:00`);
-    date.setMonth(date.getMonth() + 1);
-    displayedMonth = `${date.toISOString().slice(0, 7)}-01`;
+    displayedMonth = shiftMonthISO(displayedMonth, 1);
     renderCalendar();
     await loadMonthAvailability(String(state.selectedRoom.id), displayedMonth);
   });

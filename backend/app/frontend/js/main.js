@@ -1,5 +1,6 @@
 import { api } from "./api.js";
 import { CURRENT_PAGE, getSearchParam } from "./config.js";
+import { todayISO } from "./date-utils.js";
 import {
   getPersistedCheckoutDraft,
   getPersistedLastBookingId,
@@ -331,7 +332,7 @@ function resetScopedData() {
     patch.rooms = [];
     patch.roomAvailabilityPreview = {};
     patch.roomAvailabilitySearch = {
-      date: new Date().toISOString().slice(0, 10),
+      date: todayISO(),
       time: "15:00",
       duration: 60,
       matchingRoomIds: [],
