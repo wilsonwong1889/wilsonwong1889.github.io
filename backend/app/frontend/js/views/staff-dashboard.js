@@ -170,12 +170,15 @@ function windowsForDate(value) {
     .filter((rule) => rule.active !== false && Number(rule.weekday) === dateWeekday(value))
     .map((rule) => ({ start: Number(rule.start_minute), end: Number(rule.end_minute) }));
 
+  // Mirrors available_windows_for_date on the server: an all-day exception
+  // spans the studio's open hours when it grants availability, and the whole
+  // day when it blocks it.
   exceptionsForDate(value)
     .filter((item) => item.is_available)
     .forEach((item) => {
       windows.push({
-        start: item.start_minute == null ? 0 : Number(item.start_minute),
-        end: item.end_minute == null ? 1440 : Number(item.end_minute),
+        start: item.start_minute == null ? DEFAULT_WINDOW.start_minute : Number(item.start_minute),
+        end: item.end_minute == null ? DEFAULT_WINDOW.end_minute : Number(item.end_minute),
       });
     });
   windows = mergeWindows(windows);

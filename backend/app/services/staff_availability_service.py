@@ -15,6 +15,11 @@ from app.schemas.staff_availability import (
 
 WHOLE_DAY: Tuple[int, int] = (0, 1440)
 
+# An all-day *available* exception means the studio's opening hours, not a
+# literal 24 hours — otherwise "available all day" would make a staff member
+# bookable at 3 AM. An all-day *blocked* exception still blocks the whole day.
+STUDIO_OPEN_DAY: Tuple[int, int] = (720, 1200)  # 12:00 PM – 8:00 PM
+
 
 class StaffAvailabilityError(ValueError):
     """Raised for invalid availability operations (surfaced as 400/404)."""
@@ -210,7 +215,10 @@ def available_windows_for_date(
     """Merged available windows (minutes-from-midnight, business-local) for a
     staff member on a given date: a base (weekly rules for that weekday, or an
     explicit ``base_windows`` fallback), plus extra-available exceptions, minus
-    blocked exceptions."""
+    blocked exceptions.
+
+    An exception with no times spans the studio's open hours when it grants
+    availability, and the whole day when it blocks it."""
     if base_windows is None:
         rules = (
             db.query(StaffAvailabilityRule)
@@ -236,7 +244,11 @@ def available_windows_for_date(
 
     for exception in exceptions:
         if exception.is_available:
-            span = (exception.start_minute, exception.end_minute) if exception.start_minute is not None else WHOLE_DAY
+            span = (
+                (exception.start_minute, exception.end_minute)
+                if exception.start_minute is not None
+                else STUDIO_OPEN_DAY
+            )
             windows.append(span)
     windows = _merge(windows)
 

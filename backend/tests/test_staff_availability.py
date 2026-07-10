@@ -126,3 +126,40 @@ class StaffAvailabilityTest(BaseAppTest):
             self.assertEqual(
                 available_windows_for_date(db, staff_id, target), [(840, 900), (960, 1200)]
             )
+
+    def test_07_all_day_available_spans_studio_hours_not_midnight_to_midnight(self) -> None:
+        """An all-day "extra available" exception opens 12 PM-8 PM, not 24 hours,
+        so a staff member never becomes bookable at 3 AM. An all-day block still
+        blocks the entire day."""
+        from app.services.staff_availability_service import available_windows_for_date
+
+        headers = self._admin_headers()
+        staff_id = self._staff_id(headers)
+        exceptions_url = f"/api/admin/staff/{staff_id}/availability/exceptions"
+
+        # No weekly rules at all: the day is bookable only via the exception.
+        available_day = date(2026, 6, 17)
+        resp = self.client.post(
+            exceptions_url,
+            json={"exception_date": available_day.isoformat(), "is_available": True},
+            headers=headers,
+        )
+        self.assertEqual(resp.status_code, 201, resp.text)
+        with self.SessionLocal() as db:
+            self.assertEqual(available_windows_for_date(db, staff_id, available_day), [(720, 1200)])
+
+        # An all-day block covers the whole 24 hours, so nothing survives — even
+        # a same-day all-day "available" exception.
+        blocked_day = date(2026, 6, 18)
+        self.client.post(
+            exceptions_url,
+            json={"exception_date": blocked_day.isoformat(), "is_available": True},
+            headers=headers,
+        )
+        self.client.post(
+            exceptions_url,
+            json={"exception_date": blocked_day.isoformat(), "is_available": False},
+            headers=headers,
+        )
+        with self.SessionLocal() as db:
+            self.assertEqual(available_windows_for_date(db, staff_id, blocked_day), [])
