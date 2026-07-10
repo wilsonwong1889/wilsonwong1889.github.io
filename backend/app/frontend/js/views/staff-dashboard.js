@@ -245,6 +245,10 @@ function renderDashboardCalendar() {
     const windows = windowsForDate(isoDate);
     const isSelected = isoDate === dashboardSelectedDate;
     const label = windows.length ? `${windows.length} window${windows.length === 1 ? "" : "s"}` : "Unavailable";
+    // "Unavailable" is one unbreakable word and does not fit a phone-sized cell,
+    // so narrow screens show the compact form instead. The button's aria-label
+    // always carries the full wording.
+    const shortLabel = windows.length ? String(windows.length) : "—";
     const ariaLabel = `${formatDateLabel(isoDate)}: ${label}${isSelected ? ", selected" : ""}`;
     cells.push(`
       <button
@@ -254,7 +258,8 @@ function renderDashboardCalendar() {
         aria-label="${escapeHtml(ariaLabel)}"
       >
         <strong>${day}</strong>
-        <span>${escapeHtml(label)}</span>
+        <span class="calendar-cell-label">${escapeHtml(label)}</span>
+        <span class="calendar-cell-label-short" aria-hidden="true">${escapeHtml(shortLabel)}</span>
       </button>
     `);
   }

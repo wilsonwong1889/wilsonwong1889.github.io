@@ -3345,6 +3345,16 @@ select {
   color: var(--ink);
 }
 
+/* Checkboxes and radios are not text fields. The blanket rule above stretches
+   them to fill their container — inside a flex label that means a 200px-wide
+   checkbox. Keep them at their intrinsic size. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  flex: none;
+  padding: 0;
+}
+
 .checkbox-row {
   grid-template-columns: auto 1fr;
   align-items: center;
@@ -7243,8 +7253,14 @@ body[data-page="admin"] .site-acknowledgement {
     max-width: 168px;
   }
 
+  /* `1fr` is `minmax(auto, 1fr)`, so a child with a wide min-content (the
+     weekly-hours editor, the month grid) stretches the track past the page
+     and the overflow is clipped by `overflow-x` on <body>. Let it shrink. */
+  .page-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .status-strip,
-  .page-grid,
   .hero-status-inline,
   .signal-ribbon,
   .admin-grid,
@@ -10706,6 +10722,116 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
 
 .staff-day-exceptions .panel-kicker {
   margin-bottom: 6px;
+}
+
+/* ── Staff dashboard: phones ──────────────────────────────────────────── */
+
+/* A long single word in a 46px cell cannot wrap and spills over the next day. */
+.reserve-calendar-grid .calendar-cell span {
+  overflow-wrap: anywhere;
+}
+
+.reserve-calendar-grid .calendar-cell.is-open .calendar-cell-label-short,
+.reserve-calendar-grid .calendar-cell.is-closed .calendar-cell-label-short {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .reserve-calendar-grid .calendar-cell.is-open span,
+  .reserve-calendar-grid .calendar-cell.is-closed span {
+    font-size: 0.6rem;
+  }
+
+  /* Swap the wordy day label for the compact one. The full text stays in the
+     cell's aria-label, so screen readers are unaffected. Guarded by :has() so
+     that a cached older bundle — which renders no short label — keeps showing
+     the full one rather than an empty cell. */
+  .staff-dashboard-calendar-grid .calendar-cell:has(.calendar-cell-label-short) .calendar-cell-label {
+    display: none;
+  }
+
+  .staff-dashboard-calendar-grid .calendar-cell.is-open .calendar-cell-label-short,
+  .staff-dashboard-calendar-grid .calendar-cell.is-closed .calendar-cell-label-short {
+    display: block;
+    margin-top: 2px;
+    color: #8a95a6;
+    font-size: 0.72rem;
+  }
+
+  .staff-dashboard-calendar-grid .calendar-cell.is-selected .calendar-cell-label-short {
+    color: inherit;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Two native time inputs plus the remove button do not fit a phone row at
+     their intrinsic width; let them share the space instead of overflowing.
+     The trimmed padding buys back enough room for "12:00 PM" and the clock
+     icon to stay legible — the 16px font is required to stop iOS zooming. */
+  .staff-day-window {
+    gap: 6px;
+  }
+
+  .staff-day-window input[type="time"] {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 4px;
+  }
+
+  .staff-day-remove {
+    padding: 0 2px;
+  }
+
+  /* Every step of the chain defaults to an `auto` minimum, so the widest row
+     drags the editor's track past the panel. Allow each level to shrink. */
+  .staff-weekly-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .staff-day-row,
+  .staff-day-head,
+  .staff-day-windows,
+  .staff-day-window {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 400px) {
+  /* Three tabs at full padding are wider than a 320px phone. */
+  .staff-tab-switcher {
+    display: flex;
+    width: 100%;
+  }
+
+  .staff-tab-switcher .tab-button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  /* Side by side, neither time field can hold "12:00 PM" on the narrowest
+     phones. Stack them and let the remove button span both rows. */
+  .staff-day-window {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .staff-day-window input[type="time"] {
+    grid-column: 1;
+    padding: 6px 10px;
+  }
+
+  .staff-day-dash {
+    display: none;
+  }
+
+  .staff-day-remove {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
 }
 
 .engineer-fullprofile-cta {
