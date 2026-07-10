@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { CURRENT_PAGE } from "../config.js";
+import { parseLocalDate, shiftMonthISO, toLocalISODate, todayISO } from "../date-utils.js";
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -14,8 +15,34 @@ const DEFAULT_WINDOW = { start_minute: 720, end_minute: 1200 }; // 12:00–20:00
 let dashboardSelectedDate = todayString();
 let dashboardCalendarMonth = firstOfMonth(dashboardSelectedDate);
 
+let activeStaffTab = "profile";
+
 function el(id) {
   return document.getElementById(id);
+}
+
+const STAFF_TABS = ["profile", "requests", "availability"];
+
+function setActiveStaffTab(tab) {
+  // Applicants only ever have the profile tab, so ignore anything else.
+  const next = dashboardMode === "applicant" || !STAFF_TABS.includes(tab) ? "profile" : tab;
+  activeStaffTab = next;
+  document.querySelectorAll("[data-staff-tab]").forEach((button) => {
+    const isActive = button.dataset.staffTab === next;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.setAttribute("tabindex", isActive ? "0" : "-1");
+  });
+  document.querySelectorAll("[data-staff-panel]").forEach((panel) => {
+    panel.classList.toggle("hidden", panel.dataset.staffPanel !== next);
+  });
+}
+
+function setRequestsBadge(count) {
+  const badge = el("staff-requests-badge");
+  if (!badge) return;
+  badge.textContent = count > 0 ? String(count) : "";
+  badge.classList.toggle("hidden", count <= 0);
 }
 
 function minutesToTime(minutes) {
@@ -31,11 +58,7 @@ function timeToMinutes(value) {
 }
 
 function todayString() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return todayISO();
 }
 
 function firstOfMonth(value) {
@@ -55,12 +78,23 @@ function formatDateLabel(value) {
   }).format(new Date(`${value}T00:00:00`));
 }
 
-function setFeedback(message, type) {
-  const node = el("staff-dashboard-feedback");
+function writeFeedback(nodeId, message, type) {
+  const node = el(nodeId);
   if (!node) return;
   node.textContent = message;
   node.classList.remove("hidden", "is-error", "is-success");
   if (type) node.classList.add(type === "error" ? "is-error" : "is-success");
+}
+
+/** Feedback for the Requests tab. */
+function setFeedback(message, type) {
+  writeFeedback("staff-dashboard-feedback", message, type);
+}
+
+/** Feedback for the Availability tab — the two tabs have separate live regions
+ * so a message never lands on a panel the staff member can't see. */
+function setAvailabilityFeedback(message, type) {
+  writeFeedback("staff-availability-feedback", message, type);
 }
 
 function escapeHtml(value) {
@@ -136,12 +170,15 @@ function windowsForDate(value) {
     .filter((rule) => rule.active !== false && Number(rule.weekday) === dateWeekday(value))
     .map((rule) => ({ start: Number(rule.start_minute), end: Number(rule.end_minute) }));
 
+  // Mirrors available_windows_for_date on the server: an all-day exception
+  // spans the studio's open hours when it grants availability, and the whole
+  // day when it blocks it.
   exceptionsForDate(value)
     .filter((item) => item.is_available)
     .forEach((item) => {
       windows.push({
-        start: item.start_minute == null ? 0 : Number(item.start_minute),
-        end: item.end_minute == null ? 1440 : Number(item.end_minute),
+        start: item.start_minute == null ? DEFAULT_WINDOW.start_minute : Number(item.start_minute),
+        end: item.end_minute == null ? DEFAULT_WINDOW.end_minute : Number(item.end_minute),
       });
     });
   windows = mergeWindows(windows);
@@ -158,10 +195,25 @@ function windowsForDate(value) {
   return mergeWindows(windows);
 }
 
-function syncExceptionFormToSelectedDate() {
-  const form = el("staff-exception-form");
-  if (!form || !dashboardSelectedDate) return;
-  form.elements.date.value = dashboardSelectedDate;
+function exceptionRowHtml(exc) {
+  const span =
+    exc.start_minute != null ? `${minutesToTime(exc.start_minute)}–${minutesToTime(exc.end_minute)}` : "All day";
+  const label = exc.is_available ? "Extra available" : "Unavailable";
+  return `
+    <div class="summary-line staff-schedule-row">
+      <span>${escapeHtml(exc.exception_date)} · ${escapeHtml(label)} · ${span}${exc.reason ? " · " + escapeHtml(exc.reason) : ""}</span>
+      <button class="ghost-button" type="button" data-staff-action="delete-exception" data-exception-id="${escapeHtml(exc.id)}">Remove</button>
+    </div>`;
+}
+
+/** The overrides that apply to the currently selected calendar day. */
+function renderDayExceptions() {
+  const list = el("staff-day-exceptions-list");
+  if (!list) return;
+  const dayExceptions = exceptionsForDate(dashboardSelectedDate);
+  list.innerHTML = dayExceptions.length
+    ? dayExceptions.map(exceptionRowHtml).join("")
+    : '<div class="empty-state">No changes on this day — your weekly hours apply.</div>';
 }
 
 function renderDashboardCalendar() {
@@ -187,12 +239,16 @@ function renderDashboardCalendar() {
   }
 
   for (let day = 1; day <= totalDays; day += 1) {
-    const date = new Date(`${dashboardCalendarMonth}T00:00:00`);
+    const date = parseLocalDate(dashboardCalendarMonth);
     date.setDate(day);
-    const isoDate = date.toISOString().slice(0, 10);
+    const isoDate = toLocalISODate(date);
     const windows = windowsForDate(isoDate);
     const isSelected = isoDate === dashboardSelectedDate;
     const label = windows.length ? `${windows.length} window${windows.length === 1 ? "" : "s"}` : "Unavailable";
+    // "Unavailable" is one unbreakable word and does not fit a phone-sized cell,
+    // so narrow screens show the compact form instead. The button's aria-label
+    // always carries the full wording.
+    const shortLabel = windows.length ? String(windows.length) : "—";
     const ariaLabel = `${formatDateLabel(isoDate)}: ${label}${isSelected ? ", selected" : ""}`;
     cells.push(`
       <button
@@ -202,7 +258,8 @@ function renderDashboardCalendar() {
         aria-label="${escapeHtml(ariaLabel)}"
       >
         <strong>${day}</strong>
-        <span>${escapeHtml(label)}</span>
+        <span class="calendar-cell-label">${escapeHtml(label)}</span>
+        <span class="calendar-cell-label-short" aria-hidden="true">${escapeHtml(shortLabel)}</span>
       </button>
     `);
   }
@@ -220,7 +277,7 @@ function renderDashboardCalendar() {
           .join("")
       : '<span class="empty-state">Unavailable until you add a weekly window or one-off availability.</span>';
   }
-  syncExceptionFormToSelectedDate();
+  renderDayExceptions();
 }
 
 function setProfilePhotoPreview(photoUrl) {
@@ -297,6 +354,9 @@ function applyDashboardMode(profile) {
   const submitBtn = el("staff-profile-submit");
   const isApplicant = dashboardMode === "applicant";
   if (approvedSections) approvedSections.classList.toggle("hidden", isApplicant);
+  // Applicants have nothing to switch between — only the profile tab exists.
+  el("staff-tab-switcher")?.classList.toggle("hidden", isApplicant);
+  setActiveStaffTab(isApplicant ? "profile" : activeStaffTab);
   const eyebrow = el("staff-dashboard-eyebrow");
   if (!isApplicant) {
     setApplicationBanner(null);
@@ -329,6 +389,7 @@ async function renderRequests() {
     list.innerHTML = '<div class="empty-state">Could not load requests.</div>';
     return;
   }
+  setRequestsBadge(bookings.filter((booking) => booking.status === "Requested").length);
   if (!bookings.length) {
     list.innerHTML = '<div class="empty-state">No booking requests yet.</div>';
     return;
@@ -417,9 +478,9 @@ async function renderRules() {
 async function saveWeekday(weekday) {
   try {
     await api.setMyAvailabilityWeekday(weekday, weeklyWindows[weekday] || []);
-    setFeedback("Schedule updated.", "success");
+    setAvailabilityFeedback("Schedule updated.", "success");
   } catch (error) {
-    setFeedback(error?.message || "Could not update your schedule.", "error");
+    setAvailabilityFeedback(error?.message || "Could not update your schedule.", "error");
   }
   await renderRules();
 }
@@ -427,7 +488,7 @@ async function saveWeekday(weekday) {
 async function copyDayToAllDays(weekday) {
   const source = (weeklyWindows[weekday] || []).map((w) => ({ ...w }));
   if (!source.length) {
-    setFeedback("Add some hours to this day first, then copy them.", "error");
+    setAvailabilityFeedback("Add some hours to this day first, then copy them.", "error");
     return;
   }
   try {
@@ -435,9 +496,9 @@ async function copyDayToAllDays(weekday) {
       weeklyWindows[day] = source.map((w) => ({ ...w }));
       await api.setMyAvailabilityWeekday(day, weeklyWindows[day]);
     }
-    setFeedback(`Copied ${WEEKDAYS[weekday]}'s hours to every day.`, "success");
+    setAvailabilityFeedback(`Copied ${WEEKDAYS[weekday]}'s hours to every day.`, "success");
   } catch (error) {
-    setFeedback(error?.message || "Could not copy those hours.", "error");
+    setAvailabilityFeedback(error?.message || "Could not copy those hours.", "error");
   }
   await renderRules();
 }
@@ -450,22 +511,15 @@ async function renderExceptions() {
   } catch (error) {
     return;
   }
-  list.innerHTML = scheduleExceptions.length
-    ? scheduleExceptions
-        .map((exc) => {
-          const span =
-            exc.start_minute != null
-              ? `${minutesToTime(exc.start_minute)}–${minutesToTime(exc.end_minute)}`
-              : "All day";
-          const label = exc.is_available ? "Extra available" : "Unavailable";
-          return `
-            <div class="summary-line staff-schedule-row">
-              <span>${escapeHtml(exc.exception_date)} · ${escapeHtml(label)} · ${span}${exc.reason ? " · " + escapeHtml(exc.reason) : ""}</span>
-              <button class="ghost-button" type="button" data-staff-action="delete-exception" data-exception-id="${escapeHtml(exc.id)}">Remove</button>
-            </div>`;
-        })
-        .join("")
-    : '<div class="empty-state">No one-off changes.</div>';
+  // The backend returns every exception ever created. Only the ones that still
+  // affect a bookable day are worth showing; past overrides are noise.
+  const today = todayString();
+  const upcoming = scheduleExceptions
+    .filter((exc) => String(exc.exception_date) >= today)
+    .sort((left, right) => String(left.exception_date).localeCompare(String(right.exception_date)));
+  list.innerHTML = upcoming.length
+    ? upcoming.map(exceptionRowHtml).join("")
+    : '<div class="empty-state">No upcoming changes — your weekly hours apply.</div>';
   renderDashboardCalendar();
 }
 
@@ -530,6 +584,12 @@ async function loadDashboard() {
 export function initStaffDashboardView() {
   if (CURRENT_PAGE !== "staff-dashboard") return;
 
+  el("staff-tab-switcher")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-staff-tab]");
+    if (!button) return;
+    setActiveStaffTab(button.dataset.staffTab);
+  });
+
   el("staff-dashboard-month-grid")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-staff-dashboard-date]");
     if (!button) return;
@@ -539,39 +599,38 @@ export function initStaffDashboardView() {
   });
 
   el("staff-dashboard-prev-month")?.addEventListener("click", () => {
-    const date = new Date(`${dashboardCalendarMonth}T00:00:00`);
-    date.setMonth(date.getMonth() - 1);
-    dashboardCalendarMonth = `${date.toISOString().slice(0, 7)}-01`;
+    dashboardCalendarMonth = shiftMonthISO(dashboardCalendarMonth, -1);
     renderDashboardCalendar();
   });
 
   el("staff-dashboard-next-month")?.addEventListener("click", () => {
-    const date = new Date(`${dashboardCalendarMonth}T00:00:00`);
-    date.setMonth(date.getMonth() + 1);
-    dashboardCalendarMonth = `${date.toISOString().slice(0, 7)}-01`;
+    dashboardCalendarMonth = shiftMonthISO(dashboardCalendarMonth, 1);
     renderDashboardCalendar();
   });
+
+  /** Drop every override on the selected day, so a quick action always starts
+   * from the weekly hours rather than stacking on top of earlier clicks. */
+  async function clearSelectedDayExceptions() {
+    for (const exc of exceptionsForDate(dashboardSelectedDate)) {
+      await api.deleteMyAvailabilityException(exc.id);
+    }
+  }
 
   document.querySelectorAll("[data-staff-calendar-action]").forEach((button) => {
     button.addEventListener("click", async () => {
       const action = button.dataset.staffCalendarAction;
       try {
         button.disabled = true;
+        await clearSelectedDayExceptions();
         if (action === "available") {
-          const fullDayBlocks = exceptionsForDate(dashboardSelectedDate).filter(
-            (item) => !item.is_available && item.start_minute == null && item.end_minute == null,
-          );
-          for (const block of fullDayBlocks) {
-            await api.deleteMyAvailabilityException(block.id);
-          }
           await api.createMyAvailabilityException({
             exception_date: dashboardSelectedDate,
             is_available: true,
-            start_minute: 720,
-            end_minute: 1200,
+            start_minute: DEFAULT_WINDOW.start_minute,
+            end_minute: DEFAULT_WINDOW.end_minute,
             reason: "Available",
           });
-          setFeedback("Selected day is available from 12 PM to 8 PM.", "success");
+          setAvailabilityFeedback("Selected day is available from 12 PM to 8 PM.", "success");
         } else if (action === "blocked") {
           await api.createMyAvailabilityException({
             exception_date: dashboardSelectedDate,
@@ -580,11 +639,13 @@ export function initStaffDashboardView() {
             end_minute: null,
             reason: "Unavailable",
           });
-          setFeedback("Selected day marked unavailable.", "success");
+          setAvailabilityFeedback("Selected day marked unavailable.", "success");
+        } else if (action === "reset") {
+          setAvailabilityFeedback("Day reset — your weekly hours apply again.", "success");
         }
         await renderExceptions();
       } catch (error) {
-        setFeedback(error?.message || "Could not update that day.", "error");
+        setAvailabilityFeedback(error?.message || "Could not update that day.", "error");
       } finally {
         button.disabled = false;
       }
@@ -683,7 +744,7 @@ export function initStaffDashboardView() {
       const start = timeToMinutes(block.querySelector("[data-win-start]").value);
       const end = timeToMinutes(block.querySelector("[data-win-end]").value);
       if (start == null || end == null || start >= end) {
-        setFeedback("Each block needs a start time before its end time.", "error");
+        setAvailabilityFeedback("Each block needs a start time before its end time.", "error");
         await renderRules();
         return;
       }
@@ -714,8 +775,18 @@ export function initStaffDashboardView() {
     const form = event.currentTarget;
     const start = form.elements.start.value ? timeToMinutes(form.elements.start.value) : null;
     const end = form.elements.end.value ? timeToMinutes(form.elements.end.value) : null;
+    // The API takes both times or neither; catch the half-filled case here so
+    // staff get a sentence instead of a validation dump.
+    if ((start === null) !== (end === null)) {
+      setAvailabilityFeedback("Enter both a start and an end time, or leave both blank for the whole day.", "error");
+      return;
+    }
+    if (start !== null && start >= end) {
+      setAvailabilityFeedback("The start time must be before the end time.", "error");
+      return;
+    }
     const payload = {
-      exception_date: form.elements.date.value,
+      exception_date: dashboardSelectedDate,
       is_available: form.elements.kind.value === "available",
       start_minute: start,
       end_minute: end,
@@ -723,14 +794,11 @@ export function initStaffDashboardView() {
     };
     try {
       await api.createMyAvailabilityException(payload);
-      dashboardSelectedDate = payload.exception_date || dashboardSelectedDate;
-      dashboardCalendarMonth = firstOfMonth(dashboardSelectedDate);
       form.reset();
-      syncExceptionFormToSelectedDate();
-      setFeedback("Change saved.", "success");
+      setAvailabilityFeedback("Change saved.", "success");
       await renderExceptions();
     } catch (error) {
-      setFeedback(error?.message || "Could not save that change.", "error");
+      setAvailabilityFeedback(error?.message || "Could not save that change.", "error");
     }
   });
 

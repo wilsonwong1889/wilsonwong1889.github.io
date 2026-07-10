@@ -1,5 +1,6 @@
 import { api } from "./api.js";
 import { CURRENT_PAGE, getSearchParam } from "./config.js";
+import { todayISO } from "./date-utils.js";
 import {
   getPersistedCheckoutDraft,
   getPersistedLastBookingId,
@@ -331,7 +332,7 @@ function resetScopedData() {
     patch.rooms = [];
     patch.roomAvailabilityPreview = {};
     patch.roomAvailabilitySearch = {
-      date: new Date().toISOString().slice(0, 10),
+      date: todayISO(),
       time: "15:00",
       duration: 60,
       matchingRoomIds: [],
@@ -348,6 +349,7 @@ function resetScopedData() {
     patch.adminBookings = [];
     patch.adminAnalytics = null;
     patch.adminActivity = [];
+    patch.adminNotifications = [];
     patch.adminUsers = [];
     patch.adminTestCases = [];
     patch.adminStaffProfiles = [];
@@ -495,13 +497,16 @@ async function refreshAdminActivity(message) {
   }
 
   if (!state.currentUser?.is_admin) {
-    setState({ adminActivity: [], message: message || state.message });
+    setState({ adminActivity: [], adminNotifications: [], message: message || state.message });
     return;
   }
 
   try {
-    const adminActivity = await api.getAdminActivity();
-    setState({ adminActivity, message: message || "Admin activity loaded." });
+    const [adminActivity, adminNotifications] = await Promise.all([
+      api.getAdminActivity(),
+      api.getAdminNotifications(),
+    ]);
+    setState({ adminActivity, adminNotifications, message: message || "Admin activity loaded." });
   } catch (error) {
     setState({ message: error.message });
   }
@@ -839,6 +844,7 @@ async function refreshSession(message) {
       adminBookings: [],
       adminAnalytics: null,
       adminActivity: [],
+      adminNotifications: [],
       adminUsers: [],
       adminTestCases: [],
       adminStaffProfiles: [],
@@ -864,6 +870,7 @@ async function clearSession() {
     adminBookings: [],
     adminAnalytics: null,
     adminActivity: [],
+    adminNotifications: [],
     adminUsers: [],
     adminTestCases: [],
     adminStaffProfiles: [],

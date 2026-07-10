@@ -263,8 +263,11 @@ class BookingPaymentE2ETest(unittest.TestCase):
         self.assertIn("booking_created", notification_types)
         self.assertIn("booking_created_email_worker", notification_types)
         self.assertIn("booking_created_sms_worker", notification_types)
-        self.assertIn("booking_confirmation_email", notification_types)
-        self.assertIn("booking_confirmation_email_worker", notification_types)
+        # Online payment is collected as a deposit (balance owing), so the
+        # customer gets the dedicated deposit-paid email rather than the generic
+        # confirmation. The confirmation SMS is still sent.
+        self.assertIn("deposit_paid_email", notification_types)
+        self.assertIn("deposit_paid_email_worker", notification_types)
         self.assertIn("booking_confirmation_sms_worker", notification_types)
 
     def test_20_booking_payment_failure_e2e(self) -> None:

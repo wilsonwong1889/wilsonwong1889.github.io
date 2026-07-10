@@ -2,6 +2,7 @@ import { api } from "../api.js";
 import { downloadBookingCalendarFile } from "../calendar.js";
 import { downloadBookingReceiptPdf } from "../receipt.js";
 import { getSearchParam } from "../config.js";
+import { todayISO } from "../date-utils.js";
 import { elements, toggleHidden } from "../dom.js";
 import {
   getPersistedLastBookingId,
@@ -17,6 +18,10 @@ let googlePayScriptPromise = null;
 let activePaymentSession = null;
 let paymentDeadlineTimer = null;
 let reloadBookingDetailAction = null;
+// Reschedule UI is temporarily hidden (admin-only panel was too messy). Flip to
+// true to bring back the "Reschedule this booking" panel on the detail page;
+// all the wiring below is intact.
+const RESCHEDULE_ENABLED = false;
 let rescheduleAvailability = null;
 let rescheduleBookingId = null;
 let rescheduleDateValue = "";
@@ -362,7 +367,7 @@ function getBookingLayoutElements() {
 }
 
 function getDateInputValue(value) {
-  return String(value || "").split("T")[0] || new Date().toISOString().slice(0, 10);
+  return String(value || "").split("T")[0] || todayISO();
 }
 
 function isAdminWaivedPayment(booking) {
@@ -1151,7 +1156,7 @@ function renderReschedulePanel(booking) {
   }
 
   const isAdmin = Boolean(state.currentUser?.is_admin);
-  const canReschedule = isAdmin && booking.status === "Paid" && !booking.checked_in_at;
+  const canReschedule = RESCHEDULE_ENABLED && isAdmin && booking.status === "Paid" && !booking.checked_in_at;
   toggleHidden(elements.bookingReschedulePanel, !canReschedule);
   if (!canReschedule) {
     return;

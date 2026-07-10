@@ -17,6 +17,7 @@ from app.schemas.booking import (
     AdminBookingLookupOut,
     AdminBookingBulkClearResultOut,
     AdminBookingClearByDateIn,
+    AdminNotificationLogOut,
     AdminTodayRosterOut,
     BookingOut,
     ManualBookingCreate,
@@ -62,6 +63,7 @@ from app.services.booking_service import (
     get_admin_analytics_summary,
     get_admin_today_roster,
     list_recent_admin_activity,
+    list_recent_notifications,
     lookup_bookings_for_admin,
     mark_booking_paid_manually,
     process_refund,
@@ -261,6 +263,19 @@ def admin_recent_activity(
     _: None = Depends(admin_rate_limit),
 ):
     return list_recent_admin_activity(db, limit=limit)
+
+
+@router.get("/notifications", response_model=List[AdminNotificationLogOut])
+def admin_recent_notifications(
+    limit: int = Query(default=50, ge=1, le=200),
+    status: Optional[str] = Query(default=None),
+    type: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+    _: None = Depends(admin_rate_limit),
+):
+    """Recent email/SMS notification log for admin visibility."""
+    return list_recent_notifications(db, limit=limit, status=status, notification_type=type)
 
 
 @router.get("/staff", response_model=List[AdminStaffProfileOut])

@@ -354,6 +354,12 @@ export const api = {
   getAdminActivity(limit = 12) {
     return request(`/api/admin/activity?limit=${limit}`);
   },
+  getAdminNotifications({ limit = 50, status = "", type = "" } = {}) {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (status) params.set("status", status);
+    if (type) params.set("type", type);
+    return request(`/api/admin/notifications?${params.toString()}`);
+  },
   getAdminStaffProfiles() {
     return request("/api/admin/staff");
   },

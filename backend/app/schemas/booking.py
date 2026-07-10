@@ -237,6 +237,18 @@ class AdminActivityItemOut(BaseModel):
     created_at: datetime
 
 
+class AdminNotificationLogOut(BaseModel):
+    id: UUID
+    type: str
+    status: str
+    user_email: Optional[str] = None
+    booking_code: Optional[str] = None
+    backend: Optional[str] = None
+    error: Optional[str] = None
+    sent_at: Optional[datetime] = None
+    created_at: datetime
+
+
 class AdminBookingClearByDateIn(BaseModel):
     date: date
 

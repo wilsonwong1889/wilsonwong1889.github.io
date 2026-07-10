@@ -1,4 +1,5 @@
 import { API_BASE_URL, getSearchParam } from "../config.js";
+import { isDateBeforeToday, parseLocalDate, shiftMonthISO, toLocalISODate, todayISO } from "../date-utils.js";
 import { elements } from "../dom.js";
 import {
   persistCheckoutDraft,
@@ -32,15 +33,7 @@ let staffPromoPreview = null;
 const STAFF_DURATION_OPTIONS = [60, 120, 180, 240, 300];
 
 function todayString() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function isDateBeforeToday(value) {
-  return Boolean(value && value < todayString());
+  return todayISO();
 }
 
 function clampBookingDate(value) {
@@ -903,9 +896,9 @@ function renderStaffBookingCalendar(profile) {
   }
 
   for (let day = 1; day <= totalDays; day += 1) {
-    const date = new Date(`${displayedStaffMonth}T00:00:00`);
+    const date = parseLocalDate(displayedStaffMonth);
     date.setDate(day);
-    const isoDate = date.toISOString().slice(0, 10);
+    const isoDate = toLocalISODate(date);
     const isPast = isDateBeforeToday(isoDate);
     const count = isPast ? 0 : staffMonthAvailability[isoDate];
     const isSelected = isoDate === selectedDate;
@@ -1517,9 +1510,7 @@ export function initStaffDirectoryView() {
     if (!getSelectedStaffProfile() || !displayedStaffMonth) {
       return;
     }
-    const date = new Date(`${displayedStaffMonth}T00:00:00`);
-    date.setMonth(date.getMonth() - 1);
-    const previousMonth = `${date.toISOString().slice(0, 7)}-01`;
+    const previousMonth = shiftMonthISO(displayedStaffMonth, -1);
     displayedStaffMonth = previousMonth < firstOfMonth(todayString()) ? firstOfMonth(todayString()) : previousMonth;
     renderStaffBookingShell({ currentUser: state.currentUser });
     await loadStaffMonthAvailability();
@@ -1528,9 +1519,7 @@ export function initStaffDirectoryView() {
     if (!getSelectedStaffProfile() || !displayedStaffMonth) {
       return;
     }
-    const date = new Date(`${displayedStaffMonth}T00:00:00`);
-    date.setMonth(date.getMonth() + 1);
-    displayedStaffMonth = `${date.toISOString().slice(0, 7)}-01`;
+    displayedStaffMonth = shiftMonthISO(displayedStaffMonth, 1);
     renderStaffBookingShell({ currentUser: state.currentUser });
     await loadStaffMonthAvailability();
   });

@@ -1006,6 +1006,7 @@ def reschedule_staff_booking(
         end_time,
         exclude_staff_booking_id=booking.id,
     )
+    previous_start = booking.start_time
     try:
         booking.start_time = normalized_start
         booking.end_time = end_time
@@ -1017,6 +1018,7 @@ def reschedule_staff_booking(
             details={
                 "staff_booking_id": str(booking.id),
                 "new_start_time": normalized_start.isoformat(),
+                "previous_start_time": previous_start.isoformat() if previous_start else None,
             },
         )
         db.commit()
@@ -1026,6 +1028,10 @@ def reschedule_staff_booking(
             raise
         raise StaffBookingConflictError("Selected time is no longer available") from exc
     db.refresh(booking)
+    from app.tasks import send_staff_booking_rescheduled_email_task
+
+    previous_start_iso = previous_start.isoformat() if previous_start else None
+    send_staff_booking_rescheduled_email_task.delay(str(booking.id), previous_start_iso)
     return attach_staff_profile_snapshot(db, booking)
 
 

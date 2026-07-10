@@ -1202,6 +1202,7 @@ def reschedule_booking(
         exclude_booking_id=booking.id,
     )
 
+    previous_start = booking.start_time
     slot_starts = build_slot_starts(normalized_start, booking.duration_minutes)
     try:
         release_booking_slots(db, booking.id)
@@ -1226,6 +1227,7 @@ def reschedule_booking(
             details={
                 "start_time": normalized_start.isoformat(),
                 "end_time": end_time.isoformat(),
+                "previous_start_time": previous_start.isoformat() if previous_start else None,
                 "status": booking.status,
             },
         )
@@ -1238,8 +1240,8 @@ def reschedule_booking(
             details={
                 "booking_code": booking.booking_code,
                 "queued_tasks": [
-                    "send_booking_confirmation_email",
-                    "send_booking_confirmation_sms",
+                    "send_booking_rescheduled_email",
+                    "send_booking_rescheduled_sms",
                 ],
             },
         )
@@ -1252,13 +1254,14 @@ def reschedule_booking(
 
     db.refresh(booking)
     from app.tasks import (
-        send_booking_confirmation_email_task,
-        send_booking_confirmation_sms_task,
+        send_booking_rescheduled_email_task,
+        send_booking_rescheduled_sms_task,
         send_booking_staff_notification_email_task,
     )
 
-    send_booking_confirmation_email_task.delay(str(booking.id))
-    send_booking_confirmation_sms_task.delay(str(booking.id))
+    previous_start_iso = previous_start.isoformat() if previous_start else None
+    send_booking_rescheduled_email_task.delay(str(booking.id), previous_start_iso)
+    send_booking_rescheduled_sms_task.delay(str(booking.id))
     send_booking_staff_notification_email_task.delay(str(booking.id), "confirmed")
     return booking
 
@@ -1769,6 +1772,51 @@ def list_recent_admin_activity(db: Session, limit: int = 12) -> list[dict]:
     ]
 
 
+def list_recent_notifications(
+    db: Session,
+    *,
+    limit: int = 50,
+    status: Optional[str] = None,
+    notification_type: Optional[str] = None,
+) -> list[dict]:
+    """Recent NotificationLog rows for the admin visibility panel, newest first.
+
+    Joins the recipient's email and the booking code when available, and
+    surfaces the delivery backend / error captured in `details`.
+    """
+    query = (
+        db.query(NotificationLog, User.email, Booking.booking_code)
+        .outerjoin(User, NotificationLog.user_id == User.id)
+        .outerjoin(Booking, NotificationLog.booking_id == Booking.id)
+    )
+    if status:
+        query = query.filter(NotificationLog.status == status)
+    if notification_type:
+        query = query.filter(NotificationLog.type == notification_type)
+    rows = query.order_by(NotificationLog.created_at.desc()).limit(limit).all()
+
+    results = []
+    for log, user_email, booking_code in rows:
+        details = log.details or {}
+        delivery = details.get("delivery") if isinstance(details, dict) else None
+        backend = delivery.get("backend") if isinstance(delivery, dict) else None
+        error = details.get("error") if isinstance(details, dict) else None
+        results.append(
+            {
+                "id": log.id,
+                "type": log.type,
+                "status": log.status,
+                "user_email": user_email,
+                "booking_code": booking_code,
+                "backend": backend,
+                "error": error,
+                "sent_at": log.sent_at,
+                "created_at": log.created_at,
+            }
+        )
+    return results
+
+
 def clear_bookings_for_admin_day(db: Session, admin: User, target_date: date) -> dict:
     utc_start, utc_end = get_day_bounds(target_date)
     bookings = (
@@ -2068,10 +2116,18 @@ def mark_booking_paid(
         booking.status = "Paid"
     booking.payment_intent_id = payment_intent_id
     booking.confirmed_at = datetime.now(timezone.utc)
+    # Deposit payments get a dedicated "deposit received / balance due" email;
+    # full payments get the standard confirmation.
+    if as_deposit:
+        customer_email_task = "send_deposit_paid_email"
+        notification_type = "deposit_paid_email"
+    else:
+        customer_email_task = "send_booking_confirmation_email"
+        notification_type = "booking_confirmation_email"
     notification_details = {
         "booking_code": booking.booking_code,
         "queued_tasks": [
-            "send_booking_confirmation_email",
+            customer_email_task,
             "send_booking_confirmation_sms",
         ],
     }
@@ -2079,7 +2135,7 @@ def mark_booking_paid(
         db,
         user_id=booking.user_id,
         booking_id=booking.id,
-        notification_type="booking_confirmation_email",
+        notification_type=notification_type,
         status="Sent",
         details=notification_details,
     )
@@ -2088,7 +2144,7 @@ def mark_booking_paid(
         actor_id=None,
         booking_id=booking.id,
         action="payment_confirmed",
-        details={"payment_intent_id": payment_intent_id},
+        details={"payment_intent_id": payment_intent_id, "as_deposit": as_deposit},
     )
     db.commit()
     db.refresh(booking)
@@ -2096,9 +2152,13 @@ def mark_booking_paid(
         send_booking_confirmation_email_task,
         send_booking_confirmation_sms_task,
         send_booking_staff_notification_email_task,
+        send_deposit_paid_email_task,
     )
 
-    send_booking_confirmation_email_task.delay(str(booking.id))
+    if as_deposit:
+        send_deposit_paid_email_task.delay(str(booking.id))
+    else:
+        send_booking_confirmation_email_task.delay(str(booking.id))
     send_booking_confirmation_sms_task.delay(str(booking.id))
     send_booking_staff_notification_email_task.delay(str(booking.id), "confirmed")
     return booking
@@ -2191,13 +2251,13 @@ def handle_payment_webhook_event(db: Session, event: dict) -> dict:
             db,
             user_id=booking.user_id,
             booking_id=booking.id,
-            notification_type="booking_cancelled",
+            notification_type="payment_failed",
             status="Sent",
             details={
                 "reason": booking.cancellation_reason,
                 "queued_tasks": [
-                    "send_booking_cancellation_email",
-                    "send_booking_cancellation_sms",
+                    "send_payment_failed_email",
+                    "send_payment_failed_sms",
                 ],
             },
         )
@@ -2210,13 +2270,13 @@ def handle_payment_webhook_event(db: Session, event: dict) -> dict:
         )
         db.commit()
         from app.tasks import (
-            send_booking_cancellation_email_task,
-            send_booking_cancellation_sms_task,
+            send_payment_failed_email_task,
+            send_payment_failed_sms_task,
             send_booking_staff_notification_email_task,
         )
 
-        send_booking_cancellation_email_task.delay(str(booking.id))
-        send_booking_cancellation_sms_task.delay(str(booking.id))
+        send_payment_failed_email_task.delay(str(booking.id))
+        send_payment_failed_sms_task.delay(str(booking.id))
         send_booking_staff_notification_email_task.delay(str(booking.id), "cancelled")
         return {"received": True, "booking_id": str(booking.id), "status": booking.status}
 

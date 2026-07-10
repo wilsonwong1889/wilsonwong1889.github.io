@@ -1642,6 +1642,64 @@ body[data-page="home"] .site-acknowledgement {
   align-items: baseline;
 }
 
+.admin-notifications-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-notifications-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-notification-card {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.admin-notification-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.admin-notification-card p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.admin-notification-status {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-notification-sent {
+  border-left-color: #1f9d55;
+}
+
+.admin-notification-failed {
+  border-left-color: var(--brand-red);
+}
+
+.admin-notification-queued {
+  border-left-color: #b7791f;
+}
+
+.admin-notification-error {
+  color: var(--brand-red);
+}
+
 .admin-room-staff-list {
   display: grid;
   gap: 16px;
@@ -3285,6 +3343,16 @@ select {
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.88);
   color: var(--ink);
+}
+
+/* Checkboxes and radios are not text fields. The blanket rule above stretches
+   them to fill their container — inside a flex label that means a 200px-wide
+   checkbox. Keep them at their intrinsic size. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  flex: none;
+  padding: 0;
 }
 
 .checkbox-row {
@@ -7185,8 +7253,14 @@ body[data-page="admin"] .site-acknowledgement {
     max-width: 168px;
   }
 
+  /* `1fr` is `minmax(auto, 1fr)`, so a child with a wide min-content (the
+     weekly-hours editor, the month grid) stretches the track past the page
+     and the overflow is clipped by `overflow-x` on <body>. Let it shrink. */
+  .page-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .status-strip,
-  .page-grid,
   .hero-status-inline,
   .signal-ribbon,
   .admin-grid,
@@ -7275,11 +7349,6 @@ body[data-page="admin"] .site-acknowledgement {
 
   .admin-staff-catalog-list {
     grid-template-columns: 1fr;
-  }
-
-  .calendar-weekdays,
-  .calendar-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .admin-bookings-sidebar {
@@ -10582,6 +10651,187 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+}
+
+/* ── Staff dashboard tabs ─────────────────────────────────────────────── */
+
+/* The body is a direct child of .page-grid, which is two columns. Without an
+   explicit span it lands in one of them and every panel below the hero renders
+   at half width. The panels inside are block-level, so `panel-wide` on them
+   cannot reach the page grid. */
+#staff-dashboard-body {
+  grid-column: 1 / -1;
+}
+
+.staff-tab-switcher {
+  margin-bottom: 18px;
+}
+
+.staff-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 7px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--brand-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tab-button.active .staff-tab-badge {
+  background: #fff;
+  color: var(--brand-blue);
+}
+
+.staff-tab-panel > .panel + .panel {
+  margin-top: 20px;
+}
+
+/* The merged availability day editor stacks its sections instead of sitting
+   side-by-side like the original two-column day panel. */
+.staff-day-detail {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.staff-day-detail .staff-day-detail-head .field-help {
+  margin: 0 0 6px;
+}
+
+.staff-day-quick-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.staff-day-custom summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--brand-blue);
+  padding: 6px 0;
+}
+
+.staff-day-custom[open] summary {
+  margin-bottom: 10px;
+}
+
+.staff-day-exceptions .panel-kicker {
+  margin-bottom: 6px;
+}
+
+/* ── Staff dashboard: phones ──────────────────────────────────────────── */
+
+/* A long single word in a 46px cell cannot wrap and spills over the next day. */
+.reserve-calendar-grid .calendar-cell span {
+  overflow-wrap: anywhere;
+}
+
+.reserve-calendar-grid .calendar-cell.is-open .calendar-cell-label-short,
+.reserve-calendar-grid .calendar-cell.is-closed .calendar-cell-label-short {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .reserve-calendar-grid .calendar-cell.is-open span,
+  .reserve-calendar-grid .calendar-cell.is-closed span {
+    font-size: 0.6rem;
+  }
+
+  /* Swap the wordy day label for the compact one. The full text stays in the
+     cell's aria-label, so screen readers are unaffected. Guarded by :has() so
+     that a cached older bundle — which renders no short label — keeps showing
+     the full one rather than an empty cell. */
+  .staff-dashboard-calendar-grid .calendar-cell:has(.calendar-cell-label-short) .calendar-cell-label {
+    display: none;
+  }
+
+  .staff-dashboard-calendar-grid .calendar-cell.is-open .calendar-cell-label-short,
+  .staff-dashboard-calendar-grid .calendar-cell.is-closed .calendar-cell-label-short {
+    display: block;
+    margin-top: 2px;
+    color: #8a95a6;
+    font-size: 0.72rem;
+  }
+
+  .staff-dashboard-calendar-grid .calendar-cell.is-selected .calendar-cell-label-short {
+    color: inherit;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Two native time inputs plus the remove button do not fit a phone row at
+     their intrinsic width; let them share the space instead of overflowing.
+     The trimmed padding buys back enough room for "12:00 PM" and the clock
+     icon to stay legible — the 16px font is required to stop iOS zooming. */
+  .staff-day-window {
+    gap: 6px;
+  }
+
+  .staff-day-window input[type="time"] {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 4px;
+  }
+
+  .staff-day-remove {
+    padding: 0 2px;
+  }
+
+  /* Every step of the chain defaults to an `auto` minimum, so the widest row
+     drags the editor's track past the panel. Allow each level to shrink. */
+  .staff-weekly-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .staff-day-row,
+  .staff-day-head,
+  .staff-day-windows,
+  .staff-day-window {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 400px) {
+  /* Three tabs at full padding are wider than a 320px phone. */
+  .staff-tab-switcher {
+    display: flex;
+    width: 100%;
+  }
+
+  .staff-tab-switcher .tab-button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  /* Side by side, neither time field can hold "12:00 PM" on the narrowest
+     phones. Stack them and let the remove button span both rows. */
+  .staff-day-window {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .staff-day-window input[type="time"] {
+    grid-column: 1;
+    padding: 6px 10px;
+  }
+
+  .staff-day-dash {
+    display: none;
+  }
+
+  .staff-day-remove {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
 }
 
 .engineer-fullprofile-cta {

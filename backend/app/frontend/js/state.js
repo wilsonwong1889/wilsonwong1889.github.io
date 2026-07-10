@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from "./config.js";
+import { todayISO } from "./date-utils.js";
 
 const listeners = new Set();
 
@@ -7,9 +8,9 @@ export const state = {
   currentUser: null,
   rooms: [],
   roomAvailabilityPreview: {},
-  roomPreviewDate: new Date().toISOString().slice(0, 10),
+  roomPreviewDate: todayISO(),
   roomAvailabilitySearch: {
-    date: new Date().toISOString().slice(0, 10),
+    date: todayISO(),
     time: "15:00",
     duration: 60,
     matchingRoomIds: [],
@@ -22,6 +23,7 @@ export const state = {
   adminTodayRoster: null,
   adminAnalytics: null,
   adminActivity: [],
+  adminNotifications: [],
   adminUsers: [],
   adminTestCases: [],
   adminStaffProfiles: [],
