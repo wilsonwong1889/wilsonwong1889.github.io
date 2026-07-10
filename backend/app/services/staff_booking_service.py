@@ -42,6 +42,7 @@ from app.services.payment_service import (
     create_refund,
     get_payment_intent_session,
 )
+from app.services.booking_service.core import RESCHEDULE_NOTIFICATIONS_ENABLED
 from app.services.promo_code_service import apply_promo_code_to_amount
 
 
@@ -1028,10 +1029,13 @@ def reschedule_staff_booking(
             raise
         raise StaffBookingConflictError("Selected time is no longer available") from exc
     db.refresh(booking)
-    from app.tasks import send_staff_booking_rescheduled_email_task
 
-    previous_start_iso = previous_start.isoformat() if previous_start else None
-    send_staff_booking_rescheduled_email_task.delay(str(booking.id), previous_start_iso)
+    # Customer reschedule notification is gated off (reschedule is hidden in the UI).
+    if RESCHEDULE_NOTIFICATIONS_ENABLED:
+        from app.tasks import send_staff_booking_rescheduled_email_task
+
+        previous_start_iso = previous_start.isoformat() if previous_start else None
+        send_staff_booking_rescheduled_email_task.delay(str(booking.id), previous_start_iso)
     return attach_staff_profile_snapshot(db, booking)
 
 
