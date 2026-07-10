@@ -1080,6 +1080,7 @@ def staff_booking_request_email(
     start_time: datetime,
     accept_url: str,
     decline_url: str,
+    note: Optional[str] = None,
 ) -> dict:
     when = _fmt_local(start_time)
     rows = (
@@ -1089,6 +1090,8 @@ def staff_booking_request_email(
     )
     if service:
         rows += _detail_row("Service", html.escape(service))
+    if note:
+        rows += _detail_row("Notes", html.escape(note))
     body = _html_wrap(
         f'<h2 style="margin:0 0 8px;color:#00263E;font-size:22px;">New session request</h2>'
         f'<p style="margin:0 0 16px;color:#444;font-size:15px;line-height:1.6;">'
@@ -1104,7 +1107,8 @@ def staff_booking_request_email(
         subject=f"New booking request — {when}",
         plain_text_content=(
             f"New session request from {customer_name or 'a client'} for {when}.\n"
-            f"Accept: {accept_url}\nDecline: {decline_url}\n"
+            + (f"Notes: {note}\n" if note else "")
+            + f"Accept: {accept_url}\nDecline: {decline_url}\n"
         ),
         html_content=body,
     )

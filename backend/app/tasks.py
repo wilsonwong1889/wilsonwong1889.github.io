@@ -1096,6 +1096,7 @@ def send_staff_booking_request_email_task(staff_booking_id: str):
             start_time=booking.start_time,
             accept_url=accept_url,
             decline_url=decline_url,
+            note=booking.note,
         )
         create_notification_log(
             db,
