@@ -52,6 +52,7 @@ FRONTEND_PAGES = {
     "/reserve": "reserve.html",
     "/staff": "staff.html",
     "/staff-dashboard": "staff-dashboard.html",
+    "/staff-respond": "staff-respond.html",
     "/bookings": "bookings.html",
     "/booking": "booking.html",
     "/payment-success": "payment-success.html",
