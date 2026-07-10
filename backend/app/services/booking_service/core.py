@@ -45,6 +45,11 @@ from app.services.promo_code_service import apply_promo_code_to_amount
 from app.services.reservation_service import ReservationHold, create_hold, release_hold, validate_hold
 
 
+# Reschedule is hidden in the UI, so we never notify customers about a
+# reschedule (email/SMS). The reschedule endpoints and email templates stay
+# intact behind this flag; flip to True to re-enable customer notifications.
+RESCHEDULE_NOTIFICATIONS_ENABLED = False
+
 # Wednesday=2, Thursday=3, Friday=4, Saturday=5 (Python weekday() values)
 BOOKING_OPEN_WEEKDAYS = frozenset({2, 3, 4, 5})
 ACTIVE_BOOKING_STATUSES = ("PendingPayment", "Paid", "DepositPaid", "Completed")
@@ -1231,20 +1236,21 @@ def reschedule_booking(
                 "status": booking.status,
             },
         )
-        create_notification_log(
-            db,
-            user_id=booking.user_id,
-            booking_id=booking.id,
-            notification_type="booking_rescheduled",
-            status="Sent",
-            details={
-                "booking_code": booking.booking_code,
-                "queued_tasks": [
-                    "send_booking_rescheduled_email",
-                    "send_booking_rescheduled_sms",
-                ],
-            },
-        )
+        if RESCHEDULE_NOTIFICATIONS_ENABLED:
+            create_notification_log(
+                db,
+                user_id=booking.user_id,
+                booking_id=booking.id,
+                notification_type="booking_rescheduled",
+                status="Sent",
+                details={
+                    "booking_code": booking.booking_code,
+                    "queued_tasks": [
+                        "send_booking_rescheduled_email",
+                        "send_booking_rescheduled_sms",
+                    ],
+                },
+            )
         db.commit()
     except (IntegrityError, OperationalError) as exc:
         db.rollback()
@@ -1253,15 +1259,20 @@ def reschedule_booking(
         raise BookingConflictError("Selected time is no longer available") from exc
 
     db.refresh(booking)
-    from app.tasks import (
-        send_booking_rescheduled_email_task,
-        send_booking_rescheduled_sms_task,
-        send_booking_staff_notification_email_task,
-    )
+    from app.tasks import send_booking_staff_notification_email_task
 
-    previous_start_iso = previous_start.isoformat() if previous_start else None
-    send_booking_rescheduled_email_task.delay(str(booking.id), previous_start_iso)
-    send_booking_rescheduled_sms_task.delay(str(booking.id))
+    # Customer reschedule email/SMS is gated off (see RESCHEDULE_NOTIFICATIONS_ENABLED).
+    # The internal staff notification below is a separate, general booking-change
+    # notice and is intentionally kept.
+    if RESCHEDULE_NOTIFICATIONS_ENABLED:
+        from app.tasks import (
+            send_booking_rescheduled_email_task,
+            send_booking_rescheduled_sms_task,
+        )
+
+        previous_start_iso = previous_start.isoformat() if previous_start else None
+        send_booking_rescheduled_email_task.delay(str(booking.id), previous_start_iso)
+        send_booking_rescheduled_sms_task.delay(str(booking.id))
     send_booking_staff_notification_email_task.delay(str(booking.id), "confirmed")
     return booking
 
