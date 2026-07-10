@@ -7335,11 +7335,6 @@ body[data-page="admin"] .site-acknowledgement {
     grid-template-columns: 1fr;
   }
 
-  .calendar-weekdays,
-  .calendar-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .admin-bookings-sidebar {
     position: static;
   }
@@ -10643,6 +10638,14 @@ body[data-page="home"] .site-header.site-header-public .brand-mark {
 }
 
 /* ── Staff dashboard tabs ─────────────────────────────────────────────── */
+
+/* The body is a direct child of .page-grid, which is two columns. Without an
+   explicit span it lands in one of them and every panel below the hero renders
+   at half width. The panels inside are block-level, so `panel-wide` on them
+   cannot reach the page grid. */
+#staff-dashboard-body {
+  grid-column: 1 / -1;
+}
 
 .staff-tab-switcher {
   margin-bottom: 18px;
