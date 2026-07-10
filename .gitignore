@@ -15,6 +15,11 @@ secrets/
 *credentials*.json
 service-account*.json
 
+# Credential screenshots (keys/IDs pasted as images) — never commit
+Supabase Client ID and Secret ID.png
+*Secret ID*.png
+*Client ID*.png
+
 venv/
 .venv/
 __pycache__/
