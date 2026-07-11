@@ -9760,17 +9760,10 @@ body[data-page="account"] .account-auth-card-head {
 }
 
 body[data-page="account"] .account-auth-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 72px;
-  height: 48px;
-  border-radius: 12px;
-  background: var(--brand-red);
-  color: #ffffff;
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  box-shadow: 0 16px 28px rgba(215, 25, 32, 0.22);
+  display: block;
+  height: 58px;
+  width: auto;
+  object-fit: contain;
 }
 
 body[data-page="account"] .account-auth-card-head h1 {
