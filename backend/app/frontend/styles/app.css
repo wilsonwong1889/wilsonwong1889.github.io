@@ -13110,10 +13110,10 @@ body[data-page="home"] .home-layout > .panel:nth-of-type(even) {
     padding-bottom: 2px;
   }
 
-  /* Nudge the centered hub title down just enough to sit level with the tops of
-     the flanking logos. */
+  /* Drop the hub title down so it sits vertically centered against the flanking
+     logos rather than pinned to the top of the brand row. */
   body[data-page="home"] .site-header.site-header-public .header-hub-title {
-    padding-top: 8px;
+    padding-top: 34px;
   }
 
   body[data-page="home"] .header-am-logo {
