@@ -13093,18 +13093,20 @@ body[data-page="home"] .home-layout > .panel:nth-of-type(even) {
   color: #00263e;
 }
 
-/* Home header (desktop): tighten the vertical whitespace between the utility
-   bar, the logo row, the nav pills, and the hero photo. Top-align the brand row
-   so the hub title rides up directly under the utility bar instead of floating
-   in the middle of the tall logos, and trim the logos slightly so the band
-   below the title closes up too. Scoped to min-width so the mobile drawer keeps
-   its own padding/margins. */
+/* Public header (desktop, all pages): tighten the vertical whitespace between
+   the utility bar, the logo row, the nav pills, and the content below. Top-align
+   the brand row so the hub title rides up directly under the utility bar instead
+   of floating in the middle of the tall logos, and trim the logos slightly so
+   the band below the title closes up too. Scoped to min-width so the mobile
+   drawer keeps its own padding/margins. The account page is excluded because it
+   hides the utility bar and packs the BIPOC logo into a right-hand action block
+   with the Log in / Book Now buttons, which the drop would collide with. */
 @media (min-width: 769px) {
-  body[data-page="home"] .site-header.site-header-public {
+  body[data-page]:not([data-page="account"]) .site-header.site-header-public {
     gap: 6px;
   }
 
-  body[data-page="home"] .site-header.site-header-public .site-header-brand-row {
+  body[data-page]:not([data-page="account"]) .site-header.site-header-public .site-header-brand-row {
     align-items: start;
     padding-top: 6px;
     padding-bottom: 2px;
@@ -13112,33 +13114,33 @@ body[data-page="home"] .home-layout > .panel:nth-of-type(even) {
 
   /* Drop the hub title down so it sits vertically centered against the flanking
      logos rather than pinned to the top of the brand row. */
-  body[data-page="home"] .site-header.site-header-public .header-hub-title {
+  body[data-page]:not([data-page="account"]) .site-header.site-header-public .header-hub-title {
     padding-top: 34px;
   }
 
-  body[data-page="home"] .header-am-logo {
+  body[data-page]:not([data-page="account"]) .header-am-logo {
     height: 120px;
   }
 
-  body[data-page="home"] .header-bipoc-side-logo {
+  body[data-page]:not([data-page="account"]) .header-bipoc-side-logo {
     height: 72px;
   }
 
   /* Drop both logo links so each logo's center sits midway between the utility
-     bar and the top of the carousel, rather than top-aligned with the brand
-     row. Shift the <a> links (not just the <img>) so the clickable area tracks
-     the logo. The two offsets differ because the logos are different heights.
+     bar and the content below, rather than top-aligned with the brand row.
+     Shift the <a> links (not just the <img>) so the clickable area tracks the
+     logo. The two offsets differ because the logos are different heights.
      translateY is visual-only, so the header height and other columns are
      unaffected. */
-  body[data-page="home"] .header-am-logo-link {
+  body[data-page]:not([data-page="account"]) .header-am-logo-link {
     transform: translateY(28px);
   }
 
-  body[data-page="home"] .header-bipoc-logo-link {
+  body[data-page]:not([data-page="account"]) .header-bipoc-logo-link {
     transform: translateY(52px);
   }
 
-  body[data-page="home"] .site-header.site-header-public .site-nav {
+  body[data-page]:not([data-page="account"]) .site-header.site-header-public .site-nav {
     margin-bottom: 4px;
   }
 }
