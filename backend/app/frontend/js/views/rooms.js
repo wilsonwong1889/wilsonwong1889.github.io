@@ -39,10 +39,10 @@ const ROOM_CATEGORY_RATINGS = {
 };
 
 const ROOM_CATEGORY_VISUALS = {
-  recording: "/assets/media/placeholder-carousel-3.jpg",
-  podcast: "/assets/media/placeholder-carousel-2.jpg",
-  production: "/assets/media/placeholder-carousel-3.jpg",
-  photography: "/assets/media/placeholder-carousel-1.jpg",
+  recording: "/assets/media/music-production-horizontal-1.jpg",
+  podcast: "/assets/media/podcast-room-horizontal-9.jpg",
+  production: "/assets/media/music-production-horizontal-2.jpg",
+  photography: "/assets/media/studio-photography-horizontal-1.jpg",
   dance: "/assets/media/studio-conference-room.jpg",
   film: "/assets/media/studio-photo-editing.jpg",
 };

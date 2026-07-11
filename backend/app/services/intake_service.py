@@ -14,11 +14,13 @@ logger = logging.getLogger(__name__)
 
 MEMBERSHIP_INTEREST = "membership_interest"
 ENGINEER_APPLICATION = "engineer_application"
+SERVICE_INQUIRY = "service_inquiry"
 
 VALID_STATUSES = {"new", "reviewed", "archived"}
 INTAKE_TYPE_LABELS = {
     MEMBERSHIP_INTEREST: "Membership interest",
     ENGINEER_APPLICATION: "Studio engineer application",
+    SERVICE_INQUIRY: "Service inquiry",
 }
 
 
@@ -68,6 +70,39 @@ def create_membership_interest(
         intake,
         [
             ("Membership interest", intake.details.get("membership_interest", "")),
+            ("Message", intake.details.get("message", "")),
+        ],
+    )
+    return intake
+
+
+def create_service_inquiry(
+    db: Session,
+    *,
+    name: str,
+    email: str,
+    phone: str,
+    service_interest: str,
+    message: Optional[str] = None,
+) -> Intake:
+    intake = Intake(
+        intake_type=SERVICE_INQUIRY,
+        name=name.strip(),
+        email=email.strip(),
+        phone=phone.strip(),
+        details={
+            "service_interest": service_interest.strip(),
+            "message": (message or "").strip(),
+        },
+        status="new",
+    )
+    db.add(intake)
+    db.commit()
+    db.refresh(intake)
+    _notify_staff(
+        intake,
+        [
+            ("Service interest", intake.details.get("service_interest", "")),
             ("Message", intake.details.get("message", "")),
         ],
     )

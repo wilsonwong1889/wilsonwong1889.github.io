@@ -16,6 +16,7 @@ let selectedStaffId = getSearchParam("staff_id") || "";
 let selectedDate = todayString();
 let selectedTime = "";
 let selectedDuration = 60;
+let selectedService = "";
 let selectedAvailability = null;
 let loadingAvailability = false;
 let lastAvailabilityKey = "";
@@ -759,10 +760,22 @@ function renderServiceOptions(profile) {
   }
 
   const options = getStaffServiceOptions(profile);
-  select.innerHTML = options.map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join("");
-  if (!options.includes(select.value)) {
-    select.value = options[0] || "Creative session";
+  // Preserve the user's current pick across re-renders; fall back to the first
+  // option only when the stored choice is no longer offered for this staffer.
+  const desired = options.includes(selectedService) ? selectedService : options[0] || "Creative session";
+
+  const optionsMarkup = options
+    .map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`)
+    .join("");
+  // Rebuilding innerHTML resets select.value to the first option, so only touch
+  // the DOM when the option set actually changed.
+  if (select.innerHTML !== optionsMarkup) {
+    select.innerHTML = optionsMarkup;
   }
+  if (select.value !== desired) {
+    select.value = desired;
+  }
+  selectedService = desired;
 }
 
 function getSelectedSlot() {
@@ -1232,6 +1245,7 @@ async function selectStaffBooking(staffId, { syncUrl = true, scroll = true } = {
 
   selectedStaffId = nextId;
   selectedTime = "";
+  selectedService = "";
   selectedAvailability = null;
   lastAvailabilityKey = "";
   displayedStaffMonth = firstOfMonth(selectedDate);
@@ -1287,7 +1301,7 @@ async function handleBookingSubmit(event) {
   const notes = getBookingNotesInput()?.value.trim() || "";
   const selection = getStaffSelectionValidity(profile);
   const durationMinutes = selection.durationMinutes;
-  const serviceType = getBookingServiceSelect()?.value || profile.skills?.[0] || "Creative session";
+  const serviceType = selectedService || getBookingServiceSelect()?.value || profile.skills?.[0] || "Creative session";
 
   if (!selection.valid) {
     setStatus("Choose an available time first.", true);
@@ -1540,6 +1554,7 @@ export function initStaffDirectoryView() {
     renderStaffBookingShell({ currentUser: state.currentUser });
   });
   getBookingServiceSelect()?.addEventListener("change", () => {
+    selectedService = getBookingServiceSelect()?.value || "";
     renderStaffBookingShell({ currentUser: state.currentUser });
   });
   getStaffPromoPreviewButton()?.addEventListener("click", async () => {

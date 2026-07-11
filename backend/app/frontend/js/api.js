@@ -227,6 +227,12 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  submitServiceInquiry(payload) {
+    return request("/api/intake/service-inquiry", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
   cancelBooking(bookingId, payload) {
     return request(`/api/bookings/${bookingId}/cancel`, {
       method: "POST",
