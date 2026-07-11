@@ -13120,12 +13120,21 @@ body[data-page="home"] .home-layout > .panel:nth-of-type(even) {
     height: 120px;
   }
 
-  /* Drop the top-right BIPOC Foundation logo so its center sits midway between
-     the utility bar and the top of the carousel, rather than top-aligned with
-     the brand row. translateY keeps it visual-only so the header height and the
-     other columns are unaffected. */
   body[data-page="home"] .header-bipoc-side-logo {
     height: 72px;
+  }
+
+  /* Drop both logo links so each logo's center sits midway between the utility
+     bar and the top of the carousel, rather than top-aligned with the brand
+     row. Shift the <a> links (not just the <img>) so the clickable area tracks
+     the logo. The two offsets differ because the logos are different heights.
+     translateY is visual-only, so the header height and other columns are
+     unaffected. */
+  body[data-page="home"] .header-am-logo-link {
+    transform: translateY(28px);
+  }
+
+  body[data-page="home"] .header-bipoc-logo-link {
     transform: translateY(52px);
   }
 
