@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -253,9 +254,18 @@ def public_features(response: Response):
     }
 
 
+# Render injects RENDER_GIT_COMMIT at build time; surfacing it lets us confirm
+# exactly which commit a running instance was built from (deploy verification).
+BUILD_COMMIT = (os.environ.get("RENDER_GIT_COMMIT") or "")[:12] or "unknown"
+
+
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "BIPOC Creative Innovation Studio"}
+    return {
+        "status": "ok",
+        "service": "BIPOC Creative Innovation Studio",
+        "commit": BUILD_COMMIT,
+    }
 
 
 @app.get("/ready", include_in_schema=False)
