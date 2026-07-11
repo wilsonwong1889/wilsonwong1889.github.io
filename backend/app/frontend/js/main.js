@@ -40,6 +40,7 @@ const PAGE_DATA_REQUIREMENTS = {
   reserve: { rooms: false, bookings: false, admin: false, selectedRoom: true, selectedBooking: false },
   staff: { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: false, publicStaff: true },
   "staff-dashboard": { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: false },
+  "staff-respond": { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: false },
   bookings: { rooms: true, bookings: true, admin: false, selectedRoom: false, selectedBooking: false },
   booking: { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: true },
   "payment-success": { rooms: false, bookings: false, admin: false, selectedRoom: false, selectedBooking: true },
