@@ -13093,17 +13093,35 @@ body[data-page="home"] .home-layout > .panel:nth-of-type(even) {
   color: #00263e;
 }
 
-/* Home header (desktop): tighten the vertical whitespace between the logo row,
-   the nav pills, and the hero photo. Scoped to min-width so the mobile drawer
-   keeps its own padding/margins. */
+/* Home header (desktop): tighten the vertical whitespace between the utility
+   bar, the logo row, the nav pills, and the hero photo. Top-align the brand row
+   so the hub title rides up directly under the utility bar instead of floating
+   in the middle of the tall logos, and trim the logos slightly so the band
+   below the title closes up too. Scoped to min-width so the mobile drawer keeps
+   its own padding/margins. */
 @media (min-width: 769px) {
   body[data-page="home"] .site-header.site-header-public {
     gap: 6px;
   }
 
   body[data-page="home"] .site-header.site-header-public .site-header-brand-row {
+    align-items: start;
     padding-top: 6px;
     padding-bottom: 2px;
+  }
+
+  /* Nudge the centered hub title down just enough to sit level with the tops of
+     the flanking logos. */
+  body[data-page="home"] .site-header.site-header-public .header-hub-title {
+    padding-top: 8px;
+  }
+
+  body[data-page="home"] .header-am-logo {
+    height: 120px;
+  }
+
+  body[data-page="home"] .header-bipoc-side-logo {
+    height: 72px;
   }
 
   body[data-page="home"] .site-header.site-header-public .site-nav {
