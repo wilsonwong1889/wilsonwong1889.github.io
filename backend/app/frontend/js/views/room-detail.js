@@ -1,48 +1,7 @@
 import { elements } from "../dom.js";
-// Real, category-matched galleries so every room shows multiple genuine
-// photos even before an admin uploads room-specific images.
-const ROOM_CATEGORY_GALLERIES = {
-  recording: [
-    "/assets/media/music-production-horizontal-1.jpg",
-    "/assets/media/music-production-horizontal-2.jpg",
-    "/assets/media/music-production-horizontal-3.jpg",
-  ],
-  production: [
-    "/assets/media/music-production-horizontal-2.jpg",
-    "/assets/media/music-production-horizontal-1.jpg",
-    "/assets/media/music-production-horizontal-3.jpg",
-  ],
-  podcast: [
-    "/assets/media/podcast-room-horizontal-9.jpg",
-    "/assets/media/podcast-room-horizontal-3.jpg",
-    "/assets/media/podcast-room-horizontal-4.jpg",
-    "/assets/media/podcast-room-horizontal-10.jpg",
-  ],
-  photography: [
-    "/assets/media/studio-photography-horizontal-1.jpg",
-    "/assets/media/studio-photography-horizontal-5.jpg",
-    "/assets/media/studio-photography-horizontal-8.jpg",
-    "/assets/media/studio-photography-horizontal-9.jpg",
-  ],
-  film: [
-    "/assets/media/studio-photography-horizontal-5.jpg",
-    "/assets/media/studio-photo-editing.jpg",
-    "/assets/media/studio-photography-horizontal-8.jpg",
-  ],
-  dance: [
-    "/assets/media/studio-conference-room.jpg",
-    "/assets/media/studio-building-lobby.jpg",
-  ],
-};
-
-const ROOM_CATEGORY_VISUALS = {
-  recording: ROOM_CATEGORY_GALLERIES.recording[0],
-  podcast: ROOM_CATEGORY_GALLERIES.podcast[0],
-  production: ROOM_CATEGORY_GALLERIES.production[0],
-  photography: ROOM_CATEGORY_GALLERIES.photography[0],
-  dance: ROOM_CATEGORY_GALLERIES.dance[0],
-  film: ROOM_CATEGORY_GALLERIES.film[0],
-};
+// Neutral graphic shown when a room has no uploaded photos (or a photo fails to
+// load). We never fill a room's gallery with unrelated stock images.
+const ROOM_PLACEHOLDER_IMAGE = "/assets/media/room-placeholder.svg";
 
 function formatCurrency(cents) {
   return new Intl.NumberFormat("en-US", {
@@ -118,14 +77,9 @@ function getRoomCategory(room) {
 }
 
 function getRoomGallery(room) {
+  // Only the room's own uploaded photos — no category stock fill-ins.
   const rawPhotos = Array.isArray(room.photos) ? room.photos : [];
-  const usablePhotos = rawPhotos.filter((photo) => photo && !String(photo).includes("/assets/media/rooms/"));
-  if (usablePhotos.length) {
-    return usablePhotos;
-  }
-
-  const category = getRoomCategory(room);
-  return ROOM_CATEGORY_GALLERIES[category] || ROOM_CATEGORY_GALLERIES.recording;
+  return rawPhotos.filter(Boolean);
 }
 
 function buildAmenityList(room) {
@@ -226,7 +180,7 @@ export function renderRoomDetailView(state) {
         .map(
           (photo, index) => `
             <figure class="${index === 0 ? "room-detail-hero-media" : "room-detail-thumb-card"}">
-              <img class="detail-image" src="${escapeHtml(photo)}" alt="${escapeHtml(room.name)} image ${index + 1}" loading="lazy" />
+              <img class="detail-image" src="${escapeHtml(photo)}" alt="${escapeHtml(room.name)} image ${index + 1}" loading="lazy" onerror="this.onerror=null;this.src='${ROOM_PLACEHOLDER_IMAGE}';" />
               ${index === 0 ? "" : `<figcaption>Image ${index + 1}</figcaption>`}
             </figure>
           `,

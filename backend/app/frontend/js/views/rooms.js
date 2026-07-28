@@ -38,14 +38,9 @@ const ROOM_CATEGORY_RATINGS = {
   film: 4.9,
 };
 
-const ROOM_CATEGORY_VISUALS = {
-  recording: "/assets/media/music-production-horizontal-1.jpg",
-  podcast: "/assets/media/podcast-room-horizontal-9.jpg",
-  production: "/assets/media/music-production-horizontal-2.jpg",
-  photography: "/assets/media/studio-photography-horizontal-1.jpg",
-  dance: "/assets/media/studio-conference-room.jpg",
-  film: "/assets/media/studio-photo-editing.jpg",
-};
+// Neutral graphic shown when a room has no uploaded photo (or its photo fails
+// to load). We never substitute a random category stock image for a real room.
+const ROOM_PLACEHOLDER_IMAGE = "/assets/media/room-placeholder.svg";
 
 function roomsSearchTextInput() {
   return document.getElementById("rooms-search-text");
@@ -204,11 +199,9 @@ function getRoomRating(room) {
 function getRoomVisual(room) {
   const category = getRoomCategory(room);
   const photo = getPrimaryPhoto(room);
-  const fallback = ROOM_CATEGORY_VISUALS[category] || "/assets/media/studio-building-lobby.jpg";
-  if (!photo || String(photo).includes("/assets/media/rooms/")) {
-    return { photo: fallback, fallback, category };
-  }
-  return { photo, fallback, category };
+  // Always show the room's own uploaded photo. When there is none we render a
+  // neutral placeholder instead of an unrelated stock image.
+  return { photo: photo || null, fallback: ROOM_PLACEHOLDER_IMAGE, category };
 }
 
 function getRoomSearchText(room) {

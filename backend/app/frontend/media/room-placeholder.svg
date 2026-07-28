@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">Studio photo placeholder</title>
+  <desc id="desc">Neutral placeholder shown for a studio that has no uploaded photo yet.</desc>
+  <defs>
+    <linearGradient id="room-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#26282c" />
+      <stop offset="100%" stop-color="#3a3d42" />
+    </linearGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#room-bg)" />
+  <g transform="translate(320 168)" fill="none" stroke="#8f959d" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="-78" y="-56" width="156" height="112" rx="12" />
+    <circle cx="-34" cy="-18" r="15" fill="#8f959d" stroke="none" />
+    <path d="M-78 34 L-24 -8 L14 24 L40 2 L78 40" />
+  </g>
+  <text x="320" y="286" text-anchor="middle" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-size="26" fill="#9aa0a8" letter-spacing="0.5">No photo added yet</text>
+</svg>
