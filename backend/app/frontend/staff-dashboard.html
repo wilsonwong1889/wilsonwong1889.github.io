@@ -132,11 +132,11 @@
               </div>
               <label class="checkbox-row"><input type="checkbox" name="notify_by_email" /><span>Notify me by email</span></label>
               <label class="checkbox-row"><input type="checkbox" name="notify_by_sms" /><span>Notify me by SMS</span></label>
-              <label><span>Profile photo</span><input id="staff-profile-photo-file" type="file" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp" /></label>
+              <label><span>Profile photo</span><input id="staff-profile-photo-file" type="file" accept="image/*" /></label>
               <input id="staff-profile-photo-url" type="hidden" name="photo_url" />
               <div id="staff-profile-photo-preview" class="staff-photo-preview empty-state">Upload a JPG photo to show on your public profile.</div>
               <p class="field-help">JPG, PNG, WebP, or HEIC. Maximum 20 MB.</p>
-              <label><span>Portfolio photos <span class="intake-optional">(upload your work — shown on your public profile)</span></span><input id="staff-profile-headshots-file" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.heic,.heif,image/jpeg,image/png,image/webp" /></label>
+              <label><span>Portfolio photos <span class="intake-optional">(upload your work — shown on your public profile)</span></span><input id="staff-profile-headshots-file" type="file" multiple accept="image/*" /></label>
               <div id="staff-profile-headshots-list" class="staff-headshots-list"></div>
               <p id="staff-profile-feedback" class="intake-feedback hidden" role="status" aria-live="polite"></p>
               <div class="hero-actions"><button class="primary-button" type="submit" id="staff-profile-submit">Save profile</button></div>

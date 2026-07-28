@@ -1,7 +1,5 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
-from app.core.image_utils import ACCEPTED_PHOTO_EXTENSIONS as ACCEPTED_AVATAR_EXTENSIONS
-from app.core.image_utils import MAX_PHOTO_BYTES as MAX_AVATAR_BYTES
 from app.core.image_utils import to_jpeg_bytes as _to_jpeg_bytes
 from app.core.media_storage import store_media
 from app.database import get_db
@@ -41,17 +39,7 @@ async def upload_profile_avatar(
     photo: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
-    filename = (photo.filename or "").lower()
-    if not any(filename.endswith(ext) for ext in ACCEPTED_AVATAR_EXTENSIONS):
-        raise HTTPException(status_code=400, detail="Upload a JPG, PNG, or WebP photo.")
-
-    file_bytes = await photo.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded avatar is empty.")
-    if len(file_bytes) > MAX_AVATAR_BYTES:
-        raise HTTPException(status_code=400, detail="Avatar image must be 20 MB or smaller.")
-
-    jpeg_bytes = _to_jpeg_bytes(file_bytes)
+    jpeg_bytes = _to_jpeg_bytes(await photo.read())
     avatar_url = store_media(jpeg_bytes, folder="avatars")
     return {"avatar_url": avatar_url}
 

@@ -42,7 +42,7 @@ from app.schemas.user import (
     AdminUserMembershipUpdate,
     AdminUserRoleUpdate,
 )
-from app.core.image_utils import ACCEPTED_PHOTO_EXTENSIONS, MAX_PHOTO_BYTES, to_jpeg_bytes
+from app.core.image_utils import to_jpeg_bytes
 from app.core.media_storage import store_media
 from app.core.security import verify_password
 from app.services.account_service import (
@@ -413,17 +413,7 @@ async def admin_upload_room_photo(
     admin: User = Depends(get_admin_user),
     _: None = Depends(admin_rate_limit),
 ):
-    filename = (photo.filename or "").lower()
-    if not any(filename.endswith(ext) for ext in ACCEPTED_PHOTO_EXTENSIONS):
-        raise HTTPException(status_code=400, detail="Upload a JPG, PNG, or WebP photo.")
-
-    file_bytes = await photo.read()
-    if not file_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded photo is empty.")
-    if len(file_bytes) > MAX_PHOTO_BYTES:
-        raise HTTPException(status_code=400, detail="Photo must be 20 MB or smaller.")
-
-    jpeg_bytes = to_jpeg_bytes(file_bytes)
+    jpeg_bytes = to_jpeg_bytes(await photo.read())
     photo_url = store_media(jpeg_bytes, folder="rooms")
     return {"photo_url": photo_url}
 
