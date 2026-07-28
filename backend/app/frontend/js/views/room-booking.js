@@ -9,14 +9,9 @@ import {
 } from "../date-utils.js";
 import { elements, toggleHidden } from "../dom.js";
 import { persistCheckoutDraft, persistLastBookingId, persistToken, setState, state } from "../state.js";
-const ROOM_CATEGORY_VISUALS = {
-  recording: "/assets/media/placeholder-carousel-3.jpg",
-  podcast: "/assets/media/placeholder-carousel-2.jpg",
-  production: "/assets/media/placeholder-carousel-3.jpg",
-  photography: "/assets/media/placeholder-carousel-1.jpg",
-  dance: "/assets/media/studio-conference-room.jpg",
-  film: "/assets/media/studio-photo-editing.jpg",
-};
+// Neutral graphic shown when a room has no uploaded photo (or its photo fails
+// to load). The reserve page never swaps in a random category stock image.
+const ROOM_PLACEHOLDER_IMAGE = "/assets/media/room-placeholder.svg";
 
 const MIN_DURATION_MINUTES = 60;
 const MAX_DURATION_MINUTES = 300;
@@ -212,26 +207,9 @@ function getRoomCategory(room) {
 }
 
 function getReserveGallery(room) {
+  // Only the room's own uploaded photos — no category stock fill-ins.
   const rawPhotos = Array.isArray(room.photos) ? room.photos : [];
-  const usablePhotos = rawPhotos.filter((photo) => photo && !String(photo).includes("/assets/media/rooms/"));
-  if (usablePhotos.length) {
-    return usablePhotos;
-  }
-
-  const category = getRoomCategory(room);
-  const fallback = ROOM_CATEGORY_VISUALS[category] || "/assets/media/studio-building-lobby.jpg";
-  if (category === "podcast") {
-    return [
-      "/assets/media/placeholder-carousel-2.jpg",
-      "/assets/media/studio-conference-room.jpg",
-      "/assets/media/studio-building-lobby.jpg",
-    ];
-  }
-  return [
-    fallback,
-    "/assets/media/placeholder-carousel-2.jpg",
-    "/assets/media/studio-conference-room.jpg",
-  ];
+  return rawPhotos.filter(Boolean);
 }
 
 function buildDurationValues(limitMinutes = MAX_DURATION_MINUTES) {
@@ -471,10 +449,8 @@ function renderRoomVisuals(room) {
   if (elements.reserveRoomMedia) {
     const gallery = getReserveGallery(room);
     const primary = gallery[0];
-    const fallback = ROOM_CATEGORY_VISUALS[getRoomCategory(room)] || "/assets/media/studio-building-lobby.jpg";
-    elements.reserveRoomMedia.innerHTML = primary
-      ? `<img class="reserve-room-media-image" src="${escapeHtml(primary)}" alt="${escapeHtml(room.name)}" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(fallback)}';" />`
-      : "";
+    const safeImage = escapeHtml(primary || ROOM_PLACEHOLDER_IMAGE);
+    elements.reserveRoomMedia.innerHTML = `<img class="reserve-room-media-image" src="${safeImage}" alt="${escapeHtml(room.name)}" loading="lazy" onerror="this.onerror=null;this.src='${ROOM_PLACEHOLDER_IMAGE}';" />`;
   }
 }
 

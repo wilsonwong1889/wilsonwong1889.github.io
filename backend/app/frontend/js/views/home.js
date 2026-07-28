@@ -1,12 +1,7 @@
 const AUTOPLAY_INTERVAL_MS = 6000;
-const REAL_STUDIO_VISUALS = {
-  Recording: "/assets/media/music-production-horizontal-1.jpg",
-  Podcast: "/assets/media/podcast-room-horizontal-9.jpg",
-  Photography: "/assets/media/studio-photography-horizontal-5.jpg",
-  Film: "/assets/media/studio-photo-editing.jpg",
-  Dance: "/assets/media/studio-conference-room.jpg",
-  Production: "/assets/media/music-production-horizontal-2.jpg",
-};
+// Neutral graphic shown when a featured room has no uploaded photo (or its
+// photo fails to load). We never substitute a random category stock image.
+const ROOM_PLACEHOLDER_IMAGE = "/assets/media/room-placeholder.svg";
 
 function formatCurrency(cents) {
   return new Intl.NumberFormat("en-US", {
@@ -37,14 +32,9 @@ function inferCategory(room) {
 }
 
 function getFeaturePhoto(room) {
-  // Prefer the room's own uploaded photo (same as the /rooms page); fall back
-  // to a category placeholder only when a room has no image yet.
-  const uploaded = Array.isArray(room.photos) && room.photos.length ? room.photos[0] : null;
-  if (uploaded) {
-    return uploaded;
-  }
-  const category = inferCategory(room);
-  return REAL_STUDIO_VISUALS[category] || REAL_STUDIO_VISUALS.Recording;
+  // Show the room's own uploaded photo, or nothing (the card renders a neutral
+  // placeholder). We never fall back to an unrelated category stock image.
+  return Array.isArray(room.photos) && room.photos.length ? room.photos[0] : null;
 }
 
 function renderFeaturedRooms(currentState) {
@@ -69,7 +59,7 @@ function renderFeaturedRooms(currentState) {
             <div class="home-studio-card-media">
               ${
                 photo
-                  ? `<img class="home-studio-card-image" src="${photo}" alt="${room.name}" loading="lazy" onerror="this.onerror=null;this.src='${REAL_STUDIO_VISUALS[category] || REAL_STUDIO_VISUALS.Recording}';" />`
+                  ? `<img class="home-studio-card-image" src="${photo}" alt="${room.name}" loading="lazy" onerror="this.onerror=null;this.src='${ROOM_PLACEHOLDER_IMAGE}';" />`
                   : '<div class="room-card-placeholder">No room image yet.</div>'
               }
               <div class="home-studio-card-badges">
