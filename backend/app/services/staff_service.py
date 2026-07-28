@@ -3,7 +3,9 @@ from __future__ import annotations
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.image_utils import ACCEPTED_PHOTO_EXTENSIONS, MAX_PHOTO_BYTES, to_jpeg_bytes
+from fastapi import HTTPException
+
+from app.core.image_utils import to_jpeg_bytes
 from app.core.media_storage import delete_media, store_media
 from app.models.room import Room
 from app.models.staff_profile import StaffProfile
@@ -17,17 +19,15 @@ class StaffPhotoError(ValueError):
     """Raised when an uploaded staff photo is invalid."""
 
 
-def save_staff_photo(file_bytes: bytes, filename: str | None) -> str:
+def save_staff_photo(file_bytes: bytes, filename: str | None = None) -> str:
     """Validate, normalize to JPEG, and store a staff photo. Returns its URL.
-    Shared by the admin editor and the staff self-service portal."""
-    lowered = (filename or "").lower()
-    if not any(lowered.endswith(ext) for ext in ACCEPTED_PHOTO_EXTENSIONS):
-        raise StaffPhotoError("Upload a JPG, PNG, or WebP photo.")
-    if not file_bytes:
-        raise StaffPhotoError("Uploaded photo is empty.")
-    if len(file_bytes) > MAX_PHOTO_BYTES:
-        raise StaffPhotoError("Photo must be 20 MB or smaller.")
-    jpeg_bytes = to_jpeg_bytes(file_bytes)
+    Shared by the admin editor and the staff self-service portal. Any image
+    Pillow can decode is accepted; validation is delegated to ``to_jpeg_bytes``.
+    ``filename`` is accepted for call-site compatibility but no longer gates."""
+    try:
+        jpeg_bytes = to_jpeg_bytes(file_bytes)
+    except HTTPException as exc:
+        raise StaffPhotoError(str(exc.detail)) from exc
     return store_media(jpeg_bytes, folder="staff")
 
 
