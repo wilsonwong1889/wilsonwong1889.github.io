@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { elements } from "../dom.js";
+import { bindRoomCarousels, getRoomPhotos, renderRoomCarousel } from "../room-carousel.js";
 import { setState, state } from "../state.js";
 
 let editingRoomId = null;
@@ -556,11 +557,7 @@ function renderRoomCard(room, canManageRooms) {
   return `
     <article class="room-card room-catalog-card${isComingSoon ? " is-coming-soon" : ""}">
       <div class="room-catalog-media">
-        ${
-          primaryPhoto
-            ? `<img class="room-card-image" src="${safePrimaryPhoto}" alt="${safeRoomName}" loading="lazy" onerror="this.onerror=null;this.src='${safeFallback}';" />`
-            : '<div class="room-card-placeholder">No room image yet.</div>'
-        }
+        ${renderRoomCarousel(getRoomPhotos(room), { name: room.name, variant: "card" })}
         <div class="room-catalog-media-badges">
           <span class="room-catalog-pill room-catalog-pill-category">${safeCategoryLabel}</span>
           <span class="room-catalog-pill room-catalog-pill-status ${statusPillClass}">${escapeHtml(statusLabel)}</span>
@@ -1071,6 +1068,7 @@ export function initRoomsView(actions) {
   }
 
   initCarousel();
+  bindRoomCarousels();
   initAvailCal();
 
   if (!roomsViewBound) {

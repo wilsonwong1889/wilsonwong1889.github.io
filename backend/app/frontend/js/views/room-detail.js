@@ -1,4 +1,5 @@
 import { elements } from "../dom.js";
+import { bindRoomCarousels, renderRoomCarousel } from "../room-carousel.js";
 // Neutral graphic shown when a room has no uploaded photos (or a photo fails to
 // load). We never fill a room's gallery with unrelated stock images.
 const ROOM_PLACEHOLDER_IMAGE = "/assets/media/room-placeholder.svg";
@@ -127,7 +128,43 @@ function renderRoomStaffList(room) {
     : '<div class="empty-state">This room does not have extra staff add-ons configured yet.</div>';
 }
 
-export function initRoomDetailView() {}
+function renderRoomDetailGallery(room) {
+  const photos = getRoomGallery(room);
+  if (!photos.length) {
+    elements.roomDetailPhotos.innerHTML =
+      '<div class="empty-state">No room images were added for this room yet.</div>';
+    return;
+  }
+
+  // Thumbnails act as jump-to-photo controls for the carousel above them.
+  const thumbs =
+    photos.length > 1
+      ? `
+        <div class="room-detail-thumb-rail" data-room-carousel-thumbs>
+          ${photos
+            .map(
+              (photo, index) => `
+                <button class="room-detail-thumb${index === 0 ? " is-active" : ""}" type="button" data-room-carousel-thumb data-slide-index="${index}" aria-label="Show photo ${index + 1}" aria-current="${index === 0 ? "true" : "false"}">
+                  <img src="${escapeHtml(photo)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${ROOM_PLACEHOLDER_IMAGE}';" />
+                </button>
+              `,
+            )
+            .join("")}
+        </div>
+      `
+      : "";
+
+  elements.roomDetailPhotos.innerHTML = `
+    <div class="room-detail-gallery-group" data-room-carousel-group>
+      ${renderRoomCarousel(photos, { name: room.name, variant: "detail", eagerFirst: true })}
+      ${thumbs}
+    </div>
+  `;
+}
+
+export function initRoomDetailView() {
+  bindRoomCarousels();
+}
 
 export function renderRoomDetailView(state) {
   if (!elements.roomDetailEmpty || !elements.roomDetailCard) {
@@ -174,19 +211,7 @@ export function renderRoomDetailView(state) {
       .join("");
   }
 
-  const photos = getRoomGallery(room);
-  elements.roomDetailPhotos.innerHTML = photos.length
-    ? photos
-        .map(
-          (photo, index) => `
-            <figure class="${index === 0 ? "room-detail-hero-media" : "room-detail-thumb-card"}">
-              <img class="detail-image" src="${escapeHtml(photo)}" alt="${escapeHtml(room.name)} image ${index + 1}" loading="lazy" onerror="this.onerror=null;this.src='${ROOM_PLACEHOLDER_IMAGE}';" />
-              ${index === 0 ? "" : `<figcaption>Image ${index + 1}</figcaption>`}
-            </figure>
-          `,
-        )
-        .join("")
-    : '<div class="empty-state">No room images were added for this room yet.</div>';
+  renderRoomDetailGallery(room);
 
   if (elements.roomDetailBookingLink) {
     if (room.active) {

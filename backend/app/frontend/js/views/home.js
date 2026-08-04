@@ -1,7 +1,6 @@
+import { bindRoomCarousels, getRoomPhotos, renderRoomCarousel } from "../room-carousel.js";
+
 const AUTOPLAY_INTERVAL_MS = 6000;
-// Neutral graphic shown when a featured room has no uploaded photo (or its
-// photo fails to load). We never substitute a random category stock image.
-const ROOM_PLACEHOLDER_IMAGE = "/assets/media/room-placeholder.svg";
 
 function formatCurrency(cents) {
   return new Intl.NumberFormat("en-US", {
@@ -31,12 +30,6 @@ function inferCategory(room) {
   return "Recording";
 }
 
-function getFeaturePhoto(room) {
-  // Show the room's own uploaded photo, or nothing (the card renders a neutral
-  // placeholder). We never fall back to an unrelated category stock image.
-  return Array.isArray(room.photos) && room.photos.length ? room.photos[0] : null;
-}
-
 function renderFeaturedRooms(currentState) {
   const container = document.getElementById("home-featured-grid");
   if (!container) {
@@ -51,22 +44,19 @@ function renderFeaturedRooms(currentState) {
 
   container.innerHTML = rooms
     .map((room) => {
-      const photo = getFeaturePhoto(room);
       const category = inferCategory(room);
       return `
         <article class="home-studio-card">
-          <a class="home-studio-card-link" href="/room?id=${room.id}">
-            <div class="home-studio-card-media">
-              ${
-                photo
-                  ? `<img class="home-studio-card-image" src="${photo}" alt="${room.name}" loading="lazy" onerror="this.onerror=null;this.src='${ROOM_PLACEHOLDER_IMAGE}';" />`
-                  : '<div class="room-card-placeholder">No room image yet.</div>'
-              }
-              <div class="home-studio-card-badges">
-                <span class="home-card-pill home-card-pill-dark">${category}</span>
-                <span class="home-card-pill">${room.active ? "Available" : "Booked"}</span>
-              </div>
+          <!-- The media sits outside the card link: the carousel has its own
+               buttons, which cannot legally nest inside an anchor. -->
+          <div class="home-studio-card-media">
+            ${renderRoomCarousel(getRoomPhotos(room), { name: room.name, variant: "card" })}
+            <div class="home-studio-card-badges">
+              <span class="home-card-pill home-card-pill-dark">${category}</span>
+              <span class="home-card-pill">${room.active ? "Available" : "Booked"}</span>
             </div>
+          </div>
+          <a class="home-studio-card-link" href="/room?id=${room.id}">
             <div class="home-studio-card-copy">
               <div class="home-studio-card-heading">
                 <h3>${room.name}</h3>
@@ -107,6 +97,8 @@ function normalizeIndex(index, total) {
 }
 
 export function initHomeView() {
+  bindRoomCarousels();
+
   const carousel = document.querySelector("[data-home-carousel]");
   if (!carousel || carousel.dataset.initialized === "true") {
     return;
