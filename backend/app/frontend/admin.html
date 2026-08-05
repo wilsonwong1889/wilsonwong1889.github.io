@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Admin | BIPOC Hub</title>
-    <link rel="stylesheet" href="/assets/styles/app.css?v=20260804c" />
+    <link rel="stylesheet" href="/assets/styles/app.css?v=20260805a" />
   </head>
   <body data-page="admin">
     <div class="site-frame admin-site-frame">
@@ -801,16 +801,26 @@
                     <input type="number" name="capacity" min="1" />
                   </label>
                   <label>
-                    <span>Primary room photo</span>
-                    <input id="room-photo-file" type="file" accept="image/*" />
+                    <span>Main room photo</span>
+                    <input id="room-photo-file" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" />
                   </label>
                   <div id="room-photo-preview" class="staff-photo-preview empty-state">
-                    Upload a JPG photo to show this room across booking and room detail pages.
+                    Upload a photo to show this room across booking and room detail pages.
                   </div>
-                  <p class="field-help">JPG, PNG, WebP, or HEIC. Maximum 20 MB.</p>
                   <label>
-                    <span>Additional photo URLs</span>
-                    <textarea name="photos" rows="3" placeholder="https://example.com/photo-one.jpg"></textarea>
+                    <span>More carousel photos</span>
+                    <input id="room-gallery-files" type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif" multiple />
+                  </label>
+                  <div id="room-gallery-preview" class="room-gallery-editor empty-state">
+                    No photos yet. The main photo shows first; anything you add here becomes the rest of this room's carousel.
+                  </div>
+                  <p class="field-help">
+                    Pick several files at once. JPG, PNG, WebP, HEIC, or most image formats — 40 MB each.
+                    Photos upload when you save the room.
+                  </p>
+                  <label>
+                    <span>Photo URLs (optional)</span>
+                    <textarea name="photos" rows="2" placeholder="https://example.com/photo-one.jpg"></textarea>
                   </label>
                   <label>
                     <span>Hourly rate (cents)</span>
@@ -919,6 +929,6 @@
       </section>
     </div>
 
-    <script type="module" src="/assets/js/main.js?v=20260804a"></script>
+    <script type="module" src="/assets/js/main.js?v=20260805a"></script>
   </body>
 </html>

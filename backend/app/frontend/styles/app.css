@@ -5086,6 +5086,95 @@ textarea.booking-contact-value:focus {
 }
 
 /* ---------------------------------------------------------------------------
+   Admin: the room's carousel photo grid, below the main-photo picker.
+   --------------------------------------------------------------------------- */
+
+.room-gallery-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+/* The empty message is a single line of copy, not a grid of tiles. */
+.room-gallery-editor.empty-state {
+  display: block;
+}
+
+.room-gallery-item {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.room-gallery-item img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+  background: rgba(0, 38, 62, 0.06);
+}
+
+.room-gallery-item figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.room-gallery-position {
+  font-weight: 700;
+  color: #41516b;
+}
+
+.room-gallery-flag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(212, 132, 10, 0.16);
+  color: #8a5606;
+  font-weight: 700;
+}
+
+.room-gallery-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.room-gallery-editor .room-gallery-action {
+  min-width: 0;
+  min-height: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #41516b;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.room-gallery-editor .room-gallery-action:hover:not(:disabled) {
+  border-color: rgba(0, 38, 62, 0.28);
+  background: #ffffff;
+}
+
+.room-gallery-editor .room-gallery-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.room-gallery-editor .room-gallery-action.is-danger {
+  color: var(--brand-red);
+}
+
+/* ---------------------------------------------------------------------------
    Per-room photo carousel (studios grid cards + room detail page).
    Each room shows only its own uploaded photos.
    --------------------------------------------------------------------------- */

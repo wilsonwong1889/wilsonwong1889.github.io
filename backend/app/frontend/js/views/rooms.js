@@ -266,6 +266,146 @@ function getRoomPhotoPreview() {
   return elements.roomForm?.querySelector("#room-photo-preview");
 }
 
+function getRoomGalleryFilesInput() {
+  return elements.roomForm?.querySelector("#room-gallery-files");
+}
+
+function getRoomGalleryPreview() {
+  return elements.roomForm?.querySelector("#room-gallery-preview");
+}
+
+// ── Room photo draft ───────────────────────────────────────────────────────
+// The ordered list of photos the admin is building for a room. Index 0 is the
+// main photo; the rest are the carousel. Entries are either already stored
+// (`url`) or picked-but-not-yet-uploaded files (`file` + `previewUrl`), so the
+// grid can show new and saved photos side by side before anything is saved.
+
+let roomPhotoDraft = [];
+let roomPhotoDraftSeq = 0;
+
+function makeStoredPhotoItem(url) {
+  roomPhotoDraftSeq += 1;
+  return { key: `p${roomPhotoDraftSeq}`, url, file: null, previewUrl: null };
+}
+
+function makePendingPhotoItem(file) {
+  roomPhotoDraftSeq += 1;
+  return { key: `p${roomPhotoDraftSeq}`, url: null, file, previewUrl: URL.createObjectURL(file) };
+}
+
+function releasePhotoItem(item) {
+  if (item?.previewUrl) {
+    URL.revokeObjectURL(item.previewUrl);
+    item.previewUrl = null;
+  }
+}
+
+function photoItemSrc(item) {
+  return item.url || item.previewUrl || "";
+}
+
+function clearRoomPhotoDraft() {
+  roomPhotoDraft.forEach(releasePhotoItem);
+  roomPhotoDraft = [];
+}
+
+function setRoomPhotoDraft(photoUrls) {
+  clearRoomPhotoDraft();
+  roomPhotoDraft = (photoUrls || []).filter(Boolean).map(makeStoredPhotoItem);
+}
+
+function renderRoomPhotoDraft() {
+  const roomName = elements.roomForm?.elements?.name?.value || "Room";
+  const [mainPhoto, ...galleryPhotos] = roomPhotoDraft;
+
+  setRoomPhotoPreview(mainPhoto ? photoItemSrc(mainPhoto) : null, roomName);
+
+  const preview = getRoomGalleryPreview();
+  if (!preview) {
+    return;
+  }
+
+  if (!galleryPhotos.length) {
+    preview.classList.add("empty-state");
+    preview.innerHTML = mainPhoto
+      ? "Only the main photo so far. Add more here and visitors can scroll through them on the room card and detail page."
+      : "No photos yet. The main photo shows first; anything you add here becomes the rest of this room's carousel.";
+    return;
+  }
+
+  preview.classList.remove("empty-state");
+  // Positions are 1-based over the whole draft, so the main photo is #1 and the
+  // first carousel photo reads as #2 — matching the "1 / 4" counter on the site.
+  preview.innerHTML = galleryPhotos
+    .map((item, galleryIndex) => {
+      const index = galleryIndex + 1;
+      const isLast = index === roomPhotoDraft.length - 1;
+      return `
+        <figure class="room-gallery-item" data-photo-key="${escapeHtml(item.key)}">
+          <img src="${escapeHtml(photoItemSrc(item))}" alt="${escapeHtml(roomName)} photo ${index + 1}" loading="lazy" />
+          <figcaption>
+            <span class="room-gallery-position">#${index + 1}</span>
+            ${item.file ? '<span class="room-gallery-flag">Not saved yet</span>' : ""}
+          </figcaption>
+          <div class="room-gallery-item-actions">
+            <button type="button" class="room-gallery-action" data-photo-action="move-up" data-photo-key="${escapeHtml(item.key)}" aria-label="Move photo ${index + 1} earlier">↑</button>
+            <button type="button" class="room-gallery-action" data-photo-action="move-down" data-photo-key="${escapeHtml(item.key)}" aria-label="Move photo ${index + 1} later"${isLast ? " disabled" : ""}>↓</button>
+            <button type="button" class="room-gallery-action" data-photo-action="make-main" data-photo-key="${escapeHtml(item.key)}">Make main</button>
+            <button type="button" class="room-gallery-action is-danger" data-photo-action="remove" data-photo-key="${escapeHtml(item.key)}" aria-label="Remove photo ${index + 1}">Remove</button>
+          </div>
+        </figure>
+      `;
+    })
+    .join("");
+}
+
+function applyRoomPhotoAction(action, key) {
+  const index = roomPhotoDraft.findIndex((item) => item.key === key);
+  if (index < 0) {
+    return;
+  }
+
+  if (action === "remove") {
+    releasePhotoItem(roomPhotoDraft[index]);
+    roomPhotoDraft.splice(index, 1);
+  } else if (action === "make-main") {
+    const [item] = roomPhotoDraft.splice(index, 1);
+    roomPhotoDraft.unshift(item);
+  } else if (action === "move-up" && index > 0) {
+    [roomPhotoDraft[index - 1], roomPhotoDraft[index]] = [roomPhotoDraft[index], roomPhotoDraft[index - 1]];
+  } else if (action === "move-down" && index < roomPhotoDraft.length - 1) {
+    [roomPhotoDraft[index + 1], roomPhotoDraft[index]] = [roomPhotoDraft[index], roomPhotoDraft[index + 1]];
+  }
+
+  renderRoomPhotoDraft();
+}
+
+/** Upload every not-yet-stored photo, in order, and return the final URL list. */
+async function uploadRoomPhotoDraft() {
+  const pendingCount = roomPhotoDraft.filter((item) => item.file).length;
+  let uploaded = 0;
+
+  for (const item of roomPhotoDraft) {
+    if (item.url) {
+      continue;
+    }
+    uploaded += 1;
+    setState({
+      message: pendingCount > 1
+        ? `Uploading photo ${uploaded} of ${pendingCount}...`
+        : "Uploading photo...",
+    });
+    const response = await api.adminUploadRoomPhoto(item.file);
+    // Swap the file for its stored URL as we go, so a failure part-way through
+    // doesn't re-upload the photos that already made it.
+    item.url = response.photo_url;
+    item.file = null;
+    releasePhotoItem(item);
+  }
+
+  return roomPhotoDraft.map((item) => item.url).filter(Boolean);
+}
+
 function setRoomPhotoPreview(photoUrl, roomName = "Room") {
   const preview = getRoomPhotoPreview();
   if (!preview) {
@@ -325,7 +465,8 @@ function resetRoomForm() {
   if (roomPhotoUrlInput) {
     roomPhotoUrlInput.value = "";
   }
-  setRoomPhotoPreview(null);
+  clearRoomPhotoDraft();
+  renderRoomPhotoDraft();
 }
 
 function populateRoomForm(room) {
@@ -343,7 +484,10 @@ function populateRoomForm(room) {
   elements.roomForm.elements.capacity.value = room.capacity || "";
   const roomPhotos = Array.isArray(room.photos) ? room.photos : [];
   const primaryPhoto = roomPhotos[0] || "";
-  elements.roomForm.elements.photos.value = roomPhotos.slice(1).join("\n");
+  // The saved photos live in the draft grid now, not the URL textarea — that
+  // box is only for pasting extra URLs on top of what's already there.
+  elements.roomForm.elements.photos.value = "";
+  setRoomPhotoDraft(roomPhotos);
   elements.roomForm.elements.hourly_rate_cents.value = room.hourly_rate_cents || 5000;
   if (elements.roomForm.elements.deposit_cents) {
     elements.roomForm.elements.deposit_cents.value = room.deposit_cents ?? 2000;
@@ -356,7 +500,7 @@ function populateRoomForm(room) {
   if (roomPhotoUrlInput) {
     roomPhotoUrlInput.value = primaryPhoto;
   }
-  setRoomPhotoPreview(primaryPhoto || null, room.name || "Room");
+  renderRoomPhotoDraft();
   if (elements.roomFormTitle) {
     elements.roomFormTitle.textContent = `Edit ${room.name}`;
   }
@@ -1154,19 +1298,36 @@ export function initRoomsView(actions) {
       renderCreateRoomStaffOptions(state);
     });
 
-    getRoomPhotoFileInput()?.addEventListener("change", () => {
-      const file = getRoomPhotoFileInput()?.files?.[0];
+    // Picking a main photo replaces slot 0; the previous main photo keeps its
+    // place in the carousel rather than being thrown away.
+    getRoomPhotoFileInput()?.addEventListener("change", (event) => {
+      const file = event.target.files?.[0];
       if (!file) {
-        setRoomPhotoPreview(
-          getRoomPhotoUrlInput()?.value || null,
-          elements.roomForm?.elements?.name?.value || "Room",
-        );
         return;
       }
-      setRoomPhotoPreview(
-        URL.createObjectURL(file),
-        elements.roomForm?.elements?.name?.value || file.name,
-      );
+      roomPhotoDraft.unshift(makePendingPhotoItem(file));
+      renderRoomPhotoDraft();
+      event.target.value = "";
+    });
+
+    getRoomGalleryFilesInput()?.addEventListener("change", (event) => {
+      const files = Array.from(event.target.files || []);
+      if (!files.length) {
+        return;
+      }
+      files.forEach((file) => roomPhotoDraft.push(makePendingPhotoItem(file)));
+      renderRoomPhotoDraft();
+      // Clear the input so re-picking the same file still fires a change event.
+      event.target.value = "";
+    });
+
+    getRoomGalleryPreview()?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-photo-action]");
+      if (!button) {
+        return;
+      }
+      event.preventDefault();
+      applyRoomPhotoAction(button.dataset.photoAction, button.dataset.photoKey);
     });
 
     elements.adminRoomCreateStaffOptions?.addEventListener("change", (event) => {
@@ -1185,24 +1346,20 @@ export function initRoomsView(actions) {
     elements.roomForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = new FormData(elements.roomForm);
-      let primaryPhotoUrl = String(form.get("primary_photo_url") || "").trim() || null;
-      const roomPhotoFile = getRoomPhotoFileInput()?.files?.[0];
       const additionalPhotos = String(form.get("photos") || "")
         .split("\n")
         .map((value) => value.trim())
         .filter(Boolean);
 
       try {
-        if (roomPhotoFile) {
-          setState({ message: "Uploading photo..." });
-          const upload = await api.adminUploadRoomPhoto(roomPhotoFile);
-          primaryPhotoUrl = upload.photo_url;
-          const roomPhotoUrlInput = getRoomPhotoUrlInput();
-          if (roomPhotoUrlInput) {
-            roomPhotoUrlInput.value = primaryPhotoUrl;
-          }
+        // Order is the draft's order: index 0 is the main photo, the rest are
+        // the carousel, then any URLs typed into the optional box.
+        const uploadedPhotos = await uploadRoomPhotoDraft();
+        const photos = Array.from(new Set([...uploadedPhotos, ...additionalPhotos].filter(Boolean)));
+        const roomPhotoUrlInput = getRoomPhotoUrlInput();
+        if (roomPhotoUrlInput) {
+          roomPhotoUrlInput.value = photos[0] || "";
         }
-        const photos = Array.from(new Set([primaryPhotoUrl, ...additionalPhotos].filter(Boolean)));
 
         const payload = {
           name: form.get("name"),
@@ -1234,6 +1391,9 @@ export function initRoomsView(actions) {
         setState({ roomAvailabilityPreview: {} });
         await actions.refreshRooms(isEditingRoom ? "Room updated." : "Room created.");
       } catch (error) {
+        // Photos that did upload are now stored URLs in the draft — re-render so
+        // the admin can see what landed and retry without re-picking files.
+        renderRoomPhotoDraft();
         setState({ message: error.message });
       }
     });
