@@ -694,8 +694,8 @@ body[data-auth-pending="true"] .site-header .header-actions > * {
 }
 
 .home-carousel-dot {
-  width: 12px;
-  height: 12px;
+  width: 8px;
+  height: 8px;
   padding: 0;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.42);
@@ -12519,6 +12519,10 @@ button.avail-cal-day:focus-visible {
   .ghost-button,
   .nav-link {
     min-height: 44px;
+  }
+
+  .home-carousel-dot {
+    min-height: 0;
   }
 
   /* Admin tabs: horizontal scroll on mobile */
