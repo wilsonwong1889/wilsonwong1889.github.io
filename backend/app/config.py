@@ -17,6 +17,7 @@ SENSITIVE_SETTING_NAMES = (
     "SMTP_PASSWORD",
     "TWILIO_AUTH_TOKEN",
     "SUITEDASH_SECRET_KEY",
+    "METRICS_TOKEN",
 )
 SECRET_TOKEN_PATTERNS = (
     re.compile(r"\bsk_(?:live|test)_[A-Za-z0-9]+\b"),
@@ -83,6 +84,9 @@ class Settings(BaseSettings):
     SUITEDASH_BASE_URL: str = "https://app.suitedash.com"
     SUITEDASH_PUBLIC_ID: str = ""
     SUITEDASH_SECRET_KEY: str = Field(default="", repr=False)
+    # Shared secret for scraping /metrics. Unset means the endpoint is off:
+    # the counters describe booking and traffic volume, so they are never public.
+    METRICS_TOKEN: str = Field(default="", repr=False)
     SUITEDASH_TIMEOUT_SECONDS: int = 20
     SUITEDASH_CONTACT_META_PATH: str = "/contact/meta"
     SUITEDASH_CONTACT_SYNC_PATH: str = "/contact"

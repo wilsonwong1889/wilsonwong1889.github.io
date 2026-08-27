@@ -14,10 +14,43 @@ from datetime import datetime, timedelta, timezone
 from threading import Barrier
 from zoneinfo import ZoneInfo
 
+from unittest.mock import patch
+
 from tests.base import BaseAppTest
 
 
 class OpsTest(BaseAppTest):
+
+    def test_39_metrics_endpoint_is_not_public(self) -> None:
+        """The counters describe traffic and booking volume, so /metrics is off
+        unless a scrape token is configured, and needs that token when it is."""
+        # setUpClass re-imports every app module, so bind settings here — a
+        # module-level import would patch an object the running app discarded.
+        from app.config import settings as app_settings
+
+        # Unconfigured: indistinguishable from a route that does not exist.
+        with patch.object(app_settings, "METRICS_TOKEN", ""):
+            self.assertEqual(self.client.get("/metrics").status_code, 404)
+
+        with patch.object(app_settings, "METRICS_TOKEN", "s3cret-scrape-token"):
+            self.assertEqual(self.client.get("/metrics").status_code, 401)
+
+            resp = self.client.get(
+                "/metrics", headers={"Authorization": "Bearer wrong-token"}
+            )
+            self.assertEqual(resp.status_code, 401)
+
+            # Right token, wrong scheme.
+            resp = self.client.get(
+                "/metrics", headers={"Authorization": "Basic s3cret-scrape-token"}
+            )
+            self.assertEqual(resp.status_code, 401)
+
+            resp = self.client.get(
+                "/metrics", headers={"Authorization": "Bearer s3cret-scrape-token"}
+            )
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn("studio_http_requests_total", resp.text)
 
     def test_40_celery_tasks_reminders_cleanup_concurrency(self) -> None:
         from app.celery_app import celery_app
@@ -172,7 +205,12 @@ class OpsTest(BaseAppTest):
         cleanup_result = cleanup_expired_pending_bookings_task(5)
         self.assertEqual(cleanup_result["cleaned"], 1)
 
-        resp = self.client.get("/metrics")
+        from app.config import settings as app_settings
+
+        with patch.object(app_settings, "METRICS_TOKEN", "metrics-token-for-tests"):
+            resp = self.client.get(
+                "/metrics", headers={"Authorization": "Bearer metrics-token-for-tests"}
+            )
         self.assertEqual(resp.status_code, 200)
         self.assertIn("studio_http_requests_total", resp.text)
         self.assertIn("studio_http_request_duration_seconds_total", resp.text)

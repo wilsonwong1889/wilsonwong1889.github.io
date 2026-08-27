@@ -2633,7 +2633,12 @@ class AppSmokeTest(unittest.TestCase):
         cleanup_result = cleanup_expired_pending_bookings_task(5)
         self.assertEqual(cleanup_result["cleaned"], 1)
 
-        response = self.client.get("/metrics")
+        from app.config import settings as app_settings
+
+        with patch.object(app_settings, "METRICS_TOKEN", "metrics-token-for-tests"):
+            response = self.client.get(
+                "/metrics", headers={"Authorization": "Bearer metrics-token-for-tests"}
+            )
         self.assertEqual(response.status_code, 200, response.text)
         self.assertIn("studio_http_requests_total", response.text)
         self.assertIn("studio_http_request_duration_seconds_total", response.text)

@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { CURRENT_PAGE } from "../config.js";
+import { state } from "../state.js";
 import { parseLocalDate, shiftMonthISO, toLocalISODate, todayISO } from "../date-utils.js";
 
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -564,6 +565,14 @@ function loadApplicantDashboard(profile) {
 }
 
 async function loadDashboard() {
+  // Signed out: show the gate straight away. Calling the portal endpoints
+  // without a token only ever returns 401, which buys nothing and fills the
+  // production log with errors that look like a fault.
+  if (!state.token) {
+    showGate();
+    return;
+  }
+
   // Approved staff use the full portal; everyone else gets the applicant flow.
   try {
     const profile = await api.getMyStaffProfile();

@@ -1,8 +1,9 @@
 import os
+import secrets
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
@@ -245,8 +246,26 @@ def robots_txt():
     )
 
 
-@app.get("/metrics", include_in_schema=False)
-def metrics():
+@app.api_route("/metrics", methods=["GET", "HEAD"], include_in_schema=False)
+def metrics(authorization: str = Header(default="")):
+    """Operational counters, behind a shared secret.
+
+    These describe traffic and booking volume, which is nobody else's business,
+    so the endpoint is off unless METRICS_TOKEN is configured. A scraper sends
+    it as a bearer token."""
+    expected = (settings.METRICS_TOKEN or "").strip()
+    if not expected:
+        # Not enabled — look no different from a route that does not exist.
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    scheme, _, presented = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not secrets.compare_digest(presented.strip(), expected):
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return PlainTextResponse(render_metrics())
 
 
