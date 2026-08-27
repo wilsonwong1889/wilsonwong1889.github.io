@@ -325,18 +325,33 @@ def health():
 
 @app.api_route("/ready", methods=["GET", "HEAD"], include_in_schema=False)
 def ready():
+    # Each dependency is probed independently and never allowed to raise: an
+    # unhandled error here would surface as a 500, and if a platform health
+    # check is pointed at this route a momentary database blip would escalate
+    # into an instance restart — which cannot fix a database, and can loop.
+    # Report degraded honestly instead. Liveness belongs on /health.
     checks = {"database": False, "redis": False}
+    errors: dict[str, str] = {}
 
-    with engine.connect() as connection:
-        connection.execute(text("SELECT 1"))
-    checks["database"] = True
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        checks["database"] = True
+    except Exception as exc:  # noqa: BLE001 - report, never propagate
+        errors["database"] = type(exc).__name__
 
     if redis is not None:
-        redis.Redis.from_url(settings.REDIS_URL, decode_responses=True).ping()
-        checks["redis"] = True
+        try:
+            redis.Redis.from_url(settings.REDIS_URL, decode_responses=True).ping()
+            checks["redis"] = True
+        except Exception as exc:  # noqa: BLE001 - report, never propagate
+            errors["redis"] = type(exc).__name__
 
     paypal_status = get_paypal_configuration_status()
     checks["paypal"] = True if not paypal_status["paypal_requested"] else paypal_status["paypal_fully_ready"]
 
     status = "ready" if all(checks.values()) else "degraded"
-    return {"status": status, "checks": checks}
+    payload = {"status": status, "checks": checks}
+    if errors:
+        payload["errors"] = errors
+    return payload
