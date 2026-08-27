@@ -173,8 +173,16 @@ if FRONTEND_DIR.exists():
 
         return handler
 
+    # HEAD as well as GET: uptime monitors probe with HEAD by default, and
+    # FastAPI's APIRoute — unlike Starlette's plain Route — does not add it
+    # alongside GET on its own. Without it every monitor check reads as 405.
     for route_path, filename in FRONTEND_PAGES.items():
-        app.add_api_route(route_path, build_frontend_handler(filename), methods=["GET"], include_in_schema=False)
+        app.add_api_route(
+            route_path,
+            build_frontend_handler(filename),
+            methods=["GET", "HEAD"],
+            include_in_schema=False,
+        )
 
     # Browsers and crawlers auto-request these at the site root; without routes
     # they 404 on every visit. Serve the brand icons with a long cache.
@@ -195,7 +203,12 @@ if FRONTEND_DIR.exists():
         return handler
 
     for route_path, (rel_path, media_type) in _ICON_ROUTES.items():
-        app.add_api_route(route_path, build_icon_handler(rel_path, media_type), methods=["GET"], include_in_schema=False)
+        app.add_api_route(
+            route_path,
+            build_icon_handler(rel_path, media_type),
+            methods=["GET", "HEAD"],
+            include_in_schema=False,
+        )
 
 WELL_KNOWN_DIR = Path(__file__).resolve().parent / "well_known"
 
@@ -206,6 +219,29 @@ def apple_pay_domain_association():
     return FileResponse(
         WELL_KNOWN_DIR / "apple-developer-merchantid-domain-association",
         media_type="application/octet-stream",
+    )
+
+
+# Crawlers request this on every visit. Keep the booking flow and the
+# signed-in areas out of search results; the marketing pages are fair game.
+ROBOTS_TXT = """User-agent: *
+Disallow: /account
+Disallow: /admin
+Disallow: /booking
+Disallow: /bookings
+Disallow: /payment-success
+Disallow: /reserve
+Disallow: /staff-dashboard
+Disallow: /staff-respond
+Disallow: /api/
+"""
+
+
+@app.api_route("/robots.txt", methods=["GET", "HEAD"], include_in_schema=False)
+def robots_txt():
+    return PlainTextResponse(
+        ROBOTS_TXT,
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 
@@ -259,7 +295,7 @@ def public_features(response: Response):
 BUILD_COMMIT = (os.environ.get("RENDER_GIT_COMMIT") or "")[:12] or "unknown"
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     return {
         "status": "ok",
@@ -268,7 +304,7 @@ def health():
     }
 
 
-@app.get("/ready", include_in_schema=False)
+@app.api_route("/ready", methods=["GET", "HEAD"], include_in_schema=False)
 def ready():
     checks = {"database": False, "redis": False}
 

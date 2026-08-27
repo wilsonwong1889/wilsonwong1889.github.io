@@ -26,6 +26,23 @@ class AuthTest(BaseAppTest):
         self.assertEqual(resp.json()["status"], "ready")
         self.assertTrue(resp.json()["checks"]["database"])
 
+    def test_00b_monitored_routes_answer_head_requests(self) -> None:
+        """Uptime monitors probe with HEAD. FastAPI's APIRoute does not add HEAD
+        alongside GET on its own, and a 405 there reads as an outage."""
+        for path in ("/", "/health", "/ready", "/rooms", "/pricing", "/favicon.ico"):
+            with self.subTest(path=path):
+                resp = self.client.head(path)
+                self.assertEqual(resp.status_code, 200, f"HEAD {path} -> {resp.status_code}")
+                # HEAD carries the status and headers, never a body.
+                self.assertEqual(resp.content, b"")
+
+    def test_00c_robots_txt_is_served_and_hides_private_areas(self) -> None:
+        resp = self.client.get("/robots.txt")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.text.startswith("User-agent: *"))
+        for private in ("/admin", "/account", "/bookings", "/staff-dashboard", "/api/"):
+            self.assertIn(f"Disallow: {private}", resp.text)
+
     def test_01_signup_login_profile_password(self) -> None:
         signup_payload = {
             "email": "user@example.com",
