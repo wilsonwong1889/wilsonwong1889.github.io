@@ -1,3 +1,4 @@
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -197,6 +198,126 @@ class PaymentServiceTest(unittest.TestCase):
                         )
 
         self.assertNotIn("super-secret-paypal-value", str(context.exception))
+
+
+class PaypalCredentialVerificationTest(unittest.TestCase):
+    """verify_paypal_credentials asks PayPal whether the keys actually work, so a
+    live/sandbox mismatch is caught before a customer hits it at checkout."""
+
+    def setUp(self) -> None:
+        payment_service._credential_check_cache.update({"checked_at": 0.0, "result": None})
+
+    @staticmethod
+    def _response(status_code, json_body=None):
+        return SimpleNamespace(
+            status_code=status_code,
+            json=lambda: (json_body if json_body is not None else {}),
+        )
+
+    def test_working_credentials_report_ok(self) -> None:
+        with patch.object(payment_service, "settings", _paypal_settings()):
+            with patch.object(
+                payment_service.httpx, "post",
+                return_value=self._response(200, {"access_token": "A21AA"}),
+            ):
+                result = payment_service.verify_paypal_credentials()
+
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["reachable"])
+        self.assertEqual(result["env"], "sandbox")
+        self.assertIsNone(result["reason"])
+
+    def test_rejected_credentials_name_the_environment(self) -> None:
+        # The live/sandbox mix-up: keys that authenticate nowhere.
+        with patch.object(payment_service, "settings", _paypal_settings(PAYPAL_ENV="live")):
+            with patch.object(
+                payment_service.httpx, "post",
+                return_value=self._response(401, {"error": "invalid_client"}),
+            ):
+                result = payment_service.verify_paypal_credentials()
+
+        self.assertFalse(result["ok"])
+        # Rejection is a real misconfiguration, not an outage.
+        self.assertTrue(result["reachable"])
+        self.assertIn("PAYPAL_ENV=live", result["reason"])
+
+    def test_unreachable_paypal_is_flagged_transient(self) -> None:
+        with patch.object(payment_service, "settings", _paypal_settings()):
+            with patch.object(
+                payment_service.httpx, "post",
+                side_effect=payment_service.httpx.ConnectTimeout("timed out"),
+            ):
+                result = payment_service.verify_paypal_credentials()
+
+        self.assertFalse(result["ok"])
+        self.assertFalse(result["reachable"])
+        self.assertIn("could not reach PayPal", result["reason"])
+
+    def test_placeholder_credentials_never_call_paypal(self) -> None:
+        fake_settings = _paypal_settings(
+            PAYPAL_CLIENT_ID="change_me", PAYPAL_CLIENT_SECRET="change_me"
+        )
+        with patch.object(payment_service, "settings", fake_settings):
+            with patch.object(payment_service.httpx, "post") as post_mock:
+                result = payment_service.verify_paypal_credentials()
+
+        post_mock.assert_not_called()
+        self.assertFalse(result["ok"])
+
+    def test_verdict_is_cached_so_health_polling_does_not_hammer_paypal(self) -> None:
+        with patch.object(payment_service, "settings", _paypal_settings()):
+            with patch.object(
+                payment_service.httpx, "post",
+                return_value=self._response(200, {"access_token": "A21AA"}),
+            ) as post_mock:
+                for _ in range(5):
+                    self.assertTrue(payment_service.verify_paypal_credentials()["ok"])
+                self.assertEqual(post_mock.call_count, 1)
+
+                # force= re-asks, so an operator can confirm a fix immediately.
+                payment_service.verify_paypal_credentials(force=True)
+                self.assertEqual(post_mock.call_count, 2)
+
+    def test_switching_environment_invalidates_the_cached_verdict(self) -> None:
+        ok = self._response(200, {"access_token": "A21AA"})
+        with patch.object(payment_service.httpx, "post", return_value=ok) as post_mock:
+            with patch.object(payment_service, "settings", _paypal_settings()):
+                payment_service.verify_paypal_credentials()
+            # Same process, PAYPAL_ENV flipped: the old verdict must not stand.
+            with patch.object(payment_service, "settings", _paypal_settings(PAYPAL_ENV="live")):
+                result = payment_service.verify_paypal_credentials()
+
+        self.assertEqual(post_mock.call_count, 2)
+        self.assertEqual(result["env"], "live")
+
+    def test_probe_timeout_stays_within_the_healthcheck_budget(self) -> None:
+        # /ready is the production healthcheck and it only allows 5s, so the
+        # probe must not inherit the 20s payment timeout.
+        with patch.object(payment_service, "settings", _paypal_settings()):
+            with patch.object(
+                payment_service.httpx, "post",
+                return_value=self._response(200, {"access_token": "A21AA"}),
+            ) as post_mock:
+                payment_service.verify_paypal_credentials()
+
+        timeout = post_mock.call_args.kwargs["timeout"]
+        self.assertLessEqual(timeout, payment_service.PAYPAL_CREDENTIAL_CHECK_TIMEOUT_SECONDS)
+        self.assertLess(timeout, 5)
+
+    def test_credential_check_leaves_the_payment_token_cache_untouched(self) -> None:
+        # Real payments reuse a cached access token; the health probe must not
+        # evict or overwrite it.
+        payment_service._token_cache.update(
+            {"access_token": "live-token", "expires_at": time.time() + 3600}
+        )
+        with patch.object(payment_service, "settings", _paypal_settings()):
+            with patch.object(
+                payment_service.httpx, "post",
+                return_value=self._response(200, {"access_token": "probe-token"}),
+            ):
+                payment_service.verify_paypal_credentials()
+
+        self.assertEqual(payment_service._token_cache["access_token"], "live-token")
 
 
 if __name__ == "__main__":

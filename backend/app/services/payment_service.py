@@ -109,6 +109,97 @@ def get_paypal_access_token(*, force_refresh: bool = False) -> str:
     return _fetch_paypal_access_token()
 
 
+# How long a credential verdict is reused before PayPal is asked again. A good
+# verdict is cheap to trust for a while; a bad one is re-checked sooner so a
+# corrected misconfiguration clears quickly without polling PayPal every time
+# a health check runs.
+PAYPAL_CREDENTIAL_OK_TTL_SECONDS = 600
+PAYPAL_CREDENTIAL_FAILURE_TTL_SECONDS = 60
+
+# The probe runs inside /ready, which the production healthcheck polls with a
+# 5s budget (docker-compose.prod.yml). Bound it well under that: a slow PayPal
+# must read as "unreachable" — a transient result — rather than hang the health
+# check long enough to have the container restarted.
+PAYPAL_CREDENTIAL_CHECK_TIMEOUT_SECONDS = 3.0
+
+_credential_check_lock = threading.Lock()
+_credential_check_cache: dict = {"checked_at": 0.0, "result": None}
+
+
+def verify_paypal_credentials(*, force: bool = False) -> dict:
+    """Ask PayPal whether the configured credentials actually work against the
+    configured PAYPAL_ENV.
+
+    Configuration checks only prove the env vars are non-empty. They cannot
+    catch the mistake that matters when switching to live: keys from one
+    environment paired with the other environment's host, which authenticates
+    nowhere and breaks every checkout while the app still looks healthy.
+
+    Returns ``{"ok", "env", "reason", "reachable", "checked_at"}``. ``reachable``
+    is False when PayPal itself could not be contacted — a transient fault
+    rather than a misconfiguration, so callers can treat it differently from a
+    flat rejection. Uses its own token request so the shared access-token cache
+    that real payments rely on is left untouched.
+    """
+    env = (getattr(settings, "PAYPAL_ENV", "sandbox") or "sandbox").lower().strip()
+    now = time.time()
+
+    with _credential_check_lock:
+        cached = _credential_check_cache.get("result")
+        age = now - _credential_check_cache.get("checked_at", 0.0)
+        if cached and not force and cached.get("env") == env:
+            ttl = (
+                PAYPAL_CREDENTIAL_OK_TTL_SECONDS
+                if cached["ok"]
+                else PAYPAL_CREDENTIAL_FAILURE_TTL_SECONDS
+            )
+            if age < ttl:
+                return dict(cached)
+
+    result = {"ok": False, "env": env, "reason": None, "reachable": True, "checked_at": now}
+    status = get_paypal_configuration_status(settings)
+    if not (status["paypal_client_id_ready"] and status["paypal_client_secret_ready"]):
+        result["reason"] = "PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET must be set to real values"
+    else:
+        try:
+            response = httpx.post(
+                f"{paypal_api_base_url()}/v1/oauth2/token",
+                auth=(settings.PAYPAL_CLIENT_ID, settings.PAYPAL_CLIENT_SECRET),
+                data={"grant_type": "client_credentials"},
+                timeout=min(
+                    float(getattr(settings, "PAYPAL_TIMEOUT_SECONDS", 20) or 20),
+                    PAYPAL_CREDENTIAL_CHECK_TIMEOUT_SECONDS,
+                ),
+            )
+        except httpx.HTTPError as exc:
+            message = redact_sensitive_text(str(exc) or "unknown PayPal error", settings)
+            result["reachable"] = False
+            result["reason"] = f"could not reach PayPal: {message}"
+        else:
+            if response.status_code in (401, 403):
+                result["reason"] = (
+                    f"PayPal rejected these credentials for PAYPAL_ENV={env}. Check that the "
+                    "client ID and secret come from the same app and that the app belongs to "
+                    "that environment."
+                )
+            elif response.status_code >= 400:
+                result["reason"] = redact_sensitive_text(_extract_paypal_error(response), settings)
+            else:
+                try:
+                    has_token = bool(response.json().get("access_token"))
+                except ValueError:
+                    has_token = False
+                if has_token:
+                    result["ok"] = True
+                else:
+                    result["reason"] = "PayPal returned no access token"
+
+    with _credential_check_lock:
+        _credential_check_cache["result"] = dict(result)
+        _credential_check_cache["checked_at"] = now
+    return dict(result)
+
+
 def _paypal_request(
     method: str,
     path: str,

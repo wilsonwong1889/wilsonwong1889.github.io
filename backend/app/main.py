@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from app.services.payment_service import verify_paypal_credentials
 from app.config import (
     get_payment_backend,
     get_paypal_configuration_status,
@@ -283,5 +284,21 @@ def ready():
     paypal_status = get_paypal_configuration_status()
     checks["paypal"] = True if not paypal_status["paypal_requested"] else paypal_status["paypal_fully_ready"]
 
+    details: dict = {}
+    if paypal_status["paypal_requested"] and paypal_status["paypal_fully_ready"]:
+        # Having the keys set proves nothing about whether they work. Ask PayPal,
+        # so live keys pointed at the sandbox host (or the reverse) surface here
+        # instead of as a failed checkout for a real customer.
+        credentials = verify_paypal_credentials()
+        # A rejection is a genuine misconfiguration. PayPal being unreachable is
+        # transient and must not flap the health check.
+        checks["paypal_credentials"] = credentials["ok"] or not credentials["reachable"]
+        details["paypal_env"] = credentials["env"]
+        if not credentials["ok"]:
+            details["paypal_credentials"] = credentials["reason"]
+
     status = "ready" if all(checks.values()) else "degraded"
-    return {"status": status, "checks": checks}
+    payload = {"status": status, "checks": checks}
+    if details:
+        payload["details"] = details
+    return payload
