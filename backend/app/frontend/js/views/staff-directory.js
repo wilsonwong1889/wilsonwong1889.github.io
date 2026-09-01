@@ -118,16 +118,6 @@ function renderTagGroup(label, values = []) {
   `;
 }
 
-function getStaffRateCents(profile) {
-  return Number(
-    profile?.booking_rate_cents ??
-    profile?.hourly_rate_cents ??
-    profile?.session_rate_cents ??
-    profile?.add_on_price_cents ??
-    0,
-  );
-}
-
 function getStaffRateLabel(profile) {
   // Booking a staff member on their own is request-based: the customer sends a
   // request and the staff member confirms the rate. (Staff added to a room
@@ -577,12 +567,6 @@ function getVisibleStaffProfiles(profiles) {
   });
 
   return filtered.sort((left, right) => {
-    if (staffSortMode === "rate-low") {
-      return getStaffRateCents(left) - getStaffRateCents(right);
-    }
-    if (staffSortMode === "rate-high") {
-      return getStaffRateCents(right) - getStaffRateCents(left);
-    }
     if (staffSortMode === "name") {
       return String(left.name || "").localeCompare(String(right.name || ""));
     }

@@ -151,10 +151,6 @@ def get_staff_profile_or_404(db: Session, staff_profile_id: UUID | str, include_
     return profile
 
 
-def get_staff_booking_rate_cents(profile: StaffProfile) -> int:
-    return max(0, profile.booking_rate_cents or profile.add_on_price_cents or 0)
-
-
 def attach_staff_profile_snapshot(
     db: Session,
     booking: StaffBooking,
