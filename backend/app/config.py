@@ -194,6 +194,9 @@ def get_paypal_configuration_status(settings_obj: Optional[Settings] = None) -> 
     client_id_ready = _is_configured(current.PAYPAL_CLIENT_ID)
     client_secret_ready = _is_configured(current.PAYPAL_CLIENT_SECRET)
     webhook_id_ready = _is_configured(current.PAYPAL_WEBHOOK_ID)
+    # Callers pass partial settings-like objects, so read this the same
+    # defensive way the credential checks do.
+    live_mode = str(getattr(current, "PAYPAL_ENV", "") or "").lower().strip() == "live"
     return {
         "paypal_requested": paypal_requested,
         "paypal_client_id_ready": client_id_ready,
@@ -206,6 +209,15 @@ def get_paypal_configuration_status(settings_obj: Optional[Settings] = None) -> 
         and client_id_ready
         and client_secret_ready
         and webhook_id_ready,
+        "paypal_live_mode": live_mode,
+        # Configured is not the same as live. Sandbox credentials look entirely
+        # ready while taking no real money, which is exactly how a checkout that
+        # collects nothing goes unnoticed for weeks.
+        "paypal_takes_real_payments": paypal_requested
+        and client_id_ready
+        and client_secret_ready
+        and webhook_id_ready
+        and live_mode,
     }
 
 

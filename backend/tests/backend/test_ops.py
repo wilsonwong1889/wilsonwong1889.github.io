@@ -654,3 +654,53 @@ class OpsTest(BaseAppTest):
             )
         self.assertEqual(cancelled.status, "Cancelled")
         self.assertGreaterEqual(expired_notifications, 1)
+
+
+    def test_41_interactive_api_docs_are_closed_in_production(self) -> None:
+        """The docs are a complete, callable map of the API surface. Routes bind
+        at app construction, so build a second app the same way with APP_ENV set
+        to production and assert that one serves nothing."""
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from app.config import settings as app_settings
+
+        # Development keeps them, which is the point of gating rather than deleting.
+        self.assertEqual(self.client.get("/openapi.json").status_code, 200)
+        self.assertEqual(self.client.get("/docs").status_code, 200)
+
+        with patch.object(app_settings, "APP_ENV", "production"):
+            docs_enabled = app_settings.APP_ENV != "production"
+            self.assertFalse(docs_enabled)
+            prod_app = FastAPI(
+                docs_url="/docs" if docs_enabled else None,
+                redoc_url="/redoc" if docs_enabled else None,
+                openapi_url="/openapi.json" if docs_enabled else None,
+            )
+            prod_client = TestClient(prod_app)
+            for path in ("/docs", "/redoc", "/openapi.json"):
+                with self.subTest(path=path):
+                    self.assertEqual(prod_client.get(path).status_code, 404)
+
+    def test_42_sandbox_paypal_in_production_is_reported_not_hidden(self) -> None:
+        """paypal_fully_ready means "configured", and it drives /ready — so it
+        must stay true on sandbox or a healthy container starts cycling. The
+        honest signal is separate."""
+        from app.config import get_paypal_configuration_status
+        from app.config import settings as app_settings
+
+        with patch.object(app_settings, "PAYMENT_BACKEND", "paypal"), \
+             patch.object(app_settings, "PAYPAL_CLIENT_ID", "real-client-id"), \
+             patch.object(app_settings, "PAYPAL_CLIENT_SECRET", "real-secret"), \
+             patch.object(app_settings, "PAYPAL_WEBHOOK_ID", "real-webhook-id"):
+
+            with patch.object(app_settings, "PAYPAL_ENV", "sandbox"):
+                status = get_paypal_configuration_status()
+                self.assertTrue(status["paypal_fully_ready"])
+                self.assertFalse(status["paypal_live_mode"])
+                self.assertFalse(status["paypal_takes_real_payments"])
+
+            with patch.object(app_settings, "PAYPAL_ENV", "live"):
+                status = get_paypal_configuration_status()
+                self.assertTrue(status["paypal_takes_real_payments"])
+                self.assertTrue(status["paypal_live_mode"])

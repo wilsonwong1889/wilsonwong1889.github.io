@@ -69,11 +69,20 @@ async def lifespan(_app: FastAPI):
     yield
 
 
+# The interactive docs are a complete, callable map of the API. Everything
+# behind them is authenticated, so publishing them is not a breach — but it
+# hands anyone probing the site the entire surface for free, and nobody needs
+# Swagger against production.
+_DOCS_ENABLED = settings.APP_ENV != "production"
+
 app = FastAPI(
     title="BIPOC Creative Innovation Studio",
     version="0.1.0",
     description="Room booking platform for studios",
     lifespan=lifespan,
+    docs_url="/docs" if _DOCS_ENABLED else None,
+    redoc_url="/redoc" if _DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if _DOCS_ENABLED else None,
 )
 
 app.add_middleware(
@@ -383,6 +392,7 @@ def public_config(response: Response):
         "paypal_checkout_ready": paypal_status["paypal_checkout_ready"],
         "paypal_webhooks_ready": paypal_status["paypal_webhooks_ready"],
         "paypal_fully_ready": paypal_status["paypal_fully_ready"],
+        "paypal_takes_real_payments": paypal_status["paypal_takes_real_payments"],
         "supabase_url": settings.SUPABASE_URL if supabase_status["supabase_fully_ready"] else None,
         "supabase_publishable_key": (
             settings.SUPABASE_PUBLISHABLE_KEY if supabase_status["supabase_fully_ready"] else None
@@ -453,4 +463,16 @@ def ready():
     payload = {"status": status, "checks": checks}
     if errors:
         payload["errors"] = errors
+
+    # A warning, deliberately not a check: sandbox credentials on a production
+    # site serve traffic perfectly well, so this must not flip the verdict to
+    # degraded and start restarting a healthy container. It does mean the site
+    # takes no real money, which is worth saying out loud where someone
+    # debugging payments would actually look.
+    if settings.APP_ENV == "production" and paypal_status["paypal_requested"]:
+        if not paypal_status["paypal_takes_real_payments"]:
+            payload["warnings"] = [
+                "PayPal is in sandbox mode on a production deployment - "
+                "checkout completes but no real payment is taken"
+            ]
     return payload
