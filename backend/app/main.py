@@ -89,6 +89,40 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=600)
 
 
+# Baseline protective headers on every response.
+#
+# X-Frame-Options is the one that matters most here: without it the checkout
+# page can be framed by another site and overlaid with invisible controls,
+# which is the standard clickjacking setup. SAMEORIGIN blocks every
+# cross-origin frame while leaving our own embeds alone — PayPal framing its
+# own checkout *inside* our page is unaffected, since this governs who may
+# frame us, not whom we may frame.
+#
+# Permissions-Policy deliberately leaves `payment` alone: the PayPal and
+# Google Pay flows use the Payment Request API, and denying it breaks checkout.
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+
+# A year, and only in production. Browsers ignore HSTS delivered over plain
+# HTTP, but local development runs on http://127.0.0.1 and pinning localhost to
+# HTTPS would break every other project on this machine.
+HSTS_HEADER = "max-age=31536000; includeSubDomains"
+
+
+@app.middleware("http")
+async def security_headers_middleware(request, call_next):
+    response = await call_next(request)
+    for header, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(header, value)
+    if settings.APP_ENV == "production":
+        response.headers.setdefault("Strict-Transport-Security", HSTS_HEADER)
+    return response
+
+
 @app.middleware("http")
 async def request_metrics_middleware(request, call_next):
     started_at = time_request()

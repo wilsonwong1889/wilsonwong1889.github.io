@@ -10,6 +10,7 @@ import sys
 import os
 from datetime import datetime, timedelta, timezone
 from xml.etree import ElementTree
+from unittest.mock import patch
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from tests.base import BaseAppTest
@@ -105,6 +106,33 @@ class AuthTest(BaseAppTest):
         self.assertEqual(
             resp.text, "google-site-verification: google80489ce95ca215bd.html"
         )
+
+    def test_00j_responses_carry_baseline_security_headers(self) -> None:
+        """Pages, API responses and static assets alike. X-Frame-Options is the
+        one that matters: without it the checkout page can be framed and
+        overlaid, which is how clickjacking works."""
+        for path in ("/", "/booking", "/api/rooms", "/assets/styles/app.css"):
+            with self.subTest(path=path):
+                headers = self.client.get(path).headers
+                self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
+                self.assertEqual(headers.get("X-Frame-Options"), "SAMEORIGIN")
+                self.assertEqual(
+                    headers.get("Referrer-Policy"), "strict-origin-when-cross-origin"
+                )
+                self.assertIn("camera=()", headers.get("Permissions-Policy", ""))
+                # Denying payment would break the PayPal and Google Pay flows.
+                self.assertNotIn("payment=()", headers.get("Permissions-Policy", ""))
+
+    def test_00k_hsts_is_production_only(self) -> None:
+        """Pinning http://127.0.0.1 to HTTPS would break local development for
+        every other project on the machine."""
+        from app.config import settings as app_settings
+
+        self.assertNotIn("Strict-Transport-Security", self.client.get("/").headers)
+
+        with patch.object(app_settings, "APP_ENV", "production"):
+            headers = self.client.get("/").headers
+            self.assertIn("max-age=31536000", headers.get("Strict-Transport-Security", ""))
 
     def test_01_signup_login_profile_password(self) -> None:
         signup_payload = {
