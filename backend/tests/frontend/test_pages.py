@@ -4,6 +4,7 @@ Frontend tests — HTML page content.
 Each test makes a GET request to a served page and asserts on static HTML
 structure. No database mutations; these verify the HTML templates are correct.
 """
+import re
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -41,6 +42,33 @@ class PageContentTest(BaseAppTest):
         self.assertIn("header-bookings-link", resp.text)
         self.assertNotIn('id="rooms-grid"', resp.text)
         self.assertIn('/assets/styles/app.css?v=', resp.text)
+
+    def test_01b_social_icons_point_at_real_social_accounts(self) -> None:
+        """They shipped pointing at /contact, so clicking Facebook landed the
+        visitor on a contact page rather than Facebook."""
+        expected = {
+            "facebook.com/bipocfoundation",
+            "instagram.com/bipocfoundation",
+            "youtube.com/channel/",
+        }
+        for path in ("/", "/rooms", "/pricing", "/contact"):
+            with self.subTest(path=path):
+                html = self.client.get(path).text
+                links = re.findall(r'home-social-link" href="([^"]+)"', html)
+                self.assertTrue(links, f"no social links on {path}")
+                for href in links:
+                    self.assertTrue(
+                        href.startswith("https://"),
+                        f"{path}: social link is not an external URL: {href}",
+                    )
+                self.assertNotIn("/contact", links)
+                for fragment in expected:
+                    self.assertTrue(
+                        any(fragment in href for href in links),
+                        f"{path}: no link matching {fragment}",
+                    )
+                # New tab on someone else's origin needs noopener.
+                self.assertIn('rel="noopener noreferrer"', html)
 
     def test_02_pricing_page(self) -> None:
         resp = self.client.get("/pricing")
