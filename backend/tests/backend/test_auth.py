@@ -9,6 +9,7 @@ import re
 import sys
 import os
 from datetime import datetime, timedelta, timezone
+from xml.etree import ElementTree
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from tests.base import BaseAppTest
@@ -42,6 +43,59 @@ class AuthTest(BaseAppTest):
         self.assertTrue(resp.text.startswith("User-agent: *"))
         for private in ("/admin", "/account", "/bookings", "/staff-dashboard", "/api/"):
             self.assertIn(f"Disallow: {private}", resp.text)
+
+    def test_00d_sitemap_lists_public_pages_and_omits_private_ones(self) -> None:
+        resp = self.client.get("/sitemap.xml")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("application/xml", resp.headers["content-type"])
+
+        root = ElementTree.fromstring(resp.content)
+        ns = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+        locs = [el.text or "" for el in root.iter(f"{ns}loc")]
+        self.assertTrue(locs, "sitemap contained no URLs")
+
+        paths = {loc.rsplit("/", 1)[-1] or "/" for loc in locs}
+        for public in ("rooms", "pricing", "contact", "faq"):
+            self.assertIn(public, paths)
+        # Anything robots.txt disallows must never be advertised here.
+        for private in ("admin", "account", "bookings", "staff-dashboard", "reserve"):
+            self.assertNotIn(private, paths)
+
+        for loc in locs:
+            self.assertTrue(loc.startswith("http"), f"{loc} is not absolute")
+
+    def test_00e_robots_points_at_the_sitemap(self) -> None:
+        robots = self.client.get("/robots.txt").text
+        sitemap_lines = [ln for ln in robots.splitlines() if ln.startswith("Sitemap:")]
+        self.assertEqual(len(sitemap_lines), 1, robots)
+        url = sitemap_lines[0].split(":", 1)[1].strip()
+        self.assertTrue(url.endswith("/sitemap.xml"), url)
+        # The advertised URL must actually serve a sitemap.
+        self.assertEqual(self.client.get("/sitemap.xml").status_code, 200)
+
+    def test_00f_public_pages_carry_share_and_search_metadata(self) -> None:
+        """A page with no description or og: tags shares as a bare link and
+        gives search engines nothing to show."""
+        for path in ("/", "/rooms", "/pricing", "/contact"):
+            with self.subTest(path=path):
+                html = self.client.get(path).text
+                self.assertIn('<meta name="description"', html)
+                self.assertIn('<link rel="canonical"', html)
+                for prop in ("og:title", "og:description", "og:image", "og:url"):
+                    self.assertIn(f'property="{prop}"', html)
+                self.assertIn('name="twitter:card"', html)
+
+    def test_00g_private_pages_are_marked_noindex(self) -> None:
+        for path in ("/account", "/admin", "/bookings", "/staff-dashboard"):
+            with self.subTest(path=path):
+                html = self.client.get(path).text
+                self.assertIn('<meta name="robots" content="noindex', html)
+
+    def test_00h_share_card_image_is_served(self) -> None:
+        """og:image must resolve, or every link preview falls back to blank."""
+        resp = self.client.get("/assets/media/og-share-card.jpg")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("image", resp.headers["content-type"])
 
     def test_01_signup_login_profile_password(self) -> None:
         signup_payload = {

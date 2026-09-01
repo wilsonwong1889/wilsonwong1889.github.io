@@ -237,11 +237,54 @@ Disallow: /staff-respond
 Disallow: /api/
 """
 
+# The marketing pages worth indexing. /room is deliberately absent: without a
+# room id it is an empty shell, so it carries its own meta tags for link
+# previews but is not a destination we ask search engines to crawl.
+SITEMAP_PATHS = (
+    "/",
+    "/rooms",
+    "/pricing",
+    "/services",
+    "/staff",
+    "/programming",
+    "/info",
+    "/faq",
+    "/contact",
+)
+
+
+def _site_base_url() -> str:
+    return (settings.APP_BASE_URL or "").rstrip("/")
+
 
 @app.api_route("/robots.txt", methods=["GET", "HEAD"], include_in_schema=False)
 def robots_txt():
+    # Point crawlers at the sitemap so they do not have to guess the URL set.
+    body = f"{ROBOTS_TXT}\nSitemap: {_site_base_url()}/sitemap.xml\n"
     return PlainTextResponse(
-        ROBOTS_TXT,
+        body,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.api_route("/sitemap.xml", methods=["GET", "HEAD"], include_in_schema=False)
+def sitemap_xml():
+    """The public page list, for search engines.
+
+    No <lastmod>: the HTML ships inside the image, so its mtime is the build
+    time and would claim every page changed on every deploy. Google ignores a
+    lastmod it cannot trust, so an honest omission beats a misleading date."""
+    base = _site_base_url()
+    urls = "".join(f"  <url><loc>{base}{path}</loc></url>\n" for path in SITEMAP_PATHS)
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{urls}"
+        "</urlset>\n"
+    )
+    return Response(
+        content=body,
+        media_type="application/xml",
         headers={"Cache-Control": "public, max-age=86400"},
     )
 
