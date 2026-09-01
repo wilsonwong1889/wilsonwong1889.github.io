@@ -82,6 +82,26 @@ class PageContentTest(BaseAppTest):
         self.assertNotIn("Grand opening", resp.text)
         self.assertNotIn("60% beta", resp.text)
 
+    def test_02b_pages_name_every_studio_that_is_open(self) -> None:
+        """The homepage claimed two studios while the rooms API returned five,
+        and the pricing page listed two of them. If a sixth studio opens, this
+        should fail until the copy is updated with it."""
+        studios = (
+            "Conference Room",
+            "Large Photography / Videography Studio",
+            "Precision / Brand Studio &amp; Editing Suite",
+            "Sound Engineering / Recording Studio",
+            "Podcast Studio",
+        )
+        pricing = self.client.get("/pricing").text
+        for studio in studios:
+            with self.subTest(studio=studio):
+                self.assertIn(studio, pricing)
+
+        home = self.client.get("/").text
+        self.assertIn("Five studios open for booking now", home)
+        self.assertNotIn("Two studios", home)
+
     def test_03_account_page(self) -> None:
         resp = self.client.get("/account")
         self.assertEqual(resp.status_code, 200)
