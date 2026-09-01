@@ -48,7 +48,10 @@ class PageContentTest(BaseAppTest):
         self.assertIn("Pricing & membership", resp.text)
         self.assertIn("$50/hr", resp.text)
         self.assertIn("$15", resp.text)
-        self.assertIn("Open Studio Night: May 9, 2026", resp.text)
+        self.assertIn("Now Open", resp.text)
+        # The launch dates are past; they must not creep back in.
+        self.assertNotIn("Open Studio Night", resp.text)
+        self.assertNotIn("Grand opening", resp.text)
         self.assertNotIn("60% beta", resp.text)
 
     def test_03_account_page(self) -> None:

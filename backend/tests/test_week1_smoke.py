@@ -301,7 +301,10 @@ class AppSmokeTest(unittest.TestCase):
         self.assertIn("Pricing & membership", pricing_page.text)
         self.assertIn("$50/hr", pricing_page.text)
         self.assertIn("$15", pricing_page.text)
-        self.assertIn("Open Studio Night: May 9, 2026", pricing_page.text)
+        self.assertIn("Now Open", pricing_page.text)
+        # The launch dates are past; they must not creep back in.
+        self.assertNotIn("Open Studio Night", pricing_page.text)
+        self.assertNotIn("Grand opening", pricing_page.text)
         self.assertNotIn("60% beta", pricing_page.text)
 
         account_page = self.client.get("/account")
