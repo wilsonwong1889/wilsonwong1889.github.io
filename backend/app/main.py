@@ -267,6 +267,28 @@ def robots_txt():
     )
 
 
+# Google Search Console proves domain ownership by fetching this exact file
+# from the site root. The token is not a secret — it only asserts that whoever
+# controls this domain also controls that Search Console property — so it lives
+# in the source rather than the environment. Served inline for the same reason
+# robots.txt is: one line of content is not worth a file to misplace.
+GOOGLE_SITE_VERIFICATION_FILENAME = "google80489ce95ca215bd.html"
+GOOGLE_SITE_VERIFICATION_BODY = "google-site-verification: google80489ce95ca215bd.html"
+
+
+@app.api_route(
+    f"/{GOOGLE_SITE_VERIFICATION_FILENAME}",
+    methods=["GET", "HEAD"],
+    include_in_schema=False,
+)
+def google_site_verification():
+    return Response(
+        content=GOOGLE_SITE_VERIFICATION_BODY,
+        media_type="text/html",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.api_route("/sitemap.xml", methods=["GET", "HEAD"], include_in_schema=False)
 def sitemap_xml():
     """The public page list, for search engines.

@@ -97,6 +97,15 @@ class AuthTest(BaseAppTest):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("image", resp.headers["content-type"])
 
+    def test_00i_google_site_verification_file_is_served_verbatim(self) -> None:
+        """Search Console fetches this exact path and matches the body exactly;
+        a redirect, a 404, or altered bytes all read as "not verified"."""
+        resp = self.client.get("/google80489ce95ca215bd.html")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(
+            resp.text, "google-site-verification: google80489ce95ca215bd.html"
+        )
+
     def test_01_signup_login_profile_password(self) -> None:
         signup_payload = {
             "email": "user@example.com",
