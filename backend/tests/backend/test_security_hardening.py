@@ -307,5 +307,50 @@ class VendoredSupabaseTest(BaseAppTest):
         self.assertNotIn("import('https://esm.sh", module)
 
 
+class ContentSecurityPolicyTest(BaseAppTest):
+    def test_policy_is_report_only_until_checkout_has_been_exercised(self) -> None:
+        """A policy that blocks the PayPal SDK breaks the one flow that earns
+        money. Report-only surfaces the same violations without that risk."""
+        headers = self.client.get("/").headers
+        self.assertIn("Content-Security-Policy-Report-Only", headers)
+        self.assertNotIn("Content-Security-Policy", [k for k in headers if k.lower() == "content-security-policy"])
+
+    def test_policy_allows_what_the_site_actually_loads(self) -> None:
+        from app.main import build_csp
+
+        policy = build_csp()
+        # PayPal's SDK, its artwork, its API and its frames.
+        self.assertIn("https://www.paypal.com", policy)
+        self.assertIn("https://www.paypalobjects.com", policy)
+        self.assertIn("https://www.sandbox.paypal.com", policy)
+        # The embedded map on the homepage.
+        self.assertIn("https://www.google.com", policy)
+        # Banner artwork hosted on the foundation's own site.
+        self.assertIn("https://www.bipocfoundation.org", policy)
+
+    def test_scripts_get_no_inline_exemption(self) -> None:
+        """Styles are allowed inline because nine style attributes remain in the
+        markup and a style attack is far smaller. Scripts are not."""
+        from app.main import build_csp
+
+        policy = build_csp()
+        script_directive = [d for d in policy.split("; ") if d.startswith("script-src")][0]
+        self.assertNotIn("unsafe-inline", script_directive)
+        self.assertNotIn("unsafe-eval", script_directive)
+        self.assertIn("object-src 'none'", policy)
+        self.assertIn("base-uri 'self'", policy)
+
+    def test_supabase_origin_comes_from_settings(self) -> None:
+        """Hard-coding it would silently break auth in any other environment."""
+        from unittest.mock import patch
+
+        from app.config import settings as app_settings
+        from app.main import build_csp
+
+        with patch.object(app_settings, "SUPABASE_URL", "https://example-project.supabase.co"):
+            policy = build_csp()
+        self.assertIn("https://example-project.supabase.co", policy)
+
+
 if __name__ == "__main__":
     unittest.main()

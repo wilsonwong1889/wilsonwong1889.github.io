@@ -115,6 +115,11 @@ class Settings(BaseSettings):
     # Off switch. Tests disable it because counters now live in Redis and
     # therefore persist across the whole suite; it is also the lever to pull
     # if the limiter ever misfires in production.
+    # Send the Content Security Policy as enforcing rather than reporting.
+    # Left off until a real PayPal checkout has been exercised under it: a
+    # policy that blocks the payment SDK breaks the one flow that earns money,
+    # and report-only surfaces the same violations without that risk.
+    CSP_ENFORCE: bool = False
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_WINDOW_SECONDS: int = 60
     AUTH_RATE_LIMIT_MAX_REQUESTS: int = 20

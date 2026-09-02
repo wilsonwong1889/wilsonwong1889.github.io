@@ -122,6 +122,60 @@ SECURITY_HEADERS = {
 HSTS_HEADER = "max-age=31536000; includeSubDomains"
 
 
+def build_csp() -> str:
+    """The Content Security Policy, built from what the site actually loads.
+
+    Measured rather than guessed: every page serves its own scripts, styles and
+    fonts from this origin — the Supabase client is vendored, so there is no
+    third-party script host to allow beyond PayPal's checkout SDK.
+
+    'unsafe-inline' appears for styles only. Nine inline style attributes remain
+    in the markup, and a style-based attack is a far smaller problem than a
+    script one; scripts get no such exemption. The JSON-LD block needs no
+    exception at all, since browsers do not execute application/ld+json.
+    """
+    supabase = (settings.SUPABASE_URL or "").rstrip("/")
+
+    # PayPal's SDK loads from www.paypal.com, draws from paypalobjects, calls
+    # back to both the live and sandbox APIs, and renders its own frames.
+    paypal_script = ["https://www.paypal.com", "https://www.paypalobjects.com"]
+    paypal_api = ["https://www.paypal.com", "https://www.sandbox.paypal.com"]
+
+    connect = ["'self'", *paypal_api]
+    images = [
+        "'self'",
+        "data:",
+        "blob:",
+        "https://www.paypalobjects.com",
+        # Banner artwork on the About and Community pages is hosted on the
+        # foundation's own WordPress site.
+        "https://www.bipocfoundation.org",
+        "https://bipocfoundation.org",
+    ]
+    if supabase:
+        # Auth calls, and photos uploaded to Supabase storage.
+        connect.append(supabase)
+        images.append(supabase)
+
+    return "; ".join(
+        [
+            "default-src 'self'",
+            f"script-src 'self' {' '.join(paypal_script)}",
+            "style-src 'self' 'unsafe-inline'",
+            f"img-src {' '.join(images)}",
+            "font-src 'self'",
+            f"connect-src {' '.join(connect)}",
+            # The embedded map on the homepage, plus PayPal and Google Pay.
+            "frame-src https://www.google.com "
+            "https://www.paypal.com https://www.sandbox.paypal.com https://pay.google.com",
+            "frame-ancestors 'self'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "object-src 'none'",
+        ]
+    )
+
+
 @app.middleware("http")
 async def security_headers_middleware(request, call_next):
     response = await call_next(request)
@@ -129,6 +183,15 @@ async def security_headers_middleware(request, call_next):
         response.headers.setdefault(header, value)
     if settings.APP_ENV == "production":
         response.headers.setdefault("Strict-Transport-Security", HSTS_HEADER)
+
+    # Report-only until CSP_ENFORCE is set, so a policy mistake surfaces in the
+    # console instead of breaking checkout.
+    csp_header = (
+        "Content-Security-Policy"
+        if settings.CSP_ENFORCE
+        else "Content-Security-Policy-Report-Only"
+    )
+    response.headers.setdefault(csp_header, build_csp())
     return response
 
 
