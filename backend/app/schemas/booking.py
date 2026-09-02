@@ -32,7 +32,6 @@ class BookingCreate(BaseModel):
     note: Optional[str] = Field(default=None, max_length=2000)
     staff_assignments: List[str] = Field(default_factory=list)
     with_engineer: bool = False
-    user_category: str = "general_public"
 
     @field_validator("start_time")
     @classmethod
