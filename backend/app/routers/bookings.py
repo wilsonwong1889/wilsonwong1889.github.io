@@ -87,10 +87,11 @@ def room_availability(
 @router.get("/availability/monthly")
 def monthly_availability(
     month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
+    room_id: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
     _: None = Depends(booking_rate_limit),
 ):
-    return get_monthly_availability_summary(db, month)
+    return get_monthly_availability_summary(db, month, room_id=room_id)
 
 
 @router.post("/bookings/reservations", response_model=ReservationOut, status_code=201)

@@ -643,19 +643,18 @@ async function loadMonthAvailability(roomId, monthValue) {
   loadingMonth = true;
   renderRoomBookingView(state);
   try {
-    const totalDays = daysInMonth(monthValue);
-    const entries = await Promise.all(
-      Array.from({ length: totalDays }, async (_value, index) => {
-        const date = parseLocalDate(monthValue);
-        date.setDate(index + 1);
-        const isoDate = toLocalISODate(date);
-        if (isDateBeforeToday(isoDate)) {
-          return [isoDate, 0];
-        }
-        const availability = await api.getAvailability(roomId, isoDate);
-        return [isoDate, availability.available_start_times.length];
-      }),
-    );
+    // One request for the month, not one per day. The per-day version fired
+    // thirty requests for a thirty-day month, which is exactly the booking rate
+    // limit — the last one came back 429, Promise.all rejected, and the catch
+    // below wiped every count that had already succeeded. Every day then
+    // rendered "0 slots" while the API was returning real availability.
+    // monthValue is a full ISO date (the month's first day); the endpoint
+    // takes YYYY-MM.
+    const summary = await api.getMonthlyAvailability(monthValue.slice(0, 7), roomId);
+    const entries = Object.entries(summary.days || {}).map(([isoDate, day]) => [
+      isoDate,
+      isDateBeforeToday(isoDate) ? 0 : day.open_slots ?? 0,
+    ]);
     if (requestToken !== monthAvailabilityRequestToken || String(lastRoomId) !== String(roomId) || displayedMonth !== monthValue) {
       return;
     }

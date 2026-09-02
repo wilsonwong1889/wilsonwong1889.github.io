@@ -839,8 +839,16 @@ def get_day_bounds(target_date: date) -> tuple[datetime, datetime]:
     return local_start.astimezone(timezone.utc), local_end.astimezone(timezone.utc)
 
 
-def get_monthly_availability_summary(db: Session, month: str) -> dict:
+def get_monthly_availability_summary(
+    db: Session, month: str, room_id: Optional[str] = None
+) -> dict:
     """Return per-day availability status for every day in *month* (YYYY-MM).
+
+    With *room_id*, the summary is for that room alone and each day also
+    carries ``open_slots`` — the number of start times still bookable. The
+    booking calendar needs that per-day count, and asking for it one day at a
+    time meant thirty requests for a thirty-day month, which ran straight into
+    the booking rate limit.
 
     Status values:
       available — at least one room has open slots
@@ -857,16 +865,15 @@ def get_monthly_availability_summary(db: Session, month: str) -> dict:
     now = datetime.now(timezone.utc)
     business_tz = get_business_timezone()
 
-    active_room_ids = [
-        r[0]
-        for r in (
-            db.query(Room.id)
-            .filter(Room.active.is_(True))
-            .filter(Room.coming_soon.is_(False))
-            .filter(Room.status == BOOKABLE_ROOM_STATUS)
-            .all()
-        )
-    ]
+    room_query = (
+        db.query(Room.id)
+        .filter(Room.active.is_(True))
+        .filter(Room.coming_soon.is_(False))
+        .filter(Room.status == BOOKABLE_ROOM_STATUS)
+    )
+    if room_id is not None:
+        room_query = room_query.filter(Room.id == room_id)
+    active_room_ids = [r[0] for r in room_query.all()]
     total_rooms = len(active_room_ids)
 
     # Slots per room per day: one per bookable hour (only on-the-hour starts count)
@@ -887,10 +894,13 @@ def get_monthly_availability_summary(db: Session, month: str) -> dict:
     # Group by (room_id, local_date) counting only on-the-hour slots
     from collections import defaultdict
     booked_hours: dict[tuple, int] = defaultdict(int)
-    for room_id, slot_start in booked_rows:
+    # Deliberately not `room_id`: that is the function's own parameter, and
+    # rebinding it here would leave it holding the last booked slot's room for
+    # the rest of the function.
+    for slot_room_id, slot_start in booked_rows:
         local_dt = slot_start.astimezone(business_tz)
         if local_dt.minute == 0:
-            booked_hours[(str(room_id), local_dt.date().isoformat())] += 1
+            booked_hours[(str(slot_room_id), local_dt.date().isoformat())] += 1
 
     days: dict[str, dict] = {}
     for day_num in range(1, days_in_month + 1):
@@ -917,7 +927,19 @@ def get_monthly_availability_summary(db: Session, month: str) -> dict:
         else:
             status = "available"
 
-        days[day_key] = {"status": status, "open_rooms": open_rooms, "total_rooms": total_rooms}
+        entry = {"status": status, "open_rooms": open_rooms, "total_rooms": total_rooms}
+
+        if room_id is not None and active_room_ids:
+            booked = booked_hours.get((str(active_room_ids[0]), day_key), 0)
+            first_hour = open_hour
+            # Today's earlier hours have gone. Without this the calendar would
+            # promise a full day of openings on an afternoon that is half over.
+            local_now = now.astimezone(business_tz)
+            if target_date == local_now.date():
+                first_hour = max(open_hour, local_now.hour + 1)
+            entry["open_slots"] = max(0, (close_hour - first_hour) - booked)
+
+        days[day_key] = entry
 
     return {"month": month, "total_rooms": total_rooms, "days": days}
 

@@ -17,6 +17,23 @@ from tests.base import BaseAppTest
 
 class BookingTest(BaseAppTest):
 
+    def _create_bookable_room(self, name: str) -> str:
+        from app.models.room import Room
+
+        with self.SessionLocal() as db:
+            room = Room(
+                name=name,
+                description="Room used for calendar tests",
+                capacity=3,
+                photos=[],
+                hourly_rate_cents=10000,
+                max_booking_duration_minutes=120,
+            )
+            db.add(room)
+            db.commit()
+            db.refresh(room)
+            return str(room.id)
+
     def test_20_booking_flow(self) -> None:
         from app.models.room import Room
 
@@ -302,3 +319,56 @@ class BookingTest(BaseAppTest):
         self.assertEqual(booking.user_email_snapshot, "checkout-guest@example.com")
         self.assertEqual(booking.user_phone_snapshot, "4035550199")
         self.assertEqual(booking.note, "Use the east entrance.")
+
+    def test_50_monthly_availability_supports_a_single_room(self) -> None:
+        """The booking calendar needs a per-day slot count. Asking one day at a
+        time meant thirty requests for a thirty-day month — exactly the booking
+        rate limit — so the last one 429'd, the whole batch was discarded, and
+        every day rendered "0 slots" while the API had real availability."""
+        room_id = self._create_bookable_room("Monthly Calendar Room")
+
+        resp = self.client.get(f"/api/availability/monthly?month=2026-09&room_id={room_id}")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        body = resp.json()
+        self.assertEqual(body["total_rooms"], 1)
+
+        open_days = [d for d in body["days"].values() if d["status"] not in ("closed", "past")]
+        self.assertTrue(open_days, "expected at least one open day")
+        for day in open_days:
+            self.assertIn("open_slots", day)
+            self.assertGreaterEqual(day["open_slots"], 0)
+
+    def test_51_site_wide_monthly_carries_no_per_room_slot_count(self) -> None:
+        """Regression guard. The grouping loop used `room_id` as its loop
+        variable, shadowing the parameter, so after it ran the parameter held
+        the last booked slot's room and every site-wide response leaked a
+        per-room count."""
+        resp = self.client.get("/api/availability/monthly?month=2026-09")
+        self.assertEqual(resp.status_code, 200, resp.text)
+        for day_key, day in resp.json()["days"].items():
+            self.assertNotIn("open_slots", day, f"{day_key} leaked a per-room count")
+
+    def test_52_month_summary_matches_the_single_day_endpoint(self) -> None:
+        """The two must agree, including today — where the hours already gone
+        are not bookable and must not be counted."""
+        room_id = self._create_bookable_room("Month vs Day Room")
+        month = self.client.get(
+            f"/api/availability/monthly?month=2026-09&room_id={room_id}"
+        ).json()["days"]
+
+        checked = 0
+        for day_key, day in month.items():
+            if day["status"] in ("closed", "past"):
+                continue
+            single = self.client.get(f"/api/rooms/{room_id}/availability?date={day_key}")
+            if single.status_code != 200:
+                continue
+            self.assertEqual(
+                day["open_slots"],
+                len(single.json()["available_start_times"]),
+                f"month and day disagree on {day_key}",
+            )
+            checked += 1
+            if checked >= 4:
+                break
+        self.assertGreater(checked, 0, "no days were comparable")

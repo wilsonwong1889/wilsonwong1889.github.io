@@ -134,8 +134,11 @@ export const api = {
     const holdParam = holdToken ? `&hold_token=${encodeURIComponent(holdToken)}` : "";
     return request(`/api/rooms/${roomId}/availability?date=${date}${holdParam}`);
   },
-  getMonthlyAvailability(month) {
-    return request(`/api/availability/monthly?month=${encodeURIComponent(month)}`);
+  getMonthlyAvailability(month, roomId = null) {
+    const query = roomId
+      ? `month=${encodeURIComponent(month)}&room_id=${encodeURIComponent(roomId)}`
+      : `month=${encodeURIComponent(month)}`;
+    return request(`/api/availability/monthly?${query}`);
   },
   getBookings() {
     return request("/api/bookings");
