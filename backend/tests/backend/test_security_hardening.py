@@ -282,5 +282,30 @@ class UploadLimitIsStatedToTheUserTest(BaseAppTest):
         self.assertIn("MB or smaller", ctx.exception.detail)
 
 
+class VendoredSupabaseTest(BaseAppTest):
+    def test_supabase_client_is_served_from_our_own_origin(self) -> None:
+        """Google sign-in used to fetch the client from esm.sh at the moment
+        someone clicked the button, so a CDN outage broke sign-in."""
+        resp = self.client.get("/assets/js/vendor/supabase-js-2.114.0.js")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("javascript", resp.headers["content-type"])
+        self.assertIn("createClient", resp.text)
+
+    def test_the_bundle_is_self_contained(self) -> None:
+        """esm.sh's own bundle imports /node/process.mjs and /node/buffer.mjs
+        from their origin, which would have left the dependency in place. This
+        one is built from npm and must reach for nothing."""
+        body = self.client.get("/assets/js/vendor/supabase-js-2.114.0.js").text
+        self.assertNotIn('"/node/', body)
+        self.assertNotIn("esm.sh", body.split("*/", 1)[-1])
+
+    def test_nothing_still_imports_from_the_cdn(self) -> None:
+        module = self.client.get("/assets/js/supabase.js").text
+        self.assertIn("/assets/js/vendor/supabase-js", module)
+        # The word may appear in a comment explaining why; an import must not.
+        self.assertNotIn('import("https://esm.sh', module)
+        self.assertNotIn("import('https://esm.sh", module)
+
+
 if __name__ == "__main__":
     unittest.main()

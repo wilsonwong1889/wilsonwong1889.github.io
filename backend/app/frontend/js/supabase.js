@@ -22,7 +22,9 @@ export async function getSupabaseClient() {
       if (!config?.supabase_url || !config?.supabase_publishable_key) {
         return null;
       }
-      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      // Vendored rather than fetched from esm.sh: sign-in should not depend
+      // on a third-party CDN being up at the moment someone clicks the button.
+      const { createClient } = await import("/assets/js/vendor/supabase-js-2.114.0.js");
       return createClient(config.supabase_url, config.supabase_publishable_key, {
         auth: {
           storage: window.localStorage,
