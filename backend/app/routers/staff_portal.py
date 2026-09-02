@@ -4,6 +4,7 @@ from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from app.core.image_utils import read_upload_within_limit
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_staff_user
@@ -75,7 +76,7 @@ async def upload_my_staff_photo(
     _: StaffProfile = Depends(require_my_profile),
 ):
     try:
-        photo_url = save_staff_photo(await photo.read(), photo.filename)
+        photo_url = save_staff_photo(await read_upload_within_limit(photo), photo.filename)
     except StaffPhotoError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"photo_url": photo_url}

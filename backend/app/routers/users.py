@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
-from app.core.image_utils import to_jpeg_bytes as _to_jpeg_bytes
+from app.core.image_utils import read_upload_within_limit, to_jpeg_bytes as _to_jpeg_bytes
 from app.core.media_storage import store_media
 from app.database import get_db
 from app.models.user import User
@@ -39,7 +39,7 @@ async def upload_profile_avatar(
     photo: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
-    jpeg_bytes = _to_jpeg_bytes(await photo.read())
+    jpeg_bytes = _to_jpeg_bytes(await read_upload_within_limit(photo))
     avatar_url = store_media(jpeg_bytes, folder="avatars")
     return {"avatar_url": avatar_url}
 

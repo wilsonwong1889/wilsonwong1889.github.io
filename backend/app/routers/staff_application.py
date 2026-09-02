@@ -1,6 +1,7 @@
 """Self-service studio-engineer application: any logged-in user can create and
 submit their own staff profile for admin review (no Staff role required yet)."""
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from app.core.image_utils import read_upload_within_limit
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -52,7 +53,7 @@ async def upload_my_application_photo(
     _: User = Depends(get_current_user),
 ):
     try:
-        photo_url = save_staff_photo(await photo.read(), photo.filename)
+        photo_url = save_staff_photo(await read_upload_within_limit(photo), photo.filename)
     except StaffPhotoError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"photo_url": photo_url}

@@ -42,7 +42,7 @@ from app.schemas.user import (
     AdminUserMembershipUpdate,
     AdminUserRoleUpdate,
 )
-from app.core.image_utils import to_jpeg_bytes
+from app.core.image_utils import read_upload_within_limit, to_jpeg_bytes
 from app.core.media_storage import store_media
 from app.core.security import verify_password
 from app.services.account_service import (
@@ -401,7 +401,7 @@ async def admin_upload_staff_photo(
     _: None = Depends(admin_rate_limit),
 ):
     try:
-        photo_url = save_staff_photo(await photo.read(), photo.filename)
+        photo_url = save_staff_photo(await read_upload_within_limit(photo), photo.filename)
     except StaffPhotoError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"photo_url": photo_url}
@@ -413,7 +413,7 @@ async def admin_upload_room_photo(
     admin: User = Depends(get_admin_user),
     _: None = Depends(admin_rate_limit),
 ):
-    jpeg_bytes = to_jpeg_bytes(await photo.read())
+    jpeg_bytes = to_jpeg_bytes(await read_upload_within_limit(photo))
     photo_url = store_media(jpeg_bytes, folder="rooms")
     return {"photo_url": photo_url}
 
