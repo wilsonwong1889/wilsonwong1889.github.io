@@ -39,6 +39,10 @@ class BaseAppTest(unittest.TestCase):
         os.environ["DATABASE_URL"] = cls.test_database_url
         os.environ["SECRET_KEY"] = os.environ.get("SECRET_KEY", "week1-test-secret")
         os.environ["PAYMENT_BACKEND"] = "stub"
+        # Rate-limit counters live in Redis and persist across the whole
+        # suite, so a run of auth-heavy tests would exhaust the window and
+        # start returning 429 instead of exercising the endpoint.
+        os.environ["RATE_LIMIT_ENABLED"] = "false"
 
         for module_name in list(sys.modules):
             if module_name == "app" or module_name.startswith("app."):

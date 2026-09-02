@@ -96,6 +96,65 @@ class RateLimitEvictionTest(unittest.TestCase):
         self.assertNotIn("auth:198.51.100.2", rate_limit._requests)
 
 
+class SharedRateLimitTest(unittest.TestCase):
+    """Counters must be shared across instances. Production runs two servers, so
+    a per-process dict meant the effective limit was a multiple of the
+    configured one, and every deploy reset it."""
+
+    def setUp(self) -> None:
+        from unittest.mock import patch
+
+        from app.config import settings as app_settings
+        from app.core import rate_limit
+
+        self.rate_limit = rate_limit
+        rate_limit._requests.clear()
+        # The suite disables the limiter (Redis counters persist across it), so
+        # turn it back on for the tests that exist to exercise it.
+        enabled = patch.object(app_settings, "RATE_LIMIT_ENABLED", True)
+        enabled.start()
+        self.addCleanup(enabled.stop)
+
+    def test_redis_is_preferred_when_available(self) -> None:
+        from unittest.mock import patch
+
+        calls = []
+
+        def fake_check(key, max_requests, now, window):
+            calls.append(key)
+            return True
+
+        with patch.object(self.rate_limit, "_check_redis", side_effect=fake_check):
+            dep = self.rate_limit.rate_limit_dependency("auth", 5)
+            dep(_FakeRequest({"x-forwarded-for": "8.8.8.8"}, peer="10.0.0.1"))
+
+        self.assertEqual(calls, ["ratelimit:auth:8.8.8.8"])
+        # Nothing should have been recorded in the per-process fallback.
+        self.assertEqual(len(self.rate_limit._requests), 0)
+
+    def test_falls_back_to_memory_when_redis_cannot_answer(self) -> None:
+        """A Redis blip must not take sign-in down with it."""
+        from unittest.mock import patch
+
+        with patch.object(self.rate_limit, "_check_redis", return_value=None):
+            dep = self.rate_limit.rate_limit_dependency("auth", 2)
+            req = _FakeRequest({"x-forwarded-for": "8.8.8.8"}, peer="10.0.0.1")
+            dep(req)
+            dep(req)
+            with self.assertRaises(Exception) as ctx:
+                dep(req)
+        self.assertEqual(getattr(ctx.exception, "status_code", None), 429)
+
+    def test_the_limit_is_enforced_per_caller(self) -> None:
+        from unittest.mock import patch
+
+        with patch.object(self.rate_limit, "_check_redis", return_value=None):
+            dep = self.rate_limit.rate_limit_dependency("auth", 1)
+            dep(_FakeRequest({"x-forwarded-for": "8.8.8.8"}, peer="10.0.0.1"))
+            # A different caller behind the same proxy must not be blocked by it.
+            dep(_FakeRequest({"x-forwarded-for": "1.1.1.1"}, peer="10.0.0.1"))
+
+
 class UploadLimitTest(BaseAppTest):
     def test_oversized_upload_is_refused_while_streaming(self) -> None:
         """`await upload.read()` with no argument buffers the whole body before

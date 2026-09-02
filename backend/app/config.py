@@ -112,6 +112,10 @@ class Settings(BaseSettings):
     # A staff booking must start at least this far in the future (24h to approve
     # + 24h to pay needs lead time).
     STAFF_BOOKING_MIN_ADVANCE_HOURS: int = 48
+    # Off switch. Tests disable it because counters now live in Redis and
+    # therefore persist across the whole suite; it is also the lever to pull
+    # if the limiter ever misfires in production.
+    RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_WINDOW_SECONDS: int = 60
     AUTH_RATE_LIMIT_MAX_REQUESTS: int = 20
     BOOKING_RATE_LIMIT_MAX_REQUESTS: int = 30
