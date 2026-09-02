@@ -26,8 +26,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from tests.base import BaseAppTest
 
 
-class AvailabilityGuaranteesTest(BaseAppTest):
-    # ---------------------------------------------------------------- helpers
+class _RoomFactory:
+    """Shared room builder for the classes below."""
 
     def _create_room(self, name: str) -> str:
         from app.models.room import Room
@@ -45,6 +45,10 @@ class AvailabilityGuaranteesTest(BaseAppTest):
             db.commit()
             db.refresh(room)
             return str(room.id)
+
+
+class AvailabilityGuaranteesTest(_RoomFactory, BaseAppTest):
+    # ---------------------------------------------------------------- helpers
 
     def _window(self):
         from app.services.booking_service.core import get_booking_window_hours
@@ -241,3 +245,85 @@ class AvailabilityGuaranteesTest(BaseAppTest):
         room_id = self._create_room("Publicly Listed Room")
         listed = {r["id"] for r in self.client.get("/api/rooms").json()}
         self.assertIn(room_id, listed)
+
+
+class AvailabilityCanaryTest(_RoomFactory, BaseAppTest):
+    """The tests above run before a deploy. This runs in production.
+
+    Tests cannot catch bad data, a config change, or a room deactivated by
+    hand — so /ready carries a warning when bookable rooms exist and yet
+    nothing at all can be booked.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        from app import main
+
+        main._availability_canary["checked_at"] = 0.0
+        main._availability_canary["warning"] = None
+
+    def test_silent_while_customers_can_book(self) -> None:
+        from app import main
+
+        self._create_room("Canary Quiet Room")
+        self.assertIsNone(main.availability_warning())
+
+        body = self.client.get("/ready").json()
+        self.assertEqual(body["status"], "ready")
+        for warning in body.get("warnings", []):
+            self.assertNotIn("availability", warning.lower())
+
+    def test_warns_when_rooms_exist_but_nothing_is_bookable(self) -> None:
+        """The exact production symptom: a calendar customers cannot book from."""
+        from unittest.mock import patch
+
+        from app import main
+
+        self._create_room("Canary Alarm Room")
+
+        def all_closed(db, month, room_id=None):
+            return {
+                "month": month,
+                "total_rooms": 3,
+                "days": {f"{month}-{d:02d}": {"status": "full", "open_rooms": 0, "total_rooms": 3}
+                         for d in range(1, 29)},
+            }
+
+        with patch(
+            "app.services.booking_service.core.get_monthly_availability_summary",
+            side_effect=all_closed,
+        ):
+            warning = main.availability_warning()
+
+        self.assertIsNotNone(warning, "an unbookable calendar must raise a warning")
+        self.assertIn("cannot book", warning)
+
+    def test_the_canary_never_breaks_ready(self) -> None:
+        """A monitoring aid that can take the service down is worse than none."""
+        from unittest.mock import patch
+
+        from app import main
+
+        with patch(
+            "app.services.booking_service.core.get_monthly_availability_summary",
+            side_effect=RuntimeError("database on fire"),
+        ):
+            warning = main.availability_warning()
+            resp = self.client.get("/ready")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["status"], "ready")
+        self.assertIn("could not run", warning)
+
+    def test_a_zero_availability_warning_does_not_flip_the_verdict(self) -> None:
+        """An empty calendar is serious, but the service is still up. Marking it
+        degraded would restart a healthy container without fixing anything."""
+        from unittest.mock import patch
+
+        from app import main
+
+        with patch.object(main, "availability_warning", return_value="nothing is bookable"):
+            body = self.client.get("/ready").json()
+
+        self.assertEqual(body["status"], "ready")
+        self.assertIn("nothing is bookable", body["warnings"])

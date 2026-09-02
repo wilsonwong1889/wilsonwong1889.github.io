@@ -1,5 +1,6 @@
 import os
 import secrets
+from typing import Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -417,6 +418,63 @@ def sitemap_xml():
     )
 
 
+# Availability canary.
+#
+# The booking calendar once showed "0 slots" on every day of every month while
+# the API had real availability, and nothing noticed until a person looked. The
+# tests now cover that shape, but tests only run before a deploy — this catches
+# the same symptom in production, whatever causes it: bad data, a config change,
+# a room accidentally deactivated.
+#
+# Cached, because /ready is polled continuously and this reads the month.
+_AVAILABILITY_CANARY_TTL_SECONDS = 300
+_availability_canary: dict = {"checked_at": 0.0, "warning": None}
+
+
+def availability_warning() -> Optional[str]:
+    """A warning when bookable rooms exist but nobody could book anything."""
+    now = time_request()
+    cached = _availability_canary
+    if cached["checked_at"] and (now - cached["checked_at"]) < _AVAILABILITY_CANARY_TTL_SECONDS:
+        return cached["warning"]
+
+    warning = None
+    try:
+        from datetime import date
+
+        from app.database import SessionLocal
+        from app.services.booking_service.core import get_monthly_availability_summary
+
+        with SessionLocal() as db:
+            today = date.today()
+            # This month and the next: late in a month the remaining days can
+            # legitimately all be closed, which is not a fault.
+            months = [f"{today.year:04d}-{today.month:02d}"]
+            nxt = (today.month % 12) + 1
+            months.append(f"{today.year + (1 if nxt == 1 else 0):04d}-{nxt:02d}")
+
+            total_rooms = 0
+            open_days = 0
+            for month in months:
+                summary = get_monthly_availability_summary(db, month)
+                total_rooms = max(total_rooms, summary["total_rooms"])
+                open_days += sum(
+                    1 for day in summary["days"].values() if day.get("open_rooms", 0) > 0
+                )
+
+            if total_rooms > 0 and open_days == 0:
+                warning = (
+                    f"No bookable availability found across the next two months "
+                    f"for {total_rooms} active room(s) - customers cannot book anything"
+                )
+    except Exception as exc:  # noqa: BLE001 - a canary must never break /ready
+        warning = f"Availability check could not run: {type(exc).__name__}"
+
+    _availability_canary["checked_at"] = now
+    _availability_canary["warning"] = warning
+    return warning
+
+
 @app.api_route("/metrics", methods=["GET", "HEAD"], include_in_schema=False)
 def metrics(authorization: str = Header(default="")):
     """Operational counters, behind a shared secret.
@@ -532,10 +590,21 @@ def ready():
     # degraded and start restarting a healthy container. It does mean the site
     # takes no real money, which is worth saying out loud where someone
     # debugging payments would actually look.
+    warnings: list[str] = []
     if settings.APP_ENV == "production" and paypal_status["paypal_requested"]:
         if not paypal_status["paypal_takes_real_payments"]:
-            payload["warnings"] = [
+            warnings.append(
                 "PayPal is in sandbox mode on a production deployment - "
                 "checkout completes but no real payment is taken"
-            ]
+            )
+
+    # Deliberately a warning, not a check: an empty calendar is a serious
+    # problem but the service is still up, and flipping a healthy container to
+    # degraded would restart it without fixing anything.
+    availability = availability_warning()
+    if availability:
+        warnings.append(availability)
+
+    if warnings:
+        payload["warnings"] = warnings
     return payload

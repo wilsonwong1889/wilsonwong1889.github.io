@@ -39,6 +39,12 @@ class BaseAppTest(unittest.TestCase):
         os.environ["DATABASE_URL"] = cls.test_database_url
         os.environ["SECRET_KEY"] = os.environ.get("SECRET_KEY", "week1-test-secret")
         os.environ["PAYMENT_BACKEND"] = "stub"
+        # Route uploads to the local media directory. Without this the suite
+        # inherits the real Supabase credentials from .env and writes test
+        # images into the production bucket — and fails outright whenever that
+        # host is unreachable, which kept CI permanently red.
+        os.environ["SUPABASE_SERVICE_KEY"] = ""
+        os.environ["SUPABASE_STORAGE_BUCKET"] = ""
         # Rate-limit counters live in Redis and persist across the whole
         # suite, so a run of auth-heavy tests would exhaust the window and
         # start returning 429 instead of exercising the endpoint.
