@@ -883,11 +883,18 @@ def get_monthly_availability_summary(
     month_start_dt = datetime.combine(date(year, month_num, 1), time.min, tzinfo=business_tz).astimezone(timezone.utc)
     month_end_dt = datetime.combine(date(year, month_num, days_in_month), time.max, tzinfo=business_tz).astimezone(timezone.utc)
 
+    # Join Booking and honour its status, matching what the single-day endpoint
+    # counts. Cancelling releases the slot rows, so in practice both agree — but
+    # if a row ever outlives its booking, the two views would disagree and this
+    # one would quietly hide hours that are actually free. Availability should
+    # only ever disappear because someone booked it.
     booked_rows = (
         db.query(BookingSlot.room_id, BookingSlot.slot_start)
+        .join(Booking, Booking.id == BookingSlot.booking_id)
         .filter(BookingSlot.room_id.in_(active_room_ids))
         .filter(BookingSlot.slot_start >= month_start_dt)
         .filter(BookingSlot.slot_start <= month_end_dt)
+        .filter(Booking.status.in_(ACTIVE_BOOKING_STATUSES))
         .all()
     )
 
