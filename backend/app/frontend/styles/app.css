@@ -13211,11 +13211,33 @@ button.avail-cal-day:focus-visible {
     justify-content: flex-start;
   }
   body[data-page]:not([data-page="account"]) .home-utility-inner {
-    gap: 10px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px 12px;
     padding: 10px 0;
   }
   body[data-page]:not([data-page="account"]) .home-contact-list {
+    grid-row: 1;
+    grid-column: 1 / -1;
     gap: 6px 14px;
+  }
+  /* 1b ── Social links, restored on mobile. They were hidden at <=720px back
+     when they pointed at /contact and led nowhere; they now go to the real
+     accounts. The actions row uses barely half the available width, so the
+     icons sit beside the buttons and cost no extra height. */
+  body[data-page]:not([data-page="account"]) .home-utility-actions {
+    grid-row: 2;
+    grid-column: 1;
+  }
+  body[data-page]:not([data-page="account"]) .home-utility-social {
+    display: flex;
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: end;
+  }
+  body[data-page]:not([data-page="account"]) .home-social-link {
+    display: inline-flex;
   }
   body[data-page]:not([data-page="account"]) .home-contact-item,
   body[data-page]:not([data-page="account"]) .home-contact-item span {
