@@ -13,10 +13,21 @@ async function request(path, options = {}) {
     headers.set("Authorization", `Bearer ${state.token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (cause) {
+    // fetch only rejects when the request never completed — offline, DNS,
+    // a dropped connection. The raw "Failed to fetch" means nothing to a
+    // visitor, so say what actually happened and what to do about it.
+    throw new Error(
+      "Could not reach the server. Check your internet connection and try again.",
+      { cause },
+    );
+  }
 
   const contentType = response.headers.get("content-type") || "";
   const data = contentType.includes("application/json")

@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { attachAllPhotoLimits } from "./upload-limits.js";
 import { CURRENT_PAGE, getSearchParam } from "./config.js";
 import { todayISO } from "./date-utils.js";
 import {
@@ -925,5 +926,8 @@ initStaffDashboardView();
 renderApp(state);
 resetScopedData();
 initRevealAnimations();
+// State the size limit under every photo picker, and flag an over-sized file
+// the moment it is chosen rather than after a failed upload.
+attachAllPhotoLimits();
 await loadHealth();
 await refreshSession("Frontend ready.");

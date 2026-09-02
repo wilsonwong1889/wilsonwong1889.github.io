@@ -7466,6 +7466,28 @@ body[data-page="admin"] .site-acknowledgement {
   display: none !important;
 }
 
+/* Upload limits, stated under the file picker rather than discovered on
+   failure. The error is announced (role="alert") so screen readers hear it the
+   moment an over-sized file is chosen. */
+.upload-hint {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.upload-error {
+  margin: 6px 0 0;
+  padding: 8px 11px;
+  border-left: 3px solid var(--brand-red);
+  border-radius: 0 5px 5px 0;
+  background: rgba(215, 25, 32, 0.08);
+  color: var(--brand-red-deep);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
 .sr-only {
   position: absolute !important;
   width: 1px !important;

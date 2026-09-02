@@ -182,5 +182,46 @@ class DecompressionBombTest(BaseAppTest):
         self.assertTrue(out.startswith(b"\xff\xd8"), "expected JPEG magic bytes")
 
 
+class UploadLimitIsStatedToTheUserTest(BaseAppTest):
+    def test_frontend_limit_matches_the_server_limit(self) -> None:
+        """The page tells people the maximum before they pick a file. If that
+        number drifts from the one the server enforces, we either promise more
+        than we accept or refuse uploads we said were fine."""
+        import re
+
+        from app.core.image_utils import MAX_PHOTO_BYTES
+
+        js = self.client.get("/assets/js/upload-limits.js").text
+        match = re.search(r"MAX_PHOTO_MB\s*=\s*(\d+)", js)
+        self.assertIsNotNone(match, "MAX_PHOTO_MB not found in upload-limits.js")
+        self.assertEqual(int(match.group(1)) * 1024 * 1024, MAX_PHOTO_BYTES)
+
+    def test_the_limit_helper_is_actually_loaded(self) -> None:
+        """A helper nobody imports states the limit to nobody."""
+        main_js = self.client.get("/assets/js/main.js").text
+        self.assertIn("upload-limits.js", main_js)
+        self.assertIn("attachAllPhotoLimits", main_js)
+
+    def test_server_rejection_names_the_limit(self) -> None:
+        """The message travels to the browser through FastAPI's `detail`, so it
+        has to read as a sentence rather than an error code."""
+        import asyncio
+
+        from fastapi import HTTPException
+
+        from app.core.image_utils import MAX_PHOTO_BYTES, read_upload_within_limit
+
+        class _Upload:
+            async def read(self, size=-1):
+                return b"\0" * (1024 * 1024)
+
+        with self.assertRaises(HTTPException) as ctx:
+            asyncio.get_event_loop().run_until_complete(
+                read_upload_within_limit(_Upload(), max_bytes=1024)
+            )
+        self.assertEqual(ctx.exception.status_code, 413)
+        self.assertIn("MB or smaller", ctx.exception.detail)
+
+
 if __name__ == "__main__":
     unittest.main()
